@@ -22,5 +22,17 @@
     "shared/src/test/java/com/shilapi/xcertplay/network/",
     "shared/src/test/java/com/shilapi/xcertplay/orchestration/",
     "shared/src/test/java/com/shilapi/xcertplay/transport/"
-  ]
+  ],
+  "reviewed_resolutions": {
+    "shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt": {
+      "baseline": "4bccb39f7b866497d289cc26c4ce324585156e93",
+      "upstream_blob": "a77ed0171736d95fa6d1e5c69b8a5ba046a621b3",
+      "merged_blob": "de4be469051045b3207ef91bdeddc9cde7faf568"
+    },
+    "shared/src/main/java/com/shilapi/xcertplay/media/MicrophoneUplink.kt": {
+      "baseline": "4bccb39f7b866497d289cc26c4ce324585156e93",
+      "upstream_blob": "449219fc00a06a5c31a8782694aca390ff1602a7",
+      "merged_blob": "9fe7791a776b943d16fc72004d5588c6003a53e9"
+    }
+  }
 }

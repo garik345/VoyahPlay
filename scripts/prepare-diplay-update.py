@@ -40,7 +40,21 @@ def main():
     blocked = [p for p in selected if Path(p).suffix.lower() in {'.pk8','.p7b','.pem','.key','.p12','.pfx','.jks','.keystore','.apk','.aab'}]
     if blocked:
         raise SystemExit('Forbidden file types in upstream scope: ' + ', '.join(blocked))
-    patch = git('diff', '--binary', '--full-index', '--no-renames', base, target, '--', *prefixes).stdout
+    # A reviewed manual resolution is reusable only for the exact baseline,
+    # incoming blob and committed local blob. No path is excluded unconditionally.
+    resolved = []
+    for path, resolution in config.get('reviewed_resolutions', {}).items():
+        if path not in selected or resolution.get('baseline') != base:
+            continue
+        incoming = git('rev-parse', '--verify', f'{target}:{path}', check=False)
+        local = git('rev-parse', '--verify', f'HEAD:{path}', check=False)
+        if incoming.returncode or local.returncode:
+            continue
+        if (incoming.stdout.decode().strip() == resolution.get('upstream_blob') and
+                local.stdout.decode().strip() == resolution.get('merged_blob')):
+            resolved.append(path)
+    pathspecs = [*prefixes, *[':(exclude,literal)' + path for path in resolved]]
+    patch = git('diff', '--binary', '--full-index', '--no-renames', base, target, '--', *pathspecs).stdout
     conflicts = []
     with tempfile.TemporaryDirectory(prefix='voyah-upstream-') as tmp:
         env = dict(os.environ, GIT_INDEX_FILE=str(Path(tmp)/'index'))
@@ -52,12 +66,14 @@ def main():
                 if not conflicts:
                     conflicts = ['Patch could not be applied; inspect upstream.patch manually.']
         candidate = b'' if conflicts else git('diff', '--cached', '--binary', '--full-index', env=env).stdout
-    status = 'conflict' if conflicts else ('ready' if patch else 'no-scoped-changes')
+    status = 'conflict' if conflicts else ('ready' if selected else 'no-scoped-changes')
     lines = ['# DiPlay → VoyahPlay: review required', '', f'Baseline: `{base}`', f'Target: `{target}`',
              f'Status: **{status}**', '',
              'This is a scoped update, not a complete upstream merge. Never auto-merge it.',
              'Excluded files may contain required dependencies, Gradle changes or UI integration.', '',
-             '## Selected paths', '', *[f'- `{p}`' for p in selected], '', '## Conflicts', '',
+             '## Selected paths', '', *[f'- `{p}`' for p in selected], '',
+             '## Verified manual resolutions (exact blob match; kept unchanged)', '',
+             *[f'- `{p}`' for p in resolved], '', '## Conflicts', '',
              *[f'- `{p}`' for p in conflicts], '', '## Changes outside the automatic scope', '',
              *[f'- `{p}`' for p in excluded], '', '## Before merging', '',
              '- [ ] Resolve conflicts and inspect changes outside scope for dependencies.',

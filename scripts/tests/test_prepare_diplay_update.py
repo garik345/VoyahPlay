@@ -89,5 +89,38 @@ class UpdateTest(unittest.TestCase):
         self.assertEqual(self.file.read_text(),'upstream\n')
         self.assertEqual(json.loads(self.config.read_text())['baseline'],self.target)
 
+    def test_reviewed_resolution_preserves_customization(self):
+        self.file.write_text('upstream + Voyah customization\n')
+        self.git('add','.'); self.git('commit','-qm','manual resolution')
+        config=json.loads(self.config.read_text())
+        path=PREFIX+'Sample.kt'
+        config['reviewed_resolutions']={path:{
+            'baseline':self.base,
+            'upstream_blob':self.git('rev-parse',self.target+':'+path).strip(),
+            'merged_blob':self.git('rev-parse','HEAD:'+path).strip()}}
+        self.config.write_text(json.dumps(config))
+        self.git('add','.'); self.git('commit','-qm','reviewed hashes')
+        result=self.run_update()
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('**ready**',result.stdout)
+        self.assertEqual(self.file.read_text(),'upstream + Voyah customization\n')
+        self.assertEqual(json.loads(self.config.read_text())['baseline'],self.target)
+
+    def test_wrong_resolution_hash_does_not_bypass_conflict(self):
+        self.file.write_text('different customization\n')
+        config=json.loads(self.config.read_text())
+        path=PREFIX+'Sample.kt'
+        config['reviewed_resolutions']={path:{
+            'baseline':self.base,
+            'upstream_blob':self.git('rev-parse',self.target+':'+path).strip(),
+            'merged_blob':'0'*40}}
+        self.config.write_text(json.dumps(config))
+        self.git('add','.'); self.git('commit','-qm','mismatched review')
+        result=self.run_update()
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('**conflict**',result.stdout)
+        self.assertEqual(self.file.read_text(),'different customization\n')
+        self.assertEqual(json.loads(self.config.read_text())['baseline'],self.base)
+
 if __name__ == '__main__':
     unittest.main()
