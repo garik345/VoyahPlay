@@ -62,7 +62,7 @@ jobs:
           REVIEW_STATUS: ${{ steps.prepare.outputs.status }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          branch="automation/diplay-${UPSTREAM_SHA:0:12}"
+          branch="automation/diplay-${UPSTREAM_SHA:0:12}-${GITHUB_SHA:0:8}"
           existing=$(gh pr list --state all --head "$branch" --json number --jq 'length')
           if [ "$existing" -gt 0 ]; then
             echo 'This upstream commit already has a review PR; no branch was overwritten.' >> "$GITHUB_STEP_SUMMARY"
