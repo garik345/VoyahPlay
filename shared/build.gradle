@@ -1,0 +1,64 @@
+plugins {
+    id 'com.android.library'
+}
+// Optional explicit alternative for hosts where GNU Make cannot run. The supplied
+// libraries must be built from this checkout with scripts/build-voyah-native.sh.
+def voyahPrebuiltJniDir = providers.gradleProperty('voyahPrebuiltJniDir').orNull
+android {
+    namespace = 'com.shilapi.xcertplay.shared'
+    compileSdk = 37
+
+    defaultConfig {
+        minSdk = 28
+        targetSdk = 37
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+
+        externalNativeBuild {
+            ndkBuild {
+                arguments 'APP_PLATFORM=android-28'
+            }
+        }
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    ndkVersion = '28.2.13676358'
+    if (voyahPrebuiltJniDir == null) {
+        externalNativeBuild {
+            ndkBuild {
+                path = file('src/main/jni/Android.mk')
+            }
+        }
+    } else {
+        sourceSets.main.jniLibs.srcDir(file(voyahPrebuiltJniDir))
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+if (voyahPrebuiltJniDir != null) {
+    def nativeInputs = files(['arm64-v8a', 'armeabi-v7a', 'x86_64'].collectMany { abi ->
+        ['xcertplay_i2c', 'local_hotspot_radio'].collect { name ->
+            file("${voyahPrebuiltJniDir}/${abi}/lib${name}.so")
+        }
+    })
+    def verifyVoyahNative = tasks.register('verifyVoyahNative') {
+        inputs.files(nativeInputs)
+        doLast {
+            if (!nativeInputs.files.every { it.isFile() && it.length() > 0 }) {
+                throw new GradleException('Missing native libraries; run scripts/build-voyah-native.sh')
+            }
+        }
+    }
+    tasks.named('preBuild') { dependsOn(verifyVoyahNative) }
+}
+dependencies {
+    implementation libs.androidx.app
+    implementation libs.bouncycastle
+    implementation libs.jmdns
+    testImplementation libs.junit
+    testImplementation 'org.robolectric:robolectric:4.17'
+}

@@ -1,0 +1,57 @@
+
+# ===== Android / Gradle =====
+.gradle/
+**/build/
+local.properties
+.externalNativeBuild/
+.cxx/
+captures/
+*.apk
+*.aab
+*.apks
+*.hprof
+
+# ===== IDE =====
+.idea/
+.vscode/settings.json
+*.iml
+.DS_Store
+Thumbs.db
+
+# ===== Локальные настройки и секреты =====
+.env
+.env.*
+!.env.example
+secrets/
+private/
+credentials/
+local-auth/
+
+# ===== Подписи Android =====
+keystore.properties
+signing.properties
+key.properties
+google-services.json
+
+# ===== Логи и отчёты =====
+*.log
+*.trace
+gitleaks-report.*
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== Python scripts =====
+__pycache__/
+.venv/
+*.pyc
+
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+.externalNativeBuild/
+.cxx/
+
+# Security reports
+gitleaks-report.*
