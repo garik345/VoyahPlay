@@ -1990,6 +1990,12 @@ class CarPlayHostActivity : ComponentActivity() {
             setOnClickListener { AppLocale.showPicker(this@CarPlayHostActivity) }
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
 
+        content.addView(Button(this).apply {
+            text = "Voyah: тесты и диагностика"
+            isAllCaps = false
+            setOnClickListener { com.shilapi.xcertplay.voyah.VoyahNavigationTest.show(this@CarPlayHostActivity) }
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+
         val gestureButton = Button(this).apply {
             isAllCaps = false
             setOnClickListener {
@@ -4809,6 +4815,17 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // Android 11 OEM SystemUI may also consume the legacy visibility flags.
+        // Respect separate status/navigation preferences and multi-window behavior.
+        if (android.os.Build.VERSION.SDK_INT <= 30) {
+            val managed = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            var flags = window.decorView.systemUiVisibility and managed.inv()
+            if (hideTop) flags = flags or View.SYSTEM_UI_FLAG_FULLSCREEN
+            if (hideBottom) flags = flags or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            if (hideTop || hideBottom) flags = flags or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            window.decorView.systemUiVisibility = flags
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()

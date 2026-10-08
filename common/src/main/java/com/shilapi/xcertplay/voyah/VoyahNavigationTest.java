@@ -26,7 +26,10 @@ public final class VoyahNavigationTest {
         boolean enabled=com.shilapi.xcertplay.hud.VoyahTrackOutput.enabled(activity);
         new AlertDialog.Builder(activity).setTitle("Приборная панель Voyah")
             .setItems(new String[]{"Текст без стрелки", "Стрелка по коду (0–31)", "Нижняя строка: входящий звонок", "Нижняя строка: разговор",
-                "Тест бегущей строки", "Названия треков: "+(enabled?"включены":"выключены"), "Записать данные навигации (2 мин)", "Остановить и поделиться записью", "Настройки бегущей строки", "Знаки скорости: прочитать TSR / ISA"}, (dialog,which)->{
+                "Тест бегущей строки", "Названия треков: "+(enabled?"включены":"выключены"), "Записать данные навигации (2 мин)", "Остановить и поделиться записью", "Настройки бегущей строки", "Знаки скорости: прочитать TSR / ISA", "Сиденья, руль, свет, ароматизатор: запись", "Микрофон: выбор входа", "Экран: состояние системных панелей"}, (dialog,which)->{
+                if(which==12) { VoyahDisplayDiagnostics.show(activity); return; }
+                if(which==11) { microphoneSettings(activity); return; }
+                if(which==10) { VoyahComfortTest.show(activity); return; }
                 if(which==9) { VoyahSignStateTest.show(activity); return; }
                 if(which==8) { scrollSettings(activity); return; }
                 if(which==6) {
@@ -129,6 +132,16 @@ public final class VoyahNavigationTest {
                 " Через 10 секунд будет отправлено завершение. Тест может заменить текущую навигационную подсказку.")
             .setNegativeButton("Отмена",null)
             .setPositiveButton("Начать тест",(dialog,which)->start(activity,arrowCode)).show();
+    }
+    private static void microphoneSettings(Activity activity) {
+        android.content.SharedPreferences prefs=activity.getSharedPreferences("voyah_vehicle",Context.MODE_PRIVATE);
+        new AlertDialog.Builder(activity).setTitle("Вход микрофона CarPlay")
+            .setSingleChoiceItems(new String[]{"Выбор Android (по умолчанию)","Предпочитать встроенный микрофон"},
+                prefs.getBoolean("prefer_builtin_mic",false)?1:0,(d,w)->{
+                    prefs.edit().putBoolean("prefer_builtin_mic",w==1).apply();
+                    android.widget.Toast.makeText(activity,"Применится при следующем запуске Siri или звонка. Настройка действует для USB и Wi-Fi.",android.widget.Toast.LENGTH_LONG).show();
+                    d.dismiss();
+                }).setNegativeButton("Закрыть",null).show();
     }
     private static void start(Activity activity,int arrowCode) {
         if(!BUSY.compareAndSet(false,true)) {

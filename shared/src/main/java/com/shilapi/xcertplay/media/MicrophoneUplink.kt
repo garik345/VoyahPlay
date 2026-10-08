@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.media
 
 import android.media.AudioFormat as AndroidAudioFormat
+import android.media.AudioDeviceInfo
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class MicrophoneUplink(
     private val config: MicrophoneConfig,
     private val onDiagnostic: (String) -> Unit = {},
+    private val preferredDevice: AudioDeviceInfo? = null,
 ) : Closeable {
     private val running = AtomicBoolean(false)
     private val stats = MicrophoneCaptureStats(config, report = { message ->
@@ -102,6 +104,12 @@ internal class MicrophoneUplink(
             nextEncoder?.close()
             running.set(false)
             return false
+        }
+
+        preferredDevice?.let { device ->
+            // Per-recorder preference only; never changes global audio routing.
+            val accepted = runCatching { nextRecorder.setPreferredDevice(device) }.getOrDefault(false)
+            runCatching { onDiagnostic("Microphone: preferredInputType=${device.type} accepted=$accepted") }
         }
 
         val nextSocket = try {

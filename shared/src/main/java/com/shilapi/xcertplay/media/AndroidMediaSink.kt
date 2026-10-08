@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.media
 
 import android.content.Context
+import android.media.AudioDeviceInfo
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioFormat as AndroidAudioFormat
@@ -292,7 +293,15 @@ class AndroidMediaSink(
         // This callback runs on the downlink thread; microphone failures must not stop playback.
         try {
             if (config.audioType == "telephony") enterCommunicationMode(id)
-            val uplink = microphoneUplinks.computeIfAbsent(id) { MicrophoneUplink(config, onAudioDiagnostic) }
+            val uplink = microphoneUplinks.computeIfAbsent(id) {
+                val inputs = runCatching { audioManager?.getDevices(AudioManager.GET_DEVICES_INPUTS)?.toList().orEmpty() }
+                    .getOrDefault(emptyList())
+                val preferBuiltin = appContext?.getSharedPreferences("voyah_vehicle", Context.MODE_PRIVATE)
+                    ?.getBoolean("prefer_builtin_mic", false) == true
+                val preferred = if (preferBuiltin) inputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC } else null
+                runCatching { onAudioDiagnostic("Microphone: inputTypes=${inputs.map { it.type }} preferBuiltin=$preferBuiltin builtinFound=${preferred != null}") }
+                MicrophoneUplink(config, onAudioDiagnostic, preferred)
+            }
             if (!uplink.start()) {
                 microphoneUplinks.remove(id, uplink)
                 restoreAudioMode(id)

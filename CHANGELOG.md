@@ -1,3 +1,11 @@
+## VoyahPlay 0.1.15 (2026-10-08)
+
+- Read-only two-minute comfort snapshots: seats, steering wheel heat, lights and fragrance.
+- Optional preferred built-in microphone input and input-device diagnostics (USB issue not yet confirmed fixed).
+- Android 11 legacy immersive compatibility and window-insets diagnostics.
+- Documented nine-button layout and descending level cycle; control panel still pending state validation.
+- README includes VoyahTune seat, fragrance and lighting references and vehicle test procedure.
+
 # DiPlay 0.2.13 — 2026-10-06
 
 - Enable the legacy Android 9 Wi-Fi Direct group path with generated credentials and serialized ownership/cleanup; requested frequency remains unverified on Android 9 (#282).
