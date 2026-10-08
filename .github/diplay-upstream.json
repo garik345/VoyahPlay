@@ -1,0 +1,26 @@
+{
+  "repository": "shihabal3amri/diplay",
+  "branch": "main",
+  "baseline": "4bccb39f7b866497d289cc26c4ce324585156e93",
+  "paths": [
+    "shared/src/main/java/com/shilapi/xcertplay/airplay/",
+    "shared/src/main/java/com/shilapi/xcertplay/compat/",
+    "shared/src/main/java/com/shilapi/xcertplay/iap2/",
+    "shared/src/main/java/com/shilapi/xcertplay/location/",
+    "shared/src/main/java/com/shilapi/xcertplay/media/",
+    "shared/src/main/java/com/shilapi/xcertplay/mfi/",
+    "shared/src/main/java/com/shilapi/xcertplay/network/",
+    "shared/src/main/java/com/shilapi/xcertplay/orchestration/",
+    "shared/src/main/java/com/shilapi/xcertplay/transport/",
+    "shared/src/main/jni/",
+    "shared/src/test/java/com/shilapi/xcertplay/airplay/",
+    "shared/src/test/java/com/shilapi/xcertplay/compat/",
+    "shared/src/test/java/com/shilapi/xcertplay/iap2/",
+    "shared/src/test/java/com/shilapi/xcertplay/location/",
+    "shared/src/test/java/com/shilapi/xcertplay/media/",
+    "shared/src/test/java/com/shilapi/xcertplay/mfi/",
+    "shared/src/test/java/com/shilapi/xcertplay/network/",
+    "shared/src/test/java/com/shilapi/xcertplay/orchestration/",
+    "shared/src/test/java/com/shilapi/xcertplay/transport/"
+  ]
+}

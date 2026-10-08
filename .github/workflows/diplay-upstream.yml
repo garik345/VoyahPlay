@@ -1,0 +1,98 @@
+name: DiPlay upstream review
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1' # Monday 08:17 Moscow (UTC+3)
+permissions:
+  contents: read
+concurrency:
+  group: diplay-upstream-review
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'garik345/VoyahPlay'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      candidate: ${{ steps.publish.outputs.candidate }}
+      status: ${{ steps.prepare.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test scoped update mechanism
+        run: python3 -m unittest discover -s scripts/tests -p 'test_prepare_diplay_update.py' -v
+      - name: Check public source before preparing an update
+        run: python3 scripts/check_public_tree.py
+      - name: Keep an existing review branch untouched
+        id: pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          count=$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("automation/diplay-"))] | length')
+          if [ "$count" -gt 0 ]; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            echo 'An upstream review PR is already open. It has not been overwritten.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Fetch public upstream
+        if: steps.pending.outputs.skip != 'true'
+        id: fetch
+        run: |
+          git fetch --no-tags https://github.com/shihabal3amri/diplay.git main:refs/remotes/diplay/main
+          target=$(git rev-parse refs/remotes/diplay/main)
+          baseline=$(python3 -c 'import json; print(json.load(open(".github/diplay-upstream.json"))["baseline"])')
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          if [ "$target" = "$baseline" ]; then echo 'skip=true' >> "$GITHUB_OUTPUT"; fi
+      - name: Prepare three-way scoped patch without running upstream code
+        if: steps.pending.outputs.skip != 'true' && steps.fetch.outputs.skip != 'true'
+        id: prepare
+        run: python3 scripts/prepare-diplay-update.py
+      - name: Create a draft pull request
+        if: steps.prepare.outputs.target != ''
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPSTREAM_SHA: ${{ steps.prepare.outputs.target }}
+          REVIEW_STATUS: ${{ steps.prepare.outputs.status }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          branch="automation/diplay-${UPSTREAM_SHA:0:12}"
+          existing=$(gh pr list --state all --head "$branch" --json number --jq 'length')
+          if [ "$existing" -gt 0 ]; then
+            echo 'This upstream commit already has a review PR; no branch was overwritten.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- shared/src .github/diplay-upstream.json docs/DIPLAY-UPSTREAM-REVIEW.md
+          python3 scripts/check_public_tree.py
+          git diff --cached --check
+          git commit -m "Review DiPlay ${UPSTREAM_SHA:0:12}: $REVIEW_STATUS"
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create --draft --base "$BASE_BRANCH" --head "$branch" \
+            --title "DiPlay ${UPSTREAM_SHA:0:12}: $REVIEW_STATUS" \
+            --body-file docs/DIPLAY-UPSTREAM-REVIEW.md
+          echo "candidate=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Created draft PR for $branch. Hardware verification and dependency review are required." >> "$GITHUB_STEP_SUMMARY"
+      - name: Save review and upstream patch
+        if: always() && steps.prepare.outputs.target != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: diplay-upstream-review
+          path: ${{ runner.temp }}/voyah-upstream-review/
+  validate:
+    needs: prepare
+    if: needs.prepare.outputs.candidate != '' && needs.prepare.outputs.status == 'ready'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/android.yml
+    with:
+      source_ref: ${{ needs.prepare.outputs.candidate }}
