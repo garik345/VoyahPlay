@@ -24,6 +24,7 @@ public final class VoyahDisplayDiagnostics {
         new AlertDialog.Builder(a).setTitle("Системные панели: снимок окна").setMessage(report)
             .setPositiveButton("Скопировать",(d,w)->((ClipboardManager)a.getSystemService(Context.CLIPBOARD_SERVICE))
                 .setPrimaryClip(ClipData.newPlainText("VoyahPlay window",report)))
+            .setNeutralButton("Тест дока QGBus",(d,w)->VoyahDockTest.show(a))
             .setNegativeButton("Закрыть",null).show();
     }
 }

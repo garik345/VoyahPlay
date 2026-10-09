@@ -22,7 +22,7 @@ object CarPlayRotation {
     /** How large a square to ask for; sharper is up to the screen's long side. */
     enum class Picture(val maxSide: Int?) { SMOOTHER(1920), SHARPER(null) }
 
-    fun enabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
+    fun enabled(context: Context): Boolean = false // Voyah Free has a fixed landscape display.
 
     fun setEnabled(context: Context, enabled: Boolean) = prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
 

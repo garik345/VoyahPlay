@@ -10,7 +10,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Exact OEM build, three reviewed cache getters; never sends vehicle commands. */
+/** Exact OEM build, reviewed cache getters; never sends vehicle commands. */
 public final class VoyahClient {
     static final String BUSY_MESSAGE = "Предыдущий запрос ещё выполняется";
     private static final String CAN = "com.qinggan.canbus.service";
@@ -61,6 +61,7 @@ public final class VoyahClient {
                     throw new IOException("Неподдерживаемый тип Voyah: " + type);
                 IBinder can = connect(request, CAN, CAN + ".CanBusService", CAN_DESCRIPTOR);
                 check(request);
+                long sampledAt = SystemClock.elapsedRealtime();
                 JSONObject battery = readCache(can, 71);
                 check(request);
                 JSONObject fuel = readCache(can, 9);
@@ -71,11 +72,27 @@ public final class VoyahClient {
                 check(request);
                 JSONObject windows = readCache(can, 44);
                 check(request);
+                Map<String, Integer> comfort = new HashMap<>();
+                boolean comfortAvailable = false;
+                try {
+                    JSONObject snapshot = VoyahComfortSchema.read(can, () -> !request.cancelled);
+                    Iterator<String> keys = snapshot.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        comfort.put(key, snapshot.optInt(key, -1));
+                    }
+                    comfortAvailable = true;
+                } catch (Exception ignored) {
+                    // A failed optional snapshot must not masquerade as switched-off equipment.
+                    comfort.clear();
+                }
+                check(request);
                 result = new VoyahValues(value(battery, "value"), value(fuel, "mPercentage"),
                     value(climate, "airLeftTemperature"), value(climate, "airRightTemperature"),
-                    climate == null ? -1 : climate.optInt("airWindSpeed", -1), SystemClock.elapsedRealtime(),
+                    climate == null ? -1 : climate.optInt("airWindSpeed", -1), sampledAt,
                     states(doors, "fLDoor", "fRDoor", "rLDoor", "rRDoor"),
-                    states(windows, "fLWindow", "fRWindow", "rLWindow", "rRWindow"));
+                    states(windows, "fLWindow", "fRWindow", "rLWindow", "rRWindow"),
+                    new VoyahComfortValues(comfort, comfortAvailable));
             } catch (Exception e) {
                 error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             } finally {

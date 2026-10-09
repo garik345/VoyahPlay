@@ -24,9 +24,9 @@ public final class VoyahNavigationTest {
 
     public static void show(Activity activity) {
         boolean enabled=com.shilapi.xcertplay.hud.VoyahTrackOutput.enabled(activity);
-        new AlertDialog.Builder(activity).setTitle("Приборная панель Voyah")
-            .setItems(new String[]{"Текст без стрелки", "Стрелка по коду (0–31)", "Нижняя строка: входящий звонок", "Нижняя строка: разговор",
-                "Тест бегущей строки", "Названия треков: "+(enabled?"включены":"выключены"), "Записать данные навигации (2 мин)", "Остановить и поделиться записью", "Настройки бегущей строки", "Знаки скорости: прочитать TSR / ISA", "Сиденья, руль, свет, ароматизатор: запись", "Микрофон: выбор входа", "Экран: состояние системных панелей"}, (dialog,which)->{
+        new AlertDialog.Builder(activity).setTitle("Voyah: настройки и диагностика")
+            .setItems(new String[]{"Названия треков: "+(enabled?"включены":"выключены"), "Записать данные навигации (2 мин)", "Остановить и поделиться записью", "Настройки бегущей строки", "Знаки скорости: прочитать TSR / ISA", "Сиденья, руль, свет, ароматизатор: запись", "Микрофон: выбор входа", "Экран: состояние системных панелей"}, (dialog,index)->{
+                final int which=index+5;
                 if(which==12) { VoyahDisplayDiagnostics.show(activity); return; }
                 if(which==11) { microphoneSettings(activity); return; }
                 if(which==10) { VoyahComfortTest.show(activity); return; }
@@ -54,12 +54,6 @@ public final class VoyahNavigationTest {
                         .setNegativeButton("Отмена",null).show();
                     return;
                 }
-                if (com.shilapi.xcertplay.hud.VoyahNavigationOutput.isSessionActive() || BUSY.get() || com.shilapi.xcertplay.hud.VoyahTrackOutput.isBusy()) {
-                    new AlertDialog.Builder(activity).setMessage("Отключите CarPlay и дождитесь завершения предыдущего теста.")
-                        .setPositiveButton("OK",null).show();return;
-                }
-                if(which==4) { confirmScroll(activity); return; }
-                if(which==0)confirm(activity,-1);else if(which==1)chooseArrow(activity);else confirm(activity,which==2?-2:-3);
             }).setNegativeButton("Закрыть",null).show();
     }
     private static void scrollSettings(Activity activity) {

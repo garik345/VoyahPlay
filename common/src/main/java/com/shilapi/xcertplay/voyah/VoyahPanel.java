@@ -9,7 +9,7 @@ import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 
-/** Foreground-only information panel, independent of CarPlay transport and BYD providers. */
+/** Foreground-only information panel, independent of CarPlay transport. */
 public final class VoyahPanel extends LinearLayout {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final VoyahClient client;
@@ -34,7 +34,7 @@ public final class VoyahPanel extends LinearLayout {
         TextView title = text("VOYAH FREE", 20);
         title.setTextColor(Color.rgb(108, 220, 195));
         addView(title);
-        readings = text("Данные ещё не получены", 22);
+        readings = text("Данные ещё не получены", 18);
         addView(readings);
         status = text("", 13);
         addView(status);
@@ -95,7 +95,7 @@ public final class VoyahPanel extends LinearLayout {
                 return;
             }
             readings.setText(values.display(SystemClock.elapsedRealtime()));
-            status.setText("Ответ получен сейчас · возраст сигнала неизвестен");
+            status.setText("Кэш автомобиля · возраст сигнала неизвестен");
             handler.postDelayed(expire, 6000);
             handler.postDelayed(poll, 2000);
         });

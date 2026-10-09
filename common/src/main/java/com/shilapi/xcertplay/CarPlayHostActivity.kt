@@ -2178,123 +2178,12 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun buildMfiTargetSection(): View {
-        val section = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        val targetChoice = ConnectionSettingsSection.createMfiTargetChoice(
-            context = this,
-            selected = mfiTarget,
-            theme = SettingsTheme.OVERLAY,
-        ) { target ->
-            if (mfiTarget == target) return@createMfiTargetChoice
-            mfiTarget = target
-            updateMfiTargetFields()
-            appendLog("MFI target: ${mfiTargetLabel(target)}; applies when settings close")
-        }
-        mfiTargetGroup = targetChoice.radioGroup
-        section.addView(
-            targetChoice.container,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-
-        val i2cFields = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(
-                settingsInputRow(
-                    getString(R.string.i2c_device),
-                    mfiI2cPath,
-                    onInputCreated = { mfiI2cPathInput = it },
-                ) { value ->
-                    mfiI2cPath = value
-                    mfiErrorView?.visibility = View.GONE
-                },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-            addView(
-                menuText(getString(R.string.linux_device_path_for_example_dev_i2c_1), 14f, MENU_SECONDARY),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(4) },
-            )
-        }
-        section.addView(
-            i2cFields,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(8) },
-        )
-        mfiI2cFields = i2cFields
-
-        val remoteFields = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(
-                settingsInputRow(
-                    getString(R.string.server_address),
-                    remoteMfiServer,
-                    onInputCreated = { remoteMfiServerInput = it },
-                ) { value ->
-                    remoteMfiServer = value
-                },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-            addView(
-                settingsInputRow(
-                    getString(R.string.token_optional),
-                    remoteMfiToken,
-                    password = true,
-                    onInputCreated = { remoteMfiTokenInput = it },
-                ) { value ->
-                    remoteMfiToken = value
-                },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(8) },
-            )
-            addView(
-                menuText(
-                    getString(R.string.settings_mfi_address_hint),
-                    14f,
-                    MENU_SECONDARY,
-                ),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(4) },
-            )
-        }
-        section.addView(
-            remoteFields,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(8) },
-        )
-        mfiRemoteFields = remoteFields
-        val error = menuText("", 14f, MENU_DANGER).apply {
+        // VoyahPlay uses the owner's provisioned local offline authentication only.
+        mfiTarget = MfiTarget.LOCAL
+        return menuText("", 14f, MENU_DANGER).apply {
             visibility = View.GONE
+            mfiErrorView = this
         }
-        section.addView(
-            error,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(6) },
-        )
-        mfiErrorView = error
-        updateMfiTargetFields()
-        return section
     }
 
     private fun updateMfiTargetFields() {

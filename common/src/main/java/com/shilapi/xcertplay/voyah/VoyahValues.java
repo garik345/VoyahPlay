@@ -8,12 +8,19 @@ public final class VoyahValues {
     public final Integer fan;
     public final long receivedAt;
     private final int[] doors, windows;
+    private final VoyahComfortValues comfort;
 
     public VoyahValues(float battery, float fuel, float left, float right, int fan, long time) {
         this(battery, fuel, left, right, fan, time, null, null);
     }
 
     public VoyahValues(float battery, float fuel, float left, float right, int fan, long time, int[] doors, int[] windows) {
+        this(battery, fuel, left, right, fan, time, doors, windows, null);
+    }
+
+    public VoyahValues(float battery, float fuel, float left, float right, int fan, long time,
+            int[] doors, int[] windows, VoyahComfortValues comfort) {
+        this.comfort = comfort;
         this.doors = doors == null ? null : doors.clone();
         this.windows = windows == null ? null : windows.clone();
         this.battery = valid(battery, 0, 100);
@@ -54,6 +61,7 @@ public final class VoyahValues {
         return "Батарея  " + number(battery) + " %\nТопливо  " + number(fuel) +
             " %\nКлимат  " + number(left) + " / " + number(right) +
             " °C\nВентилятор  " + (fan == null ? "—" : fan) +
+            "\n\n" + (comfort == null ? "Комфорт: нет данных" : comfort.display()) +
             "\n\nДвери" + openings(doors, false) + "\n\nОкна" + openings(windows, true);
     }
 }

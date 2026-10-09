@@ -97,8 +97,8 @@ object AirPlayPersistence {
     private const val SAFE_AREA_KEY_PREFIX = "safe_area_"
     private const val CUSTOM_ICON_FILE = "airplay-icon.png"
 
-    const val DEFAULT_MANUFACTURER = "VoyahPlay"
-    const val DEFAULT_MODEL = "VoyahPlay"
+    const val DEFAULT_MANUFACTURER = "Voyah"
+    const val DEFAULT_MODEL = "Free"
     const val DEFAULT_OEM_LABEL = "Voyah"
     const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
 
@@ -236,15 +236,11 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadMfiTarget(context: Context): MfiTarget {
-        val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_MFI_TARGET, null)
-        return MfiTarget.entries.firstOrNull { it.name == stored } ?: MfiTarget.LOCAL
-    }
+    fun loadMfiTarget(context: Context): MfiTarget = MfiTarget.LOCAL
 
     fun saveMfiTarget(context: Context, target: MfiTarget) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_MFI_TARGET, target.name)
+            .putString(KEY_MFI_TARGET, MfiTarget.LOCAL.name)
             .apply()
     }
 
@@ -421,7 +417,7 @@ object AirPlayPersistence {
     fun loadManufacturer(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_MANUFACTURER, null)
-            ?.takeIf { it.isNotBlank() && !it.equals("DiPlay", ignoreCase = true) }
+            ?.takeIf { it.isNotBlank() && !it.equals("DiPlay", ignoreCase = true) && !it.equals("VoyahPlay", ignoreCase = true) }
             ?: DEFAULT_MANUFACTURER
 
     fun saveManufacturer(context: Context, manufacturer: String) {
@@ -433,7 +429,7 @@ object AirPlayPersistence {
     fun loadModel(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_MODEL, null)
-            ?.takeIf { it.isNotBlank() && !it.equals("DiPlay", ignoreCase = true) }
+            ?.takeIf { it.isNotBlank() && !it.equals("DiPlay", ignoreCase = true) && !it.equals("VoyahPlay", ignoreCase = true) }
             ?: DEFAULT_MODEL
 
     fun saveModel(context: Context, model: String) {
@@ -475,7 +471,7 @@ object AirPlayPersistence {
 
     fun loadFps(context: Context): Int = AirPlayDisplaySettings.sanitizeFps(
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_FPS, 30),
+            .getInt(KEY_FPS, 60),
     )
 
     fun loadMediaBufferMillis(context: Context): Int = com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(

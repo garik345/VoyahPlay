@@ -505,7 +505,7 @@ class DiPlayActivity : ComponentActivity() {
                 com.shilapi.xcertplay.hud.VoyahNavigationOutput.setEnabled(this, it)
             }
         }
-        content.addView(button("Voyah: тест приборки — стрелки и нижняя строка", false) {
+        content.addView(button("Voyah: настройки и диагностика", false) {
             com.shilapi.xcertplay.voyah.VoyahNavigationTest.show(this)
         })
         section(content, getString(R.string.connection_setup), R.drawable.ic_dp_connection) { card ->
@@ -627,25 +627,9 @@ class DiPlayActivity : ComponentActivity() {
                 SplitScreenSettings.setEnabled(this, it)
                 reconnectForClusterMap()
             }
-            toggle(card, getString(R.string.carplay_rotation), getString(R.string.carplay_rotation_description),
-                CarPlayRotation.enabled(this)) {
-                CarPlayRotation.setEnabled(this, it)
-                render()
-                reconnectForClusterMap()
-            }
             toggle(card, getString(R.string.side_panel), getString(R.string.side_panel_description), SidePanelSettings.enabled(this)) {
                 SidePanelSettings.setEnabled(this, it)
                 reconnectForClusterMap()
-            }
-            if (CarPlayRotation.enabled(this)) {
-                val pictures = CarPlayRotation.Picture.entries
-                choice(card, getString(R.string.carplay_rotation_picture), listOf(
-                    getString(R.string.carplay_rotation_smoother),
-                    getString(R.string.carplay_rotation_sharper),
-                ), pictures.indexOf(CarPlayRotation.picture(this)), reconnects = false) {
-                    CarPlayRotation.setPicture(this, pictures[it])
-                    reconnectForClusterMap()
-                }
             }
             addSystemBarControls(
                 hideTopBar = AirPlayPersistence.loadHideTopBar(this),
