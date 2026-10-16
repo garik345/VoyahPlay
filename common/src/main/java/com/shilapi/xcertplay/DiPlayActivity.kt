@@ -7,6 +7,7 @@ import android.app.AlertDialog
 import android.app.Dialog
 import android.view.Window
 import android.bluetooth.BluetoothManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -73,10 +74,13 @@ class DiPlayActivity : ComponentActivity() {
     private var hotspotJoinControls: HotspotJoinControls? = null
     private var setupError: String? = null
     private var status: TextView? = null
+    private var homeCardTitle: TextView? = null
+    private var homeConnectionHint: TextView? = null
     private var connectButton: Button? = null
     private var disconnectButton: Button? = null
     private var lastRunning: Boolean? = null
     private var pendingWireless = false
+    private var bluetoothSettingsVisited = false
     private var initialLaunch = true
     private var notificationTransport = true
     private var exportInProgress = false
@@ -251,6 +255,12 @@ class DiPlayActivity : ComponentActivity() {
             return
         }
         handler.removeCallbacks(tick); handler.post(tick)
+        // Back with the hotspot access now allowed: the start-up attempt that lacked it runs again.
+        if (hotspotStartupResult == CarHotspotTethering.Result.PERMISSION_REQUIRED && CarHotspotTethering.permitted(this)) {
+            hotspotStartupResult = null
+            startupHotspotCancelled = false
+            startCarHotspotOnLaunch()
+        }
         // Back from the car settings: refresh the car hotspot reminder on the home page.
         if (!initialLaunch && !adbSwitchChangePending && !pausedForAdbSwitchChange &&
             (page == "home" || page == "settings" || page == "connection")) render()
@@ -408,7 +418,8 @@ class DiPlayActivity : ComponentActivity() {
         left.addView(label(getString(R.string.a_familiar_drive), if (wide) 42 else 36, TEXT, true).apply { setPadding(0, dp(12), 0, dp(10)) })
         left.addView(label(getString(R.string.your_maps_music_and_conversations_carplay_right_here_on_yo), 19, MUTED))
         val card = card()
-        card.addView(label(getString(R.string.wireless_carplay), 12, ACCENT, true).apply { letterSpacing = .12f })
+        homeCardTitle = label(getString(R.string.wireless_carplay), 12, ACCENT, true).apply { letterSpacing = .12f }
+        card.addView(homeCardTitle)
         status = label(getString(R.string.ready_when_you_are), 24, TEXT, true).apply { setPadding(0, dp(10), 0, dp(16)) }
         card.addView(status)
         connectButton = button(getString(R.string.connect_phone), true) {
@@ -613,7 +624,7 @@ class DiPlayActivity : ComponentActivity() {
                 save = { AirPlayPersistence.saveAmbientDelaySeconds(this, it) })
             card.addView(ambientControls)
             card.addView(button(getString(R.string.picture_adjustments), false) {
-                startActivity(Intent(this, CarPlayHostActivity::class.java)
+                OwnScreenStart.start(this, Intent(this, CarPlayHostActivity::class.java)
                     .putExtra("picture_controls", true).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
             }, matchButton(0, 56).apply { bottomMargin = dp(24) })
             carPlaySizeControl(card)
@@ -867,7 +878,7 @@ class DiPlayActivity : ComponentActivity() {
         section(actionsGroup, getString(R.string.permissions_and_connection_help), R.drawable.ic_dp_permissions) { card ->
             card.addView(label(getString(R.string.nearby_devices_connects_your_iphone_microphone_enables_sir), 16, MUTED))
             card.addView(button(getString(R.string.app_permissions), false) { openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }, matchButton(16, 60))
-            card.addView(button(getString(R.string.bluetooth_settings), false) { openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }, matchButton(10, 60))
+            card.addView(button(getString(R.string.bluetooth_settings), false) { openBluetoothSettings() }, matchButton(10, 60))
             card.addView(button(getString(R.string.wireless_connection_help), false) { wirelessHelp() }, matchButton(10, 60))
         }
         section(actionsGroup, getString(R.string.about), R.drawable.ic_dp_about) { card ->
@@ -890,13 +901,45 @@ class DiPlayActivity : ComponentActivity() {
     // An opted-in connection prepares the hotspot in the controller instead of stopping at this reminder.
     private fun carHotspotOff(): Boolean =
         AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL &&
-            com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(this) == false &&
+            CarHotspotSettings.reportedOff(this, com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(this)) &&
             !(CarHotspotSettings.enabled(this) && CarHotspotTethering.permitted(this))
+
+    /**
+     * Other head units: starting the hotspot needs only Android's "Modify system settings" access
+     * (WRITE_SETTINGS), which the driver allows on the system screen. No ADB is involved.
+     */
+    private fun systemHotspotSettings(parent: LinearLayout) {
+        section(parent, getString(R.string.settings_car_hotspot_control), R.drawable.ic_dp_permissions) { card ->
+            toggle(card, getString(R.string.auto_car_hotspot_title),
+                getString(R.string.settings_auto_car_hotspot_system_description), CarHotspotSettings.enabled(this)) { enabled ->
+                CarHotspotSettings.setEnabled(this, enabled)
+                if (!enabled) startupHotspotCancelled = true
+                else if (!CarHotspotTethering.permitted(this)) openWriteSettingsAccess()
+            }
+            val permitted = CarHotspotTethering.permitted(this)
+            card.addView(label(getString(if (permitted) R.string.settings_write_settings_granted
+                else R.string.settings_write_settings_missing), 14, if (permitted) READY else MUTED).apply {
+                setPadding(0, dp(6), 0, dp(4))
+            })
+            if (!permitted) {
+                card.addView(button(getString(R.string.settings_write_settings_allow), false) { openWriteSettingsAccess() },
+                    matchButton(8, 54))
+            }
+        }
+    }
+
+    private fun openWriteSettingsAccess() =
+        openSystem(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:$packageName")))
 
     private fun bydAdbSettings(parent: LinearLayout) {
         if (AirPlayPersistence.loadWirelessHotspotMode(this) != WirelessHotspotMode.MANUAL) return
         if (!CarHotspotSetup.isBydHeadUnit(this)) {
-            Log.i("DiPlay-Hotspot", "settings hidden: BYD head unit not detected")
+            if (CarHotspotTethering.appStartSupported()) {
+                Log.i("DiPlay-Hotspot", "BYD head unit not detected: hotspot control through system settings access")
+                systemHotspotSettings(parent)
+            } else {
+                Log.i("DiPlay-Hotspot", "settings hidden: BYD head unit not detected; Android ${Build.VERSION.SDK_INT} does not let an app start tethering")
+            }
             return
         }
         val controls = column().apply { visibility = View.GONE }
@@ -1052,7 +1095,12 @@ class DiPlayActivity : ComponentActivity() {
         AlertDialog.Builder(this).setTitle(getString(R.string.car_hotspot_is_off))
             .setMessage(getString(R.string.msg_car_hotspot_connect, AirPlayPersistence.loadManualHotspotSsid(this)))
             .setPositiveButton(getString(R.string.open_car_settings)) { _, _ -> openCarWifiSettings() }
-            .setNeutralButton(getString(R.string.connect)) { _, _ -> connect(true) }
+            .setNeutralButton(getString(R.string.connect)) { _, _ ->
+                // The driver sees the hotspot on: trust that over Android's report, or this dialog would
+                // come back on every tap (#604).
+                CarHotspotSettings.setOffReportIgnored(this, true)
+                connect(true)
+            }
             .setNegativeButton(getString(R.string.cancel), null).show()
     }
 
@@ -1060,16 +1108,26 @@ class DiPlayActivity : ComponentActivity() {
     // BYD shows that screen as a dialog and closes it unless its own settings or the car home screen is on top,
     // so the home screen goes first.
     private fun openCarWifiSettings() {
-        val hotspot = Intent("com.android.settings.WIFI_TETHER_SETTINGS")
-        val target = packageManager.resolveActivity(hotspot, 0)?.activityInfo?.packageName
-        if (target == null) {
+        val tether = "com.android.settings.WIFI_TETHER_SETTINGS"
+        val target = packageManager.resolveActivity(Intent(tether), 0)?.activityInfo?.packageName
+        // Nothing opens the AOSP hotspot screen here: either no app answers the action at all, or BYD's
+        // decoy does. BYD's own screen answers android.intent.action.HOTSPOT_SETTINGS instead.
+        if (target == null || answeredByBydDecoy(tether)) {
+            if (targetedByBydSettingsWork && openBydScreen(BYD_HOTSPOT)) return
+            // Where the decoy answers the Wi-Fi settings fallback as well, taking it would only repeat
+            // the "not supported" dialog that brought the driver here. Say where the screen actually is.
+            if (answeredByBydDecoy(Settings.ACTION_WIRELESS_SETTINGS)) {
+                Log.w(BYD_SETTINGS_TAG, "no hotspot screen on this head unit")
+                toast(getString(R.string.open_this_setting_from_your_car_s_settings_app))
+                return
+            }
             openSystem(Intent(Settings.ACTION_WIRELESS_SETTINGS))
             return
         }
         if (target == "com.byd.carsettings") {
             runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
         }
-        if (runCatching { startActivity(hotspot) }.isSuccess) return
+        if (runCatching { startActivity(Intent(tether)) }.isSuccess) return
         openSystem(Intent(Settings.ACTION_WIRELESS_SETTINGS))
     }
 
@@ -1087,7 +1145,7 @@ class DiPlayActivity : ComponentActivity() {
         section(content, getString(R.string.s_1_choose_your_connection)) { card -> wirelessLinkControls(card) }
         section(content, getString(R.string.s_2_pair_your_iphone)) { card ->
             card.addView(label(getString(R.string.keep_bluetooth_and_wi_fi_on_your_iphone_pair_with_the_car), 16, MUTED))
-            card.addView(button("${getString(R.string.choose_iphone_prefix)}${DiPlayPreferences.phoneName(this)}", false) { choosePhone() }, matchButton(12, 60))
+            card.addView(button(chooseIphoneTitle(), false) { choosePhone() }, matchButton(12, 60))
             card.addView(button(getString(R.string.review_app_permissions), false) {
                 openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
             }, matchButton(12, 60))
@@ -1147,7 +1205,7 @@ class DiPlayActivity : ComponentActivity() {
                     applyWirelessLink(WirelessHotspotMode.MANUAL)
                 }
             }, matchButton(12, 60))
-            parent.addView(label(if (pendingCarHotspotSetup) getString(R.string.finish_setup_save_your_hotspot_details_to_use_this_mode) else if (carHotspotOff()) getString(R.string.hotspot_details_off) else getString(R.string.hotspot_details_saved), 15, if (carHotspotOff()) WARNING else MUTED).apply { setPadding(0, dp(12), 0, 0) })
+            parent.addView(label(if (detailsMissing) getString(R.string.finish_setup_save_your_hotspot_details_to_use_this_mode) else if (carHotspotOff()) getString(R.string.hotspot_details_off) else getString(R.string.hotspot_details_saved), 15, if (carHotspotOff()) WARNING else MUTED).apply { setPadding(0, dp(12), 0, 0) })
             val join = hotspotJoinControls ?: HotspotJoinControls(this,
                 { CarPlayBackgroundSession.hasSession() }, beforeAction = { startupHotspotCancelled = true },
                 labelFactory = { label(it, 15, MUTED) }, buttonFactory = { title, click -> button(title, false, click) })
@@ -1165,6 +1223,13 @@ class DiPlayActivity : ComponentActivity() {
         } else {
             parent.addView(label(getString(R.string.turn_the_car_s_wi_fi_switch_on_allow_location_nearby_devic), 16, MUTED))
             wifiDirectChannelControl(parent)
+            // #755: the pause also stops the car joining a known network, such as the phone's hotspot, by itself.
+            toggle(parent, getString(R.string.settings_wifi_direct_scan_pause),
+                getString(R.string.settings_wifi_direct_scan_pause_description),
+                AirPlayPersistence.loadWifiDirectScanPause(this)) {
+                AirPlayPersistence.saveWifiDirectScanPause(this, it)
+                markReconnectNeeded()
+            }
             parent.addView(button(getString(R.string.open_car_wi_fi_settings), false) { openCarClientWifiSettings() }, matchButton(12, 60))
         }
     }
@@ -2009,6 +2074,9 @@ class DiPlayActivity : ComponentActivity() {
                     vehicleProbeOutcome = null
                 }
                 render()
+                // A check the driver asked for also says its result where they look: the status line
+                // above the button changed so quietly that the button seemed to do nothing (#724).
+                if (mayAsk) toast(status?.state?.let(::adbLinkStatusText) ?: getString(R.string.adb_check_failed))
                 // Unreadable data keeps the current connection; the page shows what is missing.
                 if (!legacy && vehicleDataReconnectPending && status?.state == BydAdbAccess.State.READY &&
                     enabledVehicleDataReadable(null, status)) {
@@ -2781,7 +2849,7 @@ class DiPlayActivity : ComponentActivity() {
         else open()
     }
     private fun openProjection() {
-        startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        OwnScreenStart.start(this, Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
     private fun choosePhone() {
         if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -2798,7 +2866,7 @@ class DiPlayActivity : ComponentActivity() {
         if (devices.isEmpty()) {
             AlertDialog.Builder(this).setTitle(getString(R.string.pair_your_iphone))
                 .setMessage(getString(R.string.on_your_iphone_open_settings_bluetooth_and_pair_with_the_c))
-                .setPositiveButton(getString(R.string.open_bluetooth)) { _, _ -> openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+                .setPositiveButton(getString(R.string.open_bluetooth)) { _, _ -> openBluetoothSettings() }
                 .setNegativeButton(getString(R.string.got_it), null).show(); return
         }
         AlertDialog.Builder(this).setTitle(getString(R.string.choose_your_iphone))
@@ -2811,7 +2879,7 @@ class DiPlayActivity : ComponentActivity() {
                 val start = pendingWireless; pendingWireless = false
                 render()
                 if (start) connect(true)
-            }.setNeutralButton(getString(R.string.pair_another)) { _, _ -> openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+            }.setNeutralButton(getString(R.string.pair_another)) { _, _ -> openBluetoothSettings() }
             .setNegativeButton(getString(R.string.cancel)) { _, _ -> pendingWireless = false }.show()
     }
 
@@ -2871,6 +2939,10 @@ class DiPlayActivity : ComponentActivity() {
 
     private fun refreshStatus() {
         val running = CarPlayBackgroundSession.hasSession()
+        // A USB session shares this card's status and Disconnect, but not its wireless title or Wi-Fi hint (#742).
+        val wired = HomeCardTransport.wired(running, AirPlayPersistence.loadWirelessEnabled(this))
+        homeCardTitle?.text = getString(if (wired) R.string.home_usb_carplay else R.string.wireless_carplay)
+        homeConnectionHint?.visibility = if (wired) View.GONE else View.VISIBLE
         status?.text = when {
             setupError != null -> getString(R.string.setup_needs_attention)
             CarPlayBackgroundSession.active -> getString(R.string.carplay_connected)
@@ -3215,6 +3287,21 @@ class DiPlayActivity : ComponentActivity() {
     companion object {
         private const val BYD_VEHICLE_TAG = "DiPlay-BYD13"
         private const val VEHICLE_VALIDATION_RETRY_MILLIS = 500L
+
+        // BYD's settings app answers sixty standard android.settings actions with an activity in its
+        // "unsupport" package instead of a real screen. It does nothing but report string/unsupport_tips
+        // ("the multimedia system does not support this operation"), and startActivity reports success
+        // when it reaches it, so reaching it cannot be told apart from a real screen by catching a throw.
+        private const val BYD_SETTINGS_PACKAGE = "com.byd.vehiclesettings"
+        private const val BYD_SETTINGS_TAG = "DiPlay-Settings"
+
+        // BYD's own screens. An explicit component skips intent-filter matching, so the decoy cannot
+        // answer one. Source: docs/BYD_SETTINGS_ENTRY_POINTS.md.
+        private val BYD_BLUETOOTH_MANAGER =
+            ComponentName("com.byd.btsetting", "com.byd.btsetting.BluetoothManagerDialog")
+        private val BYD_HOTSPOT =
+            ComponentName(BYD_SETTINGS_PACKAGE, "$BYD_SETTINGS_PACKAGE.system.mvp.view.link.hotspot.PerHospotActivity")
+
         private const val ADB_KEY_SAVE_WAIT_MILLIS = 500L
         private val BG = Color.rgb(12, 17, 27)
         private val SURFACE = Color.rgb(21, 30, 44)

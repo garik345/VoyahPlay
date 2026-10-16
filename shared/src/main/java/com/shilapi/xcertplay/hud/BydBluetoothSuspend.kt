@@ -54,10 +54,16 @@ object BydBluetoothSuspend {
             val state = lease(context)
             val ticket = state.begin(owner) ?: return
             pending?.cancel(false)
+            val delay = delayMillis.coerceAtLeast(0)
+            log("car Bluetooth pause in ${TimeUnit.MILLISECONDS.toSeconds(delay)} s")
             pending = worker.schedule({
-                if (state.suspend(ticket)) Log.i(TAG, "car Bluetooth pause verified")
-                else Log.w(TAG, "car Bluetooth pause cancelled or unavailable; recovery retained if needed")
-            }, delayMillis.coerceAtLeast(0), TimeUnit.MILLISECONDS)
+                val radioBefore = state.radioEnabled()
+                val paused = state.suspend(ticket)
+                val outcome = BluetoothPauseOutcome.describe(paused, radioBefore, paused || state.isCurrent(ticket),
+                    shell.lastAccess?.name)
+                if (paused) Log.i(TAG, outcome) else Log.w(TAG, "$outcome; recovery retained if needed")
+                log(outcome)
+            }, delay, TimeUnit.MILLISECONDS)
         }
     }
 
@@ -69,7 +75,7 @@ object BydBluetoothSuspend {
             val ticket = state.end(owner) ?: state.recoveryOnAppOpen() ?: return
             pending?.cancel(false)
             pending = null
-            worker.execute { restore(state, ticket) }
+            worker.execute { restore(state, ticket, log) }
         }
     }
 
@@ -106,8 +112,14 @@ object BydBluetoothSuspend {
             .getBoolean(KEY_RESTORE_ENABLED, false) && radioEnabled(app) == false
     }
 
-    private fun restore(state: BluetoothSuspendLease, ticket: Long) {
-        if (!state.restore(ticket)) Log.w(TAG, "Bluetooth recovery incomplete or superseded")
+    private fun restore(state: BluetoothSuspendLease, ticket: Long, log: (String) -> Unit = {}) {
+        val wasPaused = state.isSuspended()
+        if (!state.restore(ticket)) {
+            Log.w(TAG, "Bluetooth recovery incomplete or superseded")
+            if (wasPaused) log("car Bluetooth recovery incomplete; DiPlay retries when it opens again")
+        } else if (wasPaused) {
+            log("car Bluetooth back on")
+        }
     }
 
     private fun radioEnabled(context: Context): Boolean? = runCatching {
