@@ -36,6 +36,7 @@ class LocalAdb(
 
     @Synchronized
     fun connect(mayAsk: Boolean): Access {
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.localAdbEnabled) return Access.UNSUPPORTED
         if (cancelled.get()) return Access.UNREACHABLE
         if (socket?.isClosed == false) return Access.READY
         return try {

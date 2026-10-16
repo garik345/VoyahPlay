@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_settings_startup">Запуск</string>
+    <string name="voyah_settings_identity">Идентичность и оформление</string>
+    <string name="voyah_settings_video">Экран и видео</string>
+    <string name="voyah_settings_window">Окно</string>
+    <string name="voyah_settings_title">Ваша поездка, ваш путь.</string>
+    <string name="voyah_settings_apply_hint">Настройки, требующие нового подключения, переподключают CarPlay при применении. Остальные изменения применяются при следующем подключении.</string>
+</resources>

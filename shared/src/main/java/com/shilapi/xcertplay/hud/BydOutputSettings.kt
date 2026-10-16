@@ -29,18 +29,21 @@ object BydOutputSettings {
     const val DEFAULT_LOW_CHARGE_PERCENT = 20
     val lowChargePresets = listOf(10, 15, 20, 25, 30)
 
-    fun enabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, true)
+    fun enabled(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(context: Context, enabled: Boolean) = prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
 
     /** Ask the iPhone to stop drawing the cluster map while the cluster hides it (needs ADB over network). */
-    fun clusterStreamPause(context: Context): Boolean = prefs(context).getBoolean(KEY_CLUSTER_STREAM_PAUSE, false)
+    fun clusterStreamPause(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_CLUSTER_STREAM_PAUSE, false)
 
     fun setClusterStreamPause(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_CLUSTER_STREAM_PAUSE, enabled).apply()
 
     /** Tell the iPhone the car's charge and range (needs ADB over network); applies on the next connection. */
-    fun batteryToIphone(context: Context): Boolean = prefs(context).getBoolean(KEY_BATTERY_TO_IPHONE, false)
+    fun batteryToIphone(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_BATTERY_TO_IPHONE, false)
 
     fun setBatteryToIphone(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_BATTERY_TO_IPHONE, enabled).commit()
@@ -48,7 +51,7 @@ object BydOutputSettings {
 
     /** Default mode uses the DiLink 5.0 addresses; legacy mode exposes only fields its saved probe confirmed. */
     fun batteryToIphoneActive(context: Context): Boolean =
-        batteryToIphone(context) && supportedInSelectedMode(context) { it.batterySupported }
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else batteryToIphone(context) && supportedInSelectedMode(context) { it.batterySupported }
 
     /** The charging inlets the iPhone is told about; applies on the next connection. */
     fun chargingConnectors(context: Context): EvChargingConnectors =
@@ -61,36 +64,40 @@ object BydOutputSettings {
     }
 
     /** Send wheel speed and gear with the car's GPS (needs ADB over network); applies on the next connection. */
-    fun wheelSpeedToIphone(context: Context): Boolean = prefs(context).getBoolean(KEY_WHEEL_SPEED_TO_IPHONE, false)
+    fun wheelSpeedToIphone(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_WHEEL_SPEED_TO_IPHONE, false)
 
     fun setWheelSpeedToIphone(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_WHEEL_SPEED_TO_IPHONE, enabled).commit()
     }
 
     fun wheelSpeedToIphoneActive(context: Context): Boolean =
-        wheelSpeedToIphone(context) && supportedInSelectedMode(context) { it.motionSupported }
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else wheelSpeedToIphone(context) && supportedInSelectedMode(context) { it.motionSupported }
     /** Offer iOS 27 video in car, played only while the gear reads P (needs ADB over network). */
-    fun videoWhileParked(context: Context): Boolean = prefs(context).getBoolean(KEY_VIDEO_WHILE_PARKED, false)
+    fun videoWhileParked(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_VIDEO_WHILE_PARKED, false)
 
     fun setVideoWhileParked(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_VIDEO_WHILE_PARKED, enabled).commit()
     }
 
     /** Show the CarPlay song in the dashboard's music card (needs ADB over network); applies at once. */
-    fun clusterSong(context: Context): Boolean = prefs(context).getBoolean(KEY_CLUSTER_SONG, false)
+    fun clusterSong(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_CLUSTER_SONG, false)
 
     fun setClusterSong(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_CLUSTER_SONG, enabled).apply()
 
     /** Show CarPlay calls on the dashboard and HUD like BYD's CarPlay app (needs ADB over network); applies at once. */
-    fun carPlayCalls(context: Context): Boolean = prefs(context).getBoolean(KEY_CARPLAY_CALLS, false)
+    fun carPlayCalls(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_CARPLAY_CALLS, false)
 
     fun setCarPlayCalls(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_CARPLAY_CALLS, enabled).apply()
 
     /** Unverified DiLink 3 call/voice/media key handling requires a separate explicit opt-in. */
     fun carPlayCallControls(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_CARPLAY_CALL_CONTROLS, false)
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_CARPLAY_CALL_CONTROLS, false)
 
     fun setCarPlayCallControls(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_CARPLAY_CALL_CONTROLS, enabled).apply()
@@ -99,31 +106,35 @@ object BydOutputSettings {
      * Hold a Telecom call during CarPlay calls so the car's own phone audio state, and its echo canceller,
      * handle the call. Replaces DiPlay's own canceller for those calls; applies at the next call.
      */
-    fun phoneAudioRoute(context: Context): Boolean = prefs(context).getBoolean(KEY_PHONE_AUDIO_ROUTE, false)
+    fun phoneAudioRoute(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_PHONE_AUDIO_ROUTE, false)
 
     fun setPhoneAudioRoute(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_PHONE_AUDIO_ROUTE, enabled).apply()
 
     /** The same for voice-over-IP calls in other apps; only calls that record from VOICE_COMMUNICATION qualify. */
-    fun phoneAudioRouteApps(context: Context): Boolean = prefs(context).getBoolean(KEY_PHONE_AUDIO_ROUTE_APPS, false)
+    fun phoneAudioRouteApps(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_PHONE_AUDIO_ROUTE_APPS, false)
 
     fun setPhoneAudioRouteApps(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_PHONE_AUDIO_ROUTE_APPS, enabled).apply()
 
     /** Show a new song on the dashboard for a few seconds only, then an empty card. */
-    fun clusterSongOnChange(context: Context): Boolean = prefs(context).getBoolean(KEY_CLUSTER_SONG_ON_CHANGE, false)
+    fun clusterSongOnChange(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_CLUSTER_SONG_ON_CHANGE, false)
 
     fun setClusterSongOnChange(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_CLUSTER_SONG_ON_CHANGE, enabled).apply()
 
     fun videoWhileParkedActive(context: Context): Boolean =
-        videoWhileParked(context) && supportedInSelectedMode(context) { it.gearSupported }
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else videoWhileParked(context) && supportedInSelectedMode(context) { it.gearSupported }
 
     /**
      * Use addresses saved by the legacy head-unit probe. Existing installations with a saved probe
      * migrate to this mode; a fresh installation stays on the default DiLink 5.0 path.
      */
     fun legacyVehicleProbe(context: Context): Boolean {
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return false
         val settings = prefs(context)
         return if (settings.contains(KEY_LEGACY_VEHICLE_PROBE)) {
             settings.getBoolean(KEY_LEGACY_VEHICLE_PROBE, false)
@@ -139,12 +150,14 @@ object BydOutputSettings {
     }
 
     /** Optional title/lyrics when navigation is absent; only the verified HUD output can send it. */
-    fun hudSong(context: Context): Boolean = prefs(context).getBoolean(KEY_HUD_SONG, false)
+    fun hudSong(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_HUD_SONG, false)
     fun setHudSong(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_HUD_SONG, enabled).apply()
 
     /** OEM changes require an explicit selection; fresh installations leave the stock map alone. */
     fun oemClusterHold(context: Context): BydOemClusterHold {
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return BydOemClusterHold.OFF
         val settings = prefs(context)
         BydOemClusterHold.fromName(settings.getString(KEY_OEM_CLUSTER_HOLD, null))?.let { return it }
         return if (settings.getBoolean("oem_cluster_freeze", false)) BydOemClusterHold.PACKAGE
@@ -159,30 +172,33 @@ object BydOutputSettings {
     fun setLowChargePercent(context: Context, percent: Int) =
         prefs(context).edit().putInt(KEY_LOW_CHARGE_PERCENT, percent).apply()
 
-    fun standaloneHudAvailable(context: Context): Boolean = BydStandaloneHudOutput.available(context)
+    fun standaloneHudAvailable(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else BydStandaloneHudOutput.available(context)
     fun standaloneHudDiagnosticReport(context: Context): String = BydStandaloneHudOutput.diagnostics(context)
 
     /** Whether the head unit has a BYD navigation receiver. This says nothing about ADB vehicle data. */
     fun navigationAvailable(context: Context): Boolean =
-        BydStandaloneHudOutput.available(context) ||
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else BydStandaloneHudOutput.available(context) ||
             BydAmapAdapter.find { installed(context, it) } != null ||
             installed(context, "com.ts.car.someip.service")
 
     /** Whether the head unit has the FCE vehicle-property service that feeds its cluster's navigation view. */
-    fun fceClusterAvailable(): Boolean = FceClusterBridge.available()
+    fun fceClusterAvailable(): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else FceClusterBridge.available()
 
     /**
      * Opt-in for [FceClusterBridge]: it writes vendor vehicle properties whose meaning was confirmed on one
      * car only, and another head unit with the same service could read them differently.
      */
-    fun fceCluster(context: Context): Boolean = prefs(context).getBoolean(KEY_FCE_CLUSTER, false)
+    fun fceCluster(context: Context): Boolean =
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else prefs(context).getBoolean(KEY_FCE_CLUSTER, false)
 
     fun setFceCluster(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_FCE_CLUSTER, enabled).apply()
 
     /** Whether the head unit has a BYD navigation receiver or is a BYD head unit, so settings can show navigation/map options. */
     fun available(context: Context): Boolean =
-        navigationAvailable(context) ||
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else navigationAvailable(context) ||
             installed(context, "com.byd.carsettings") ||
             installed(context, "com.byd.appmgr") ||
             installed(context, "com.byd.deviceinfo") ||
@@ -194,7 +210,7 @@ object BydOutputSettings {
             android.os.Build.DEVICE.contains("BYD", ignoreCase = true)
 
     private fun installed(context: Context, pkg: String): Boolean =
-        runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) false else runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
 
     private fun supportedInSelectedMode(
         context: Context,

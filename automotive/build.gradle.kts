@@ -3,6 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val localAuthenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
+    .orNull?.let { file(it).canonicalFile }
+
 android {
     namespace = "com.shilapi.xcertplay"
     compileSdk {
@@ -13,10 +16,12 @@ android {
         applicationId = "com.shilapi.xcertplay"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1201
-        versionName = "1.2.1"
+        versionCode = 1202
+        versionName = "0.2.19-voyahplay.0.1.18"
 
     }
+
+    localAuthenticationAssets?.let { sourceSets.getByName("main").assets.srcDir(it) }
 
     signingConfigs {
         create("release") {

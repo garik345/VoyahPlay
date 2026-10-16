@@ -1,0 +1,11 @@
+common/src/main/assets/voyah-root/COPYING.LIB.txt
+common/src/main/assets/voyah-root/launcher.js
+common/src/main/assets/voyah-root/module.sh
+common/src/main/assets/voyah-root/system-server.js
+common/src/main/assets/voyah-root/NOTICE.txt
+common/src/main/assets/voyah-root/COPYING.txt
+common/src/main/assets/voyah-root/frida-inject-arm64.gz
+common/src/main/java/com/shilapi/xcertplay/voyah/root/RootModuleAssets.java
+common/src/test/java/com/shilapi/xcertplay/voyah/root/RootModuleAssetsTest.java
+scripts/tests/test_root_fullscreen.js
+scripts/tests/test_root_module_guards.py

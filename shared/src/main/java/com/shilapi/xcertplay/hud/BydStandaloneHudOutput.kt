@@ -64,6 +64,7 @@ internal class BydStandaloneHudOutput private constructor(context: Context) {
 
         /** Enable production and diagnostic packages only on the physically tested firmware. */
         fun available(context: Context): Boolean {
+            if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return false
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
             if (context.packageName !in setOf(
                     "com.andrerinas.headunitrevived", "com.shihab.diplay",

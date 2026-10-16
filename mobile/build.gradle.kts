@@ -14,11 +14,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.shihab.diplay"
+        applicationId = "dev.voyah.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 39
-        versionName = "0.2.20"
+        versionCode = 38
+        versionName = "0.2.19-voyahplay.0.1.18"
 
     }
 

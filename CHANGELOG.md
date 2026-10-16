@@ -1,86 +1,63 @@
-# DiPlay 0.2.20 — 2026-10-15
+## VoyahPlay — совместимость Activity при сборке пакета 1.1.2 (2026-10-16)
 
-- Keep music playing when a head unit's audio clock drifts by adjusting its playback rate, run DiPlay's audio threads at audio priority, and keep separate music buffers for wireless and USB (#788, #740, #746).
-- Play calls that a head unit sends to its earpiece on the loudspeaker, add Calls on the loudspeaker for phone and tablet head units, open the microphone for app voice messages, open Siri once per press of BYD's voice key, and record calls in the car's phone audio state from the voice-recognition source (#797, #704, #698, #774, #786, #770).
-- Start wired CarPlay when a USB audio driver holds the iPhone, within seconds after Save and reconnect, after a VERSION reply that follows a reply trailer, and on Android 17 (#699, #714, #744, #708).
-- Turn the car hotspot on through the system shell, or without ADB on head units that aren't BYD on Android 8.0–10; let Connect in the "Car hotspot is off" dialog connect; add a switch for the Wi-Fi Direct scan pause; and skip 5 GHz Wi-Fi Direct channels on head units without that band (#699, #748, #775, #777, #789, #768, #740).
-- Find the dashboard cluster on controller 13 and 17 firmware and the Leopard 5 Ultra, hide the DiLink 4 cluster routes on DiLink 3, fall back from HEVC to H.264 without a hardware decoder, show CarPlay with FFmpeg-backed decoders, and group the settings menu inside CarPlay by goal (#714, #734, #707, #710).
-- Record DiPlay's last crash, the wheel and media keys it received, the car Bluetooth pause, app-call vocoder info, music rebuffers and the USB devices listed while waiting for a CH341 adapter in the diagnostic report (#700, #702, #788, #740, #759, #793).
+- Исправлена передача `onNightChanged` при наличии дополнительного параметра `NightTimeSource`.
+- Добавлены собственные ресурсы шести подписей настроек и переводы для семи языков.
+- Исправлен незавершённый `when` при появлении ролей `SIRI` и `MEDIA_PLAY_PAUSE`; назначения джойстика сохранены.
+- Сохранены последние изменения жизненного цикла дока в обеих Activity.
 
-See [0.2.20 release notes](docs/RELEASE-NOTES-0.2.20.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
+## VoyahPlay — root-помощник 1.1.2: остановка и временные OEM-окна (2026-10-16)
 
-# DiPlay 0.2.19 — 2026-10-12
+- Перед закрытием listener выполняется shutdown, освобождающий блокирующий accept; отдельный app_process завершается после очистки ресурсов.
+- Обновление будит старый listener запросом INFO и проверяет фактический выход процесса перед заменой снимка APK.
+- Версия нового APK проверяется перед остановкой старого помощника.
+- Для зависшего собственного помощника предусмотрен SIGTERM после проверки приватной записи, boot ID, PID/времени запуска, четырёх UID 0 и точного имени процесса.
+- Отдельно обрабатываются уже принятый STOP, потеря ответа при завершении, смена PID и отказ очистки собственного разрешения на ширину.
+- Временный onPause видимого окна сохраняет скрытие дока и разрешение на ширину; onStop/onDestroy освобождают их при настоящем уходе.
+- Пересоздание окна приостановленного приложения отложено до onResume; повтор QGBus-скрытия ускорен до 250 мс.
+- Автозапуск и полная ширина с помощником 1.1.0 подтверждены пользователем после перезагрузки; вариант 1.1.2 требует проверки на автомобиле.
 
-- Start wired CarPlay several seconds sooner by not waiting 2 s on each refused USB network write, ask for CarPlay mode first on iOS 26, grant USB access through approved ADB on Android 7.1–9 head units without a USB permission page, and let Auto-confirm USB permission find the system dialog (#644, #689).
-- Report the playback position of 16 kHz calls, Siri and navigation prompts at their own rate instead of three times too fast, restart a microphone whose first read fails, and stop background music underruns from a 0.5 s audio wait (#644).
-- Keep CarPlay from restarting at the first touch with the DiLink 4 dashboard map on and from staying scaled down after the reversing camera, show the last picture when a SurfaceView output comes back, and redesign the in-CarPlay settings menu (#663, #674, #669, #642).
-- Japanese, complete Traditional Chinese with guides, and 67 more Arabic strings (#646, #691, #682, #681, #631).
-- Download the diagnostic report on a phone by QR code or a typed address and code, keep the phone page answering behind idle connections, show connection recovery tips and a Bluetooth-off message, and fix wireless CarPlay on MIUI 13 (#686, #687, #685, #677, #679, #673).
-- Set BYD navigation audio defaults on a first setup, add an optional album-artwork card on the dashboard map, record why the car hotspot could not be started, and fall back to the default Bluetooth adapter (#656, #660, #667, #641).
+## VoyahPlay — root-помощник 1.1.1: отчёт remount и исправления сборки (2026-10-16)
 
-See [0.2.19 release notes](docs/RELEASE-NOTES-0.2.19.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
+- После проверенной записи hook ответ `Device or resource busy` при возврате ro отображается отдельным предупреждением с требованием обычной перезагрузки.
+- Отчёт показывает фактические `BOOT_MOUNT_POINT` и `BOOT_MOUNT_READ_ONLY`.
+- Ошибка восстановления ro сохраняется рядом с исходной ошибкой записи; тайм-ауты и прочие ошибки не превращаются в успех.
+- Повторная установка использует уже записанный проверенный hook без повторной правки системного файла.
+- Исправлены определение каталога очистки в PowerShell и совместимость `verifyLegacyFullscreenRemoved` с configuration cache Gradle.
 
-# DiPlay 0.2.18 — 2026-10-11
+## VoyahPlay — автозапуск root-помощника 1.1.0 (2026-10-16)
 
-- Keep wired sessions running when a USB read finishes as DiPlay stops waiting for it, start wired CarPlay on Android 7.1 head units, when a head-unit USB audio driver holds the iPhone, and without a VPN dialog over approved network ADB (#625, #614, #618).
-- Stop discarding music packets after a 10 ms wait, and log the /feedback position against the received audio (#618, #625).
-- Show the real connection stage in every app language, stop with a clear cause when a head unit's Bluetooth cannot reach the iPhone, and find the connected iPhone through sink-role Bluetooth profiles (#624, #590, #585).
-- Wheel next/previous on the CarPlay screen without the wheel-key service, Geely/Lynk `geely_fx11` wheel keys and Siri, wheel-key service restore retries, and next/previous to answer or decline with CarPlay call keys (#600, #626, #622, #625).
-- Settings backup and restore from a phone, an installer choice for updates, and About inside Settings (#598, #593, #597).
-- Experimental, off-by-default options: Harman full screen with 32-bit x86 libraries, square corners, clearer navigation voice over USB, MediaTek low-latency decoding, a media-key audio focus opt-out, car phone audio for calls, a cluster speedometer and FCE cluster guidance (#613, #596, #622, #608, #615, #595, #607, #599).
+- Добавлен root-автозапуск после готовности Android через проверенный init.logcat.sh.
+- В меню — подтверждаемое состояние автозапуска и отчёт последней загрузки.
+- Установка/обновление сохраняют backup системного сценария, права и SELinux-контекст; предусмотрено восстановление.
+- Исключены повторные процессы; блокировка учитывает boot ID/PID/время старта, проверяются UID и SHA-256 снимка APK.
+- Удалены прежние настройки модуля, автозапуск из BootReceiver, installer и старый frida-inject/JS payload из APK.
+- Добавлена миграция старого payload на ГУ и очистка устаревших исходников при обновлении ZIP.
 
-See [0.2.18 release notes](docs/RELEASE-NOTES-0.2.18.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
+## VoyahPlay — исправление проверки system_server (2026-10-16)
 
-# DiPlay 0.2.17 — 2026-10-10
+- Root-помощник обновлён до 1.0.4.
+- UID system_server проверяется по `status`, имя процесса — по `cmdline`, вместо владельца `/proc/PID` и имени главного потока.
+- Сохраняются проверки PID/Tgid, всех UID, свежести статуса и контрольных сумм Tweaks.
+- При несовпадении в отчёте доступны фактические PID, Tgid, UID и argv[0].
+- APK и скрипт проверяют обновлённую версию помощника перед использованием режима.
 
-- Keep wired sessions running after a damaged NCM block, retry identification without unsupported CarPlay messages for older iOS, recognize the Android 10+ and Chinese USB permission prompts, explain refused wired mode switches and retry NCM interface claims (#575).
-- Add an iPhone charging choice for wired USB: Normal 2.4 A, Reduced 1.5 A or Low 0.5 A (#583).
-- Recommend the built-in car hotspot, and pause the car's Wi-Fi network search during Wi-Fi Direct on Android 7.1 and later when network ADB is approved (#570).
-- Record the head-unit microphone for app voice notes and clock Opus 16 kHz microphone packets at 16 kHz (#548, #547).
-- Check daily for updates with an Update available notice, recognize the DiLink generation from the controller version, and save Android 9 reports to Download/DiPlay (#488, #531, #541).
-- Add album-cover ambient lighting and fix saving ambient settings on hotfix firmware; add experimental BYD call popup hiding and external controller keys (#537, #550, #539, #549).
+## VoyahPlay — полная ширина через Tweaks (2026-10-16)
 
-See [0.2.17 release notes](docs/RELEASE-NOTES-0.2.17.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
+- Добавлен переключатель полной ширины в общих настройках главного окна и CarPlay.
+- Используется уже проверенная добавка Tweaks 1.1; root-помощник 1.0.3 управляет кратковременным разрешением.
+- Сохранённый режим применяется при запуске и возврате; выключение возвращает исходную ширину.
+- Для применения обновляется только собственная задача Android с сохранённой CarPlay-сессией.
+- Сохранён общий контроллер дока; при обновлении собственного окна временный показ дока откладывается.
+- Добавлены проверка готовности и отчёт; ограничены повторные попытки обновления окна.
+- Добавлены проверки протокола, свежести статуса и модели жизненного цикла.
 
-# DiPlay 0.2.16 — 2026-10-09
+## VoyahPlay 0.1.15 (2026-10-08)
 
-- Send the Siri and call microphone on Android 7.1–9 head units without an Opus encoder through a bundled software Opus encoder, and offer Opus only when it can be encoded; accepted on a BOS Mini A1 (Android 9) with an iPhone 12 on iOS 27 (#468, #483).
-- Fix wired NCM receive framing and Android 8 USB reads, and retry rejected large USB reads at smaller sizes (#478, #495).
-- Refresh hotspot addresses after a first wireless timeout, request Android 17 local-network permission, handle missing VPN authorization screens and add WPA3 car-hotspot security (#474, #465, #517, #501).
-- Add experimental Low-latency decoding and Direct video output, an FPS counter, a hardware low-latency Smooth video decoder and bounded video backlog recovery (#496, #456, #347).
-- Add inline Settings search, confirm before the quick menu discards staged changes, allow turning off the swipe-down gesture, and refine Settings layout and reconnect prompts (#450, #500, #487, #486, #482, #490, #491).
-- Place the dashboard car marker with 1% sliders, give the small-window turn card its own placement, theme the cluster waiting screen, show the full DiLink 3 arrival time, declare initial appearance and add side-panel resizing (#494, #493, #481, #458, #346, #480).
-- Add experimental, off-by-default car Bluetooth pause, music-following ambient lighting, navigation wheel volume and a Platform 21 instrument route; refine call echo alignment, buffered-audio pacing and audio diagnostics (#307, #345, #344, #348, #421, #484, #499).
-
-See [0.2.16 release notes](docs/RELEASE-NOTES-0.2.16.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
-
-# DiPlay 0.2.15 — 2026-10-08
-
-- Lower the minimum to Android 7.1/API 25 with compatibility fallbacks; Android 7.1–8.1 vehicle validation remains pending (#407).
-- Add the first-launch DiLink setup guide and manual GitHub update checks in About (#416, #413).
-- Add Light/Dark/Auto app appearance and refine compact layouts, fullscreen handling, Language and About navigation (#422, #420).
-- Recover the music prebuffer after underruns, including corrected retained-audio accounting, and supply a main-decoder operating-rate hint with fallback (#401, #417).
-- Add Wi-Fi Direct automatic band choices and optional selected-iPhone Bluetooth launch; experimental Bluetooth audio remains off by default (#432, #439).
-- Correct square-canvas physical dimensions, refine turn-card placement to 1% steps and add optional small-window marker layouts with experimental Auto following (#404, #440, #438).
-- Add explicit experimental ADB boot-start repair and correct Ukrainian wording (#441, #399).
-
-See [0.2.15 release notes](docs/RELEASE-NOTES-0.2.15.md) for contribution links and limits, and [validation](docs/VALIDATION.md) for checks. Full-release vehicle acceptance is not claimed.
-
-# DiPlay 0.2.14 — 2026-10-07
-
-- Group Settings by driver goal with search, adaptive layouts, quick controls and reconnect notices (#369).
-- Add an independent Interface size control, preserving CarPlay geometry and following real density/window changes (#378).
-- Add a default automatic-connection choice, scheduled day/night mode and launcher return to active CarPlay (#373, #365, #376).
-- Improve custom car-button image selection and clarify the main app's source-build instructions (#364, #377, #374).
-- Repair the captured USBMUX diagnostic trailer, wake drained Bluetooth receive queues and retry explicitly rejected large USB reads once at 16 KiB; improve stream diagnostics (#362).
-- Select compatible video output without window hardware acceleration; use Android video decryption when available and retain a fallback (#362, #332).
-- Add default-off experimental Smooth video pacing with explicit latency/picture-adjustment limits (#367).
-- Preserve usable hotspot interface addresses and authenticated Bluetooth control on the observed rendered-session handoff fallback (#394, #396).
-- Add configurable steering-wheel Siri, bounded microphone-source fallback and optional audio-focus handling (#360, #371, #339).
-- Repair BYD call-watcher/audio-status behavior and add opt-in, default-off experimental software call echo cancellation and voice filtering (#370).
-- Preserve artwork proportions, correct system-bar-aware split/rotation geometry and recognize the specifically observed 1280×480 DiLink 3 cluster surface (#375, #389, #388).
-
-See [0.2.14 release notes](docs/RELEASE-NOTES-0.2.14.md) for all 20 contribution links, credits and limitations. Android 9/API 28 remains required. See [validation](docs/VALIDATION.md) for measured checks; complete-release vehicle acceptance is not claimed.
+- Read-only two-minute comfort snapshots: seats, steering wheel heat, lights and fragrance.
+- Optional preferred built-in microphone input and input-device diagnostics (USB issue not yet confirmed fixed).
+- Android 11 legacy immersive compatibility and window-insets diagnostics.
+- Documented nine-button layout and descending level cycle; control panel still pending state validation.
+- README includes VoyahTune seat, fragrance and lighting references and vehicle test procedure.
 
 # DiPlay 0.2.13 — 2026-10-06
 

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_settings_startup">Inicio</string>
+    <string name="voyah_settings_identity">Identidad y apariencia</string>
+    <string name="voyah_settings_video">Pantalla y vídeo</string>
+    <string name="voyah_settings_window">Ventana</string>
+    <string name="voyah_settings_title">Tu trayecto, a tu manera.</string>
+    <string name="voyah_settings_apply_hint">Los ajustes que requieren una nueva conexión reconectan CarPlay al aplicarse. Los demás cambios se aplican en tu próxima conexión.</string>
+</resources>
