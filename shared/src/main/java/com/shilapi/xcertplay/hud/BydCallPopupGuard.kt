@@ -28,6 +28,7 @@ object BydCallPopupGuard {
 
     fun update(context: Context, candidate: Any, foregroundConnected: Boolean,
         connected: () -> Boolean) = synchronized(gate) {
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return@synchronized
         if (!foregroundConnected && owner !== candidate) return@synchronized
         if (foregroundConnected && owner === candidate) return@synchronized
         owner = if (foregroundConnected) candidate else null

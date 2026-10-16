@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_settings_startup">启动</string>
+    <string name="voyah_settings_identity">身份与外观</string>
+    <string name="voyah_settings_video">显示与视频</string>
+    <string name="voyah_settings_window">窗口</string>
+    <string name="voyah_settings_title">按你的习惯设置。</string>
+    <string name="voyah_settings_apply_hint">需要重新连接的设置会在应用时重连 CarPlay。其他改动将在下次连接时生效。</string>
+</resources>

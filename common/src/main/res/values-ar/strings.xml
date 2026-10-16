@@ -871,4 +871,6 @@
     <string name="connection_help_existing_wifi">تأكد من اتصال وحدة السيارة وiPhone بشبكة Wi-Fi نفسها وأن اسمها وكلمة مرورها يطابقان إعدادات DiPlay، ثم أعد المحاولة.</string>
     <string name="settings_report_on_phone">الحصول على التقرير عبر هاتف</string>
     <string name="settings_report_on_phone_hint">امسح الرمز بكاميرا الهاتف لفتح هذه الصفحة في متصفحه، ثم اختر «تنزيل التقرير». أبقِ هذه الشاشة مفتوحة حتى يكتمل التنزيل.</string>
+    <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
+    <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
 </resources>

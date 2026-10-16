@@ -39,7 +39,7 @@ internal class WifiScanPause(
     /** Asynchronously stops the periodic scans; repeated calls are harmless. */
     @Synchronized
     fun pause() {
-        if (closed) return
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.localAdbEnabled || closed) return
         control.acquire(app, owner, { !closed }, log)
     }
 
@@ -48,6 +48,7 @@ internal class WifiScanPause(
     fun close() {
         if (closed) return
         closed = true
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.localAdbEnabled) return
         control.release(app, owner, log)
     }
 
@@ -61,7 +62,9 @@ internal class WifiScanPause(
         fun eligible(backend: WirelessHotspotBackend, sdk: Int = Build.VERSION.SDK_INT): Boolean =
             backend == WirelessHotspotBackend.WIFI_P2P && sdk >= Build.VERSION_CODES.N_MR1
 
-        fun restoreIfNeeded(context: Context) = ProcessWifiScanPause.recover(context.applicationContext)
+        fun restoreIfNeeded(context: Context) {
+            if (com.shilapi.xcertplay.VoyahPlatformPolicy.localAdbEnabled) ProcessWifiScanPause.recover(context.applicationContext)
+        }
 
         fun command(apk: String, enabled: Boolean): String {
             val quoted = "'" + apk.replace("'", "'\"'\"'") + "'"

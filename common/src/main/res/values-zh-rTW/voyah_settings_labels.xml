@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_settings_startup">啟動</string>
+    <string name="voyah_settings_identity">身分與外觀</string>
+    <string name="voyah_settings_video">顯示方式與影片</string>
+    <string name="voyah_settings_window">視窗</string>
+    <string name="voyah_settings_title">依你的喜好設定。</string>
+    <string name="voyah_settings_apply_hint">套用尺寸、解析度、音樂緩衝區和影格率設定時會重新連線 CarPlay。其他變更會在下次連線時生效。</string>
+</resources>

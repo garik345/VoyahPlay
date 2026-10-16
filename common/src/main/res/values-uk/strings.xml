@@ -834,4 +834,6 @@
     <string name="connection_help_existing_wifi">Переконайтеся, що головний пристрій та iPhone підключені до однієї мережі Wi-Fi, а її назва й пароль збігаються з налаштуваннями DiPlay, і повторіть спробу.</string>
     <string name="settings_report_on_phone">Отримати звіт на телефоні</string>
     <string name="settings_report_on_phone_hint">Відскануйте код камерою телефона, щоб відкрити сторінку в його браузері, і виберіть «Завантажити звіт». Не закривайте цей екран, доки завантаження не завершиться.</string>
+    <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
+    <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
 </resources>

@@ -10,7 +10,8 @@ android {
     }
 
     defaultConfig {
-        minSdk = 25
+        minSdk = 28
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     compileOptions {
@@ -39,13 +40,27 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.work.runtime)
+    implementation("androidx.work:work-runtime:2.12.0")
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.ui)
-    implementation(libs.zxing.core)
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation(libs.junit)
+    // The bridge snapshot parser also runs as a plain JVM test.
+    testImplementation("org.json:json:20240303")
     testImplementation("org.robolectric:robolectric:4.17")
     testImplementation("org.mockito:mockito-core:5.20.0")
     testImplementation(libs.jmdns)
 }
+
+// ZIP source updates cannot delete old files automatically. Keep the retired injector out of APKs.
+val verifyLegacyFullscreenRemoved by tasks.registering {
+    // Capture only the path; calling file() inside doLast captures the build script.
+    val retiredAssets = layout.projectDirectory.dir("src/main/assets/voyah-root").asFile
+    doLast {
+        check(!retiredAssets.exists()) {
+            "Run powershell -NoProfile -ExecutionPolicy Bypass -File scripts/root-module/remove-legacy-sources.ps1 from the project root, then rebuild."
+        }
+    }
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(verifyLegacyFullscreenRemoved) }

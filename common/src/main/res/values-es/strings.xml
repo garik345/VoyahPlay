@@ -822,4 +822,6 @@
     <string name="connection_help_existing_wifi">Comprueba que la unidad y el iPhone estén en la misma red Wi-Fi y que su nombre y contraseña coincidan con DiPlay, y reintenta.</string>
     <string name="settings_report_on_phone">Obtener el informe en un teléfono</string>
     <string name="settings_report_on_phone_hint">Escanea el código con la cámara del teléfono para abrir esta página en su navegador y elige Descargar informe. Mantén esta pantalla abierta hasta que termine la descarga.</string>
+    <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
+    <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
 </resources>

@@ -882,4 +882,6 @@
     <string name="connection_help_existing_wifi">請確認車機和 iPhone 連線的是同一個 Wi-Fi 網路，且網路名稱和密碼與 DiPlay 設定相同，再重試。</string>
     <string name="settings_report_on_phone">在手機上取得報告</string>
     <string name="settings_report_on_phone_hint">用手機相機掃碼，在瀏覽器中開啟此頁面，然後選擇「下載報告」。下載完成前請保持此畫面開啟。</string>
+    <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
+    <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
 </resources>

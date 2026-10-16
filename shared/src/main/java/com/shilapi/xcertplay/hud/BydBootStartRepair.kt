@@ -19,6 +19,7 @@ object BydBootStartRepair {
 
     /** Blocking, with the car allowed to show its ADB key approval dialog. Off the main thread. */
     fun apply(context: Context, packageName: String): Result {
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.localAdbEnabled) return Result(emptyList())
         val lines = mutableListOf<String>()
         LocalAdb(AdbKeys.load(context)).use { adb ->
             when (adb.connect(mayAsk = true)) {

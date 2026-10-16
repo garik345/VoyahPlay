@@ -922,4 +922,6 @@
     <string name="connection_help_existing_wifi">車載端末とiPhoneが同じWi-Fiネットワークに接続され、その名前とパスワードがDiPlayの設定と一致しているか確認して、再試行してください。</string>
     <string name="settings_report_on_phone">スマートフォンでレポートを取得</string>
     <string name="settings_report_on_phone_hint">スマートフォンのカメラでQRコードを読み取って、ブラウザーでページを開き、「レポートをダウンロード」を選んでください。ダウンロードが終わるまでこの画面を開いたままにしてください。</string>
+    <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
+    <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
 </resources>

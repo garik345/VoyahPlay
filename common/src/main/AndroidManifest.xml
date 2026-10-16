@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="com.qinggan.permission.WRITE_CANBUS" />
     <!-- Optional, user-authorized startup of the car's own hotspot. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
@@ -21,6 +22,12 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
+        <package android:name="com.qinggan.audiopolicy.service" />
+        <package android:name="com.qinggan.app.setting" />
+        <package android:name="com.qinggan.canbus.service" />
+        <package android:name="com.qinggan.carsignal.service" />
+        <package android:name="com.qinggan.cluster" />
+        <package android:name="com.qinggan.QGBus" />
         <package android:name="com.byd.carsettings" />
         <intent>
             <action android:name="android.intent.action.VIEW" />

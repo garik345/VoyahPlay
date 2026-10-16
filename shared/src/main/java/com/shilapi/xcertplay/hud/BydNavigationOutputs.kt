@@ -7,6 +7,7 @@ import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 object BydNavigationOutputs {
     /** Recover a journaled interrupted output when the app opens, even before a phone reconnects. */
     fun onAppOpened(context: Context) {
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return
         BydBluetoothSuspend.onAppOpened(context)
         BydOemClusterNavi.restoreIfNeeded(context)
         BydDiLink3ClusterOutput.restoreIfNeeded(context)
@@ -34,6 +35,7 @@ object BydNavigationOutputs {
 
     /** The host reports whether its CarPlay map window is on the cluster (see [BydClusterMapPause]). */
     fun setClusterMapShown(shown: Boolean) {
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return
         BydClusterMapPause.clusterMapShown = shown
         BydClusterBridge.setMapShown(shown)
     }
@@ -68,6 +70,9 @@ object BydNavigationOutputs {
     fun parked(context: Context): Boolean? = BydParkedState.parked(context.applicationContext)
 
     fun start(context: Context) {
+        VoyahNavigationOutput.start(context)
+        VoyahTrackOutput.start(context)
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return
         val app = context.applicationContext
         useStandalone = BydStandaloneHudOutput.available(app)
         if (useStandalone) standalone.start { BydStandaloneNavigationBridge.initialize(app) }
@@ -82,6 +87,13 @@ object BydNavigationOutputs {
     }
 
     internal fun onFrame(frame: Iap2Frame) {
+        VoyahNavigationOutput.onFrame(frame)
+        VoyahTrackOutput.onFrame(frame)
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) {
+            if (frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_UPDATE ||
+                frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE) updateOverlay(frame)
+            return
+        }
         if (frame.messageId == ClusterSongState.NOW_PLAYING_UPDATE) {
             BydClusterSong.onFrame(frame)
             return
@@ -156,6 +168,15 @@ object BydNavigationOutputs {
 
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
     fun endNow(preserveTurnOverlay: Boolean = false) {
+        VoyahNavigationOutput.end()
+        VoyahTrackOutput.end()
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) {
+            if (!preserveTurnOverlay) {
+                synchronized(overlayLock) { overlayRoute.clear() }
+                refreshTurnOverlay()
+            }
+            return
+        }
         standalone.clear(); hud.clear(); cluster.clear(); fceCluster.clear(); BydClusterSong.end(); BydCarPlayCall.end()
         // Only a wireless session replacement retains the card. Explicit controller close
         // and wired disconnect still clear it immediately.
