@@ -1,12 +1,12 @@
 {
   "CHANGELOG-0.1.23.md": "d5a61ab1f585dafc0f22806bcf6516d850d2a808952abcf0ae9d7665b18aee1d",
-  "TEST-ULTRA.md": "e90d44863cb92dc326916c8a4d6eaeee34d1a99ecb7a925beae592c446cf2eeb",
+  "TEST-ULTRA.md": "980838716a4501c80f1ce3bb9d55e2e928dec137eb56cfbed2d667833a8baf91",
   "UPSTREAM-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
   "UPSTREAM-SOURCES.json": "f7299fd4862c9e533e35cf7824c6ab1563d8d03cf1b645bcb57510b1a13de600",
-  "VALIDATION.md": "7b99782de508a2201f56bd66a414039e633e86a9bf31b4074ee67306033f432d",
-  "apply-ultra-pilot.ps1": "04e5f815186426533004742505f94ee028d7ce0aa27e5dd5d9ffd4ffee35e5d5",
+  "VALIDATION.md": "e8e4c89a64b57b05c622aae93e993f6eeae45cbf5f092b9c3efbe14d2af3b82d",
+  "apply-ultra-pilot.ps1": "f12f986ef9e609d35c74b390390c5b14de6778ff7586ddf1057011ae3673060a",
   "checks.txt": "098eb39882855b2f06e718cb297ffd1f0e69ea67fdd14bfba39459e763579195",
-  "edits.json": "8ff397aa7a543f36f8704462bef6618f956f0fad41e748a59264eb4095c3a9ba",
+  "edits.json": "a52aaf641c7b53dd40391189c53036648f50ef4d806793dc68efad5ca9a86a3d",
   "payload/common/src/debug/java/com/shilapi/xcertplay/voyah/ultra/VoyahUltraSettings.kt": "f3ce57ddf6e804b991824e2b9d1ad723c123e8898060fe1fb1ffb816376802d1",
   "payload/common/src/main/res/values/voyah_ultra.xml": "0c86d64cde334f5e1daec5ae9f53769c3ace5e003e92e9f29cf4ea29972724a1",
   "payload/common/src/main/res/values-ar/voyah_ultra.xml": "949b8377e2af59814bb3d26dde278788d5e48e97122e3ca4e8501c5211edefce",
@@ -41,5 +41,6 @@
   "payload/shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayProtocolExtension.kt": "c51ce14784d4b32dea72415400cfdf36a66dbb8e19676b0c19153b21c0593a2c",
   "payload/shared/src/testDebug/java/com/shilapi/xcertplay/airplay/ultra/VoyahUltraPilotTest.kt": "0a9b3ed18bb1f1ae9a238798e970eb7f3d1c9a44fc23fbf0c754475b06d42482",
   "restore-ultra-pilot.ps1": "c43bbdb67737e2b4c5169dd30a67619460d6c4ac58aad1b4e432500eaafb636e",
-  "ultra-pilot.patch": "f6ae9232d28d9ad33d67f44f44e727294ccc4d1b6ae6b1c96ea1cded6551840e"
+  "ultra-pilot.patch": "f6ae9232d28d9ad33d67f44f44e727294ccc4d1b6ae6b1c96ea1cded6551840e",
+  "apply-ultra-pilot-fix.ps1": "5f8684951aae798b4865d1bdd54b8f8110a0a5b8acd4f6a7bc33ae9df765b7f2"
 }

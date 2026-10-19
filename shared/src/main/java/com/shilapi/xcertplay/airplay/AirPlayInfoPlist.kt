@@ -81,6 +81,7 @@ object AirPlayInfoPlist {
             val legacy = features(config)
             info["videoPlaybackInfo"] = VideoInCar.info(legacy, VideoInCar.allowed)
         }
+        config.protocolExtension?.decorateInfo(info)
         return info
     }
 

@@ -109,6 +109,7 @@ internal enum class SettingsSection {
     VOYAH_SIGNS,
     VOYAH_CLUSTER,
     VOYAH_HELPER,
+    ULTRA_CLIMATE,
     VIDEO_PIPELINE,
     CARPLAY_CONTROLS,
     WHEEL_KEYS,
@@ -159,6 +160,7 @@ internal object SettingsInformationArchitecture {
             SettingsSection.CLUSTER_MAP,
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.VOYAH_HELPER,
+            SettingsSection.ULTRA_CLIMATE,
             SettingsSection.AMBIENT_LIGHTING,
         ),
     )
@@ -1702,6 +1704,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun allSettingsSections(content: LinearLayout) {
+        if (com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.available) {
+            filteredSection(content, SettingsSection.ULTRA_CLIMATE,
+                getString(R.string.voyah_ultra_title), R.drawable.ic_dp_advanced) { card ->
+                toggle(card, getString(R.string.voyah_ultra_toggle),
+                    getString(R.string.voyah_ultra_description),
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isEnabled(this)) { enabled ->
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveEnabled(this, enabled)
+                    markReconnectNeeded()
+                }
+                card.addView(label(getString(R.string.voyah_ultra_readonly), 14, MUTED))
+            }
+        }
         filteredSection(content, SettingsSection.VOYAH_CONTROLS,
             getString(R.string.voyah_controls_title), R.drawable.ic_dp_controls) { card ->
             com.shilapi.xcertplay.voyah.VoyahComfortSettings.add(this, card, SettingsTheme.card(palette))
@@ -1734,6 +1748,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         filteredSection(content, SettingsSection.DIAGNOSTICS,
             getString(R.string.diagnostics), R.drawable.ic_dp_diagnostics) { card ->
+            if (com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.available) {
+                card.addView(button(getString(R.string.voyah_ultra_probe), false) {
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.probeClimate(this)
+                }, matchButton())
+                card.addView(button(getString(R.string.voyah_ultra_report), false) {
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.showStatus(this)
+                }, matchButton())
+                card.addView(button(getString(R.string.voyah_ultra_export), false) {
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.exportReport(this)
+                }, matchButton())
+            }
             exportButton = button(if (exportInProgress) getString(R.string.saving_report) else getString(R.string.save_diagnostic_report), false) {
                 saveReportToDownloads()
             }.apply { isEnabled = !exportInProgress }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_ultra_title">CarPlay Ultra: driver climate (experimental)</string>
+    <string name="voyah_ultra_toggle">Send driver climate to iPhone</string>
+    <string name="voyah_ultra_description">Debug pilot. Takes effect after applying settings and reconnecting CarPlay. iPhone acceptance and the climate screen are not yet confirmed.</string>
+    <string name="voyah_ultra_readonly">Read only: driver temperature set point in Celsius. No cabin temperature sensor, radio or vehicle control is advertised.</string>
+    <string name="voyah_ultra_probe">Ultra: check climate readings</string>
+    <string name="voyah_ultra_report">Ultra: view capture</string>
+    <string name="voyah_ultra_export">Ultra: export capture</string>
+    <string name="voyah_ultra_working">Preparing Ultra report…</string>
+</resources>

@@ -98,6 +98,8 @@ data class AirPlayConfig(
      * default stream (#148, #341). When set, 8 and 16 kHz are not offered for default and alert audio.
      */
     val speechWithout8And16Khz: Boolean = false,
+    /** Optional debug protocol implementation; null preserves the normal receiver. */
+    val protocolExtension: AirPlayProtocolExtension? = null,
 )
 
 /** The offer, SETUP and controls must all honor the user's audio-output setting. */

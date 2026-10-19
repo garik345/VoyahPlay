@@ -76,6 +76,7 @@ class AirPlaySession(
     private val listener: AirPlaySessionListener,
     private val media: AirPlayMediaHandler,
 ) : Closeable {
+    private val protocolExtension = config.protocolExtension?.forSession()
     internal val pairSetup = PairSetup(identity, pairings)
     internal val pairVerify = PairVerify(identity, pairings)
     internal var cipher: ControlCipher? = null
@@ -143,6 +144,7 @@ class AirPlaySession(
         if (!closed.compareAndSet(false, true)) return
         mainScreenToken = null
         clearClusterContent()
+        runCatching { protocolExtension?.onSessionClosed(this) }
         safeClose(socket)
         try {
             media.onSessionClosed(this)
@@ -570,6 +572,7 @@ class AirPlaySession(
                 else RtspMessage.Response(headers = mapOf("Content-Type" to OCTET_CONTENT_TYPE), body = body)
             }
             path.endsWith("/info") -> {
+                protocolExtension?.onInfoRequest(request.body)
                 val info = AirPlayInfoPlist.build(config)
                 if (request.body.isNotEmpty()) {
                     val requestInfo = try {
@@ -612,6 +615,8 @@ class AirPlaySession(
     }
 
     private fun notifySetupResponseSent() {
+        runCatching { protocolExtension?.onSetupResponseSent(this) }
+            .onFailure { debugLog("Protocol extension SETUP failed: ${it.message}") }
         try {
             media.onSetupResponseSent(this)
         } catch (error: Exception) {
@@ -677,6 +682,7 @@ class AirPlaySession(
         val videoPlaybackEnabled = VideoInCar.FEATURE in features
         val videoDelivery = videoPlaybackAvailability.setFeatureEnabled(videoPlaybackEnabled)
         debugLog("airplay video playback negotiated=$videoPlaybackEnabled availability=$videoDelivery")
+        protocolExtension?.onFeaturesNegotiated(features)
         response["enabledFeatures"] = features
         return RtspMessage.Response(
             headers = mapOf("Content-Type" to PLIST_CONTENT_TYPE),
@@ -726,7 +732,8 @@ class AirPlaySession(
                     }
                 }
                 STREAM_TYPE_DATA -> {
-                    val streamResponse = media.onDataStream(this, stream)
+                    val streamResponse = protocolExtension?.openDataStream(this, stream)
+                        ?: media.onDataStream(this, stream)
                     debugLog(
                         "airplay data stream type=$type accepted=${streamResponse != null} " +
                             "dataPort=${streamResponse?.get("dataPort") ?: "none"}",
@@ -773,7 +780,10 @@ class AirPlaySession(
         } catch (_: Exception) {
             null
         }
-        val types = teardownStreamTypes(decodedBody)
+        val defaultTypes = teardownStreamTypes(decodedBody)
+        val types = if (protocolExtension == null) defaultTypes
+            else protocolExtension.mediaTeardownTypes(asMap(decodedBody), defaultTypes)
+        protocolExtension?.onTeardown(this, asMap(decodedBody))
 
         debugLog(
             "airplay TEARDOWN types=${types ?: "all"} activeBefore=$activeStreams " +
@@ -1007,6 +1017,7 @@ internal fun setupEnabledFeatures(config: AirPlayConfig, proposed: List<*>?): Li
     if (config.main.useIphoneCornerMask && proposed.orEmpty().contains("cornerMasks")) features.add("cornerMasks")
     if (config.videoInCar && proposed.orEmpty().contains(VideoInCar.FEATURE)) features.add(VideoInCar.FEATURE)
     if (config.bufferedAudioOutputEnabled && proposed.orEmpty().contains(MAIN_BUFFERED_FEATURE)) features.add(MAIN_BUFFERED_FEATURE)
+    config.protocolExtension?.enabledFeatures(proposed)?.forEach { if (it !in features) features.add(it) }
     return features
 }
 

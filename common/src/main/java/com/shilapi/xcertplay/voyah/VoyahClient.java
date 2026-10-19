@@ -22,6 +22,9 @@ public final class VoyahClient {
     // Shared across both activities: a stuck synchronous Binder cannot accumulate threads/tasks.
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();
     private static final AtomicBoolean BUSY = new AtomicBoolean();
+    private static volatile VoyahValues latestSnapshot;
+    /** Last completed, uncancelled read. Callers must check receivedAt; this is still OEM cache data. */
+    public static VoyahValues latestSnapshot() { return latestSnapshot; }
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
     private Request current;
@@ -105,6 +108,7 @@ public final class VoyahClient {
                 release(request);
                 if (current != request || request.cancelled) return;
                 current = null;
+                if (values != null && failure == null) latestSnapshot = values;
                 listener.complete(values, failure);
             });
         });

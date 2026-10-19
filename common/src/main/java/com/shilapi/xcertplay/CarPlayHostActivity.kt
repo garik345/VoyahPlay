@@ -3036,6 +3036,7 @@ class CarPlayHostActivity : ComponentActivity() {
             icons = listOf(loadAirPlayIcon()),
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
             mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),
+            protocolExtension = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.createExtension(this),
             speechWithout8And16Khz = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
                 com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.USB_SPEECH),
             disableAudioOutput = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
