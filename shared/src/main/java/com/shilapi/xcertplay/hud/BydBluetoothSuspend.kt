@@ -47,7 +47,7 @@ object BydBluetoothSuspend {
      * [stillActive] is checked under the same lock as [resume]: an owner that closes, or a session
      * that ends, before the pause begins never leaves a lease that nothing will release.
      */
-    fun suspend(context: Context, owner: Any, delayMillis: Long = 10_000L, stillActive: () -> Boolean = { true }) {
+    fun suspend(context: Context, owner: Any, delayMillis: Long = 10_000L, log: (String) -> Unit = {}, stillActive: () -> Boolean = { true }) {
         if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return
         synchronized(gate) {
             if (!stillActive()) return
@@ -68,7 +68,7 @@ object BydBluetoothSuspend {
     }
 
     /** Retire only this controller's work; a late old-controller close cannot release a new one. */
-    fun resume(context: Context, owner: Any) {
+    fun resume(context: Context, owner: Any, log: (String) -> Unit = {}) {
         if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) return
         synchronized(gate) {
             val state = lease(context)

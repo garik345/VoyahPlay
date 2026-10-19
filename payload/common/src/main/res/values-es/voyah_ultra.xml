@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_ultra_title">CarPlay Ultra: clima del conductor (experimental)</string>
+    <string name="voyah_ultra_toggle">Enviar el clima del conductor al iPhone</string>
+    <string name="voyah_ultra_description">Prueba debug. Se aplica al guardar y reconectar CarPlay. La aceptación del iPhone y la pantalla de climatización aún no están confirmadas.</string>
+    <string name="voyah_ultra_readonly">Solo lectura de la temperatura seleccionada por el conductor en °C. No se anuncian sensor de cabina, radio ni control del vehículo.</string>
+    <string name="voyah_ultra_probe">Ultra: comprobar datos del clima</string>
+    <string name="voyah_ultra_report">Ultra: ver registro</string>
+    <string name="voyah_ultra_export">Ultra: guardar registro</string>
+    <string name="voyah_ultra_working">Preparando informe Ultra…</string>
+</resources>

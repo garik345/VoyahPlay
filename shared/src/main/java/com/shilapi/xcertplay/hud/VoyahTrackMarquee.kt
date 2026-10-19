@@ -10,7 +10,7 @@ internal object VoyahTrackMarquee {
     fun frame(text: String, elapsedMs: Long, width: Int = WIDTH, stepMs: Long = STEP_MS): String? {
         val points = text.replace(Regex("[\\p{Cntrl}\\s]+"), " ").trim().codePoints().toArray()
         if (points.isEmpty() || elapsedMs < 0) return null
-        val count = width.coerceIn(6, 30)
+        val count = width.coerceIn(6, 20)
         val interval = stepMs.coerceIn(200, 1500)
         // The last window and each outgoing window must fit 30 UTF-16 code units.
         var tail = points.size

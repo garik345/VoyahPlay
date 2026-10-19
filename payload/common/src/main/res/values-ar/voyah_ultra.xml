@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_ultra_title">CarPlay Ultra: مناخ السائق (تجريبي)</string>
+    <string name="voyah_ultra_toggle">إرسال بيانات مناخ السائق إلى iPhone</string>
+    <string name="voyah_ultra_description">اختبار debug. يسري بعد حفظ الإعدادات وإعادة توصيل CarPlay. لم يتم تأكيد قبول iPhone للإعدادات أو عرض شاشة المناخ بعد.</string>
+    <string name="voyah_ultra_readonly">قراءة درجة الحرارة المحددة للسائق بالدرجة المئوية فقط. لا يتم الإعلان عن مستشعر حرارة المقصورة أو الراديو أو التحكم بالسيارة.</string>
+    <string name="voyah_ultra_probe">Ultra: فحص بيانات المناخ</string>
+    <string name="voyah_ultra_report">Ultra: عرض السجل</string>
+    <string name="voyah_ultra_export">Ultra: حفظ السجل</string>
+    <string name="voyah_ultra_working">جارٍ إعداد تقرير Ultra…</string>
+</resources>

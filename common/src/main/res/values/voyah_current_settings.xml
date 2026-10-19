@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_auto_car_hotspot_system_description">Turns on the saved car hotspot when VoyahPlay opens and before a wireless connection. VoyahPlay needs Android\'s “Modify system settings” access; ADB is not required. To have the hotspot after a full restart, also turn on opening VoyahPlay after the car starts. The hotspot is not turned off automatically.</string>
+    <string name="settings_call_speakerphone">Calls on the loudspeaker</string>
+    <string name="settings_call_speakerphone_description">For an Android phone or tablet used as the head unit: plays CarPlay calls on its loudspeaker instead of the earpiece and uses its hands-free microphone. Leave off on a car head unit. Applies from the next call.</string>
+    <string name="settings_car_hotspot_control">Car hotspot</string>
+    <string name="settings_navigation_attenuation">Navigation guidance volume</string>
+    <string name="settings_navigation_attenuation_description">Reduce CarPlay navigation guidance without changing music or call volume. Applies immediately; your head unit’s navigation volume still works.</string>
+    <string name="settings_navigation_attenuation_value">%1$d dB</string>
+    <string name="settings_wifi_direct_scan_pause">Pause the car\'s Wi-Fi search during CarPlay · needs ADB</string>
+    <string name="settings_wifi_direct_scan_pause_description">Over Wi-Fi Direct the car searches for Wi-Fi networks every few seconds, and each search makes music and video stutter. With this on, VoyahPlay pauses the search while CarPlay runs. The car then also does not join a known network, such as your phone\'s hotspot, by itself until CarPlay ends; you can still join one in the car\'s Wi-Fi settings. Turn it off to let the car join automatically. Applies at the next connection.</string>
+    <string name="settings_write_settings_allow">Allow access</string>
+    <string name="settings_write_settings_granted">“Modify system settings” access: allowed</string>
+    <string name="settings_write_settings_missing">“Modify system settings” access is not allowed yet. Allow it so VoyahPlay can turn on the hotspot.</string>
+    <string name="wheel_key_role_media_play_pause">Play/pause</string>
+    <string name="wheel_media_navigation_reserved">TV remote navigation, Home, volume, voice-assistant and media buttons keep their original functions. Choose a spare key.</string>
+    <string name="wheel_media_play_pause">Play/pause key on the wheel</string>
+    <string name="wheel_media_play_pause_description">Assign any available steering-wheel or keyboard key to toggle CarPlay music playback. Works while CarPlay runs, including in the background if the wheel-key service is enabled. During calls or when disconnected, the vehicle keeps the key. A key reserved by firmware may not reach VoyahPlay.</string>
+    <string name="voyah_video_pipeline">Video processing</string>
+    <string name="voyah_controls_title">Vehicle controls</string>
+    <string name="voyah_signs_title">Road sign recognition: TSR / ISA</string>
+    <string name="voyah_cluster_title">Instrument cluster</string>
+    <string name="voyah_maneuvers_title">CarPlay maneuvers on the instrument cluster</string>
+    <string name="voyah_maneuvers_hint">Arrow, distance and road. Reconnect CarPlay after enabling during a route.</string>
+    <string name="voyah_helper_title">VoyahPlay root helper</string>
+</resources>

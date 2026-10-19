@@ -43,7 +43,7 @@ internal fun audioTrackAttributesForFocus(track: AudioTrack, configured: AudioAt
 internal class AudioFocusCoordinator(
     context: Context?,
     private val enabled: Boolean,
-    private val muteMediaOnTransientLoss: Boolean = true,
+    private val muteMediaOnTransientLoss: Boolean = false,
     private val report: (String) -> Unit = {},
     private val navigationFocusEnabled: Boolean = false,
     private val onFocusStreamChanged: (Int) -> Unit = {},
@@ -59,6 +59,9 @@ internal class AudioFocusCoordinator(
     private var focusGeneration = 0L
     private var publishedStream = -1
     private var currentListener = listenerFor(focusGeneration)
+    init {
+        runCatching { report("Audio: focus policy enabled=$enabled muteOnTransientLoss=$muteMediaOnTransientLoss") }
+    }
     internal val listener: AudioManager.OnAudioFocusChangeListener get() = currentListener
 
     private fun listenerFor(generation: Long) = AudioManager.OnAudioFocusChangeListener { change ->
@@ -211,7 +214,7 @@ class AndroidMediaSink(
     private val preferSoftwareHevcDecoder: Boolean = false,
     private val advancedAudioChannelMapping: Boolean = false,
     private val audioFocusEnabled: Boolean = false,
-    private val audioFocusAutoYield: Boolean = true,
+    private val audioFocusAutoYield: Boolean = false,
     private val mediaChannel: Int = 0,
     private val navigationChannel: Int = 0,
     navigationAttenuationDb: Int = 0,

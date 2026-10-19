@@ -14,7 +14,7 @@ final class RootHelperClient {
     });
 
     static final class Unavailable extends IOException {
-        Unavailable(IOException cause) { super("Root-помощник не подключён. Во время загрузки дождитесь запуска; первичная установка автозапуска — root-helper.ps1 -Mode Install. Ручное восстановление — -Mode Start.", cause); }
+        Unavailable(IOException cause) { super("Root-помощник не подключён. Во время загрузки дождитесь запуска; первичная установка автозапуска — root-helper.ps1 -Mode Install. Ручное восстановление — -Mode Start. После переустановки APK с новым UID выполните -Mode Install.\nПричина подключения: " + cause + "", cause); }
     }
 
     static RootProcess.Result call(RootHelperProtocol.Action action, int seconds) throws IOException {

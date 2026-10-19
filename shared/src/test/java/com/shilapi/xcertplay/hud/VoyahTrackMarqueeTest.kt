@@ -44,4 +44,11 @@ class VoyahTrackMarqueeTest {
             }
         }
     }
+    @Test fun savedOversizedWidthCannotExceedTwentyCharacters() {
+        val ascii = requireNotNull(VoyahTrackMarquee.frame("ABCDEFGHIJKLMNOPQRSTUVWXYZ",0,48,200))
+        assertEquals(20,ascii.codePointCount(0,ascii.length))
+        val frame = requireNotNull(VoyahTrackMarquee.frame("🎵".repeat(48),0,48,200))
+        assertTrue(frame.codePointCount(0,frame.length) <= 20)
+    }
+
 }

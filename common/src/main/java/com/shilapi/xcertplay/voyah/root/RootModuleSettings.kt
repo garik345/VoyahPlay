@@ -19,7 +19,7 @@ object RootModuleSettings {
     fun add(activity: Activity, parent: LinearLayout, actionsParent: LinearLayout, theme: SettingsTheme) {
         TweaksFullscreenSettings.add(activity, parent, actionsParent, theme)
         val description = TextView(activity).apply {
-            textSize = 14f; maxLines = 8
+            textSize = 14f
             setTextColor(theme.textSecondary)
             text = "Первичная установка автозапуска: root-helper.ps1 -Mode Install. После неё компьютер при перезагрузках не требуется."
         }
@@ -41,7 +41,8 @@ object RootModuleSettings {
         fun completed(ok: Boolean, report: String) {
             busy = false
             if (!attached || activity.isFinishing || activity.isDestroyed) return
-            installed = ok && report.lineSequence().any { it == "AUTOSTART_INSTALLED=1" }
+            installed = ok && report.lineSequence().any { it == "AUTOSTART_INSTALLED=1" } &&
+                report.lineSequence().none { it == "HELPER_COMPATIBLE=0" }
             enabled = ok && report.lineSequence().any { it == "AUTOSTART_ENABLED=1" }
             description.text = report
             if (dialog?.isShowing == true) dialog?.setMessage(report)
@@ -83,17 +84,16 @@ object RootModuleSettings {
             buttons.add(button)
             actionsParent.addView(button, LinearLayout.LayoutParams(-1, -2))
         }
-        action("Проверить root из APK") { perform("Проверка root", true) { context, callback ->
-            VoyahRootModule.checkRoot(context) { ok, result ->
-                if (ok) VoyahRootModule.helperStatus(context) { ready, report -> callback.complete(ready, result + "\n" + report) }
-                else callback.complete(false, result)
-            }
-        } }
+        action("Проверить root из APK") { perform("Проверка root", true, VoyahRootModule::checkRoot) }
         action("Состояние root-помощника и автозапуска") { perform("Root-помощник", true, VoyahRootModule::helperStatus) }
         action("Скопировать отчёт root-помощника") {
             (activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
                 .setPrimaryClip(ClipData.newPlainText("VoyahPlay root helper", VoyahRootModule.lastReport(activity)))
             Toast.makeText(activity, "Отчёт скопирован", Toast.LENGTH_SHORT).show()
+        }
+        if (row.rowView.isAttachedToWindow) {
+            attached = true
+            perform("Состояние root-помощника", false, VoyahRootModule::helperStatus)
         }
         paint()
     }

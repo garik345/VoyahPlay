@@ -1,0 +1,31 @@
+JUnit version 4.13.2
+.............
+Time: 0.266
+
+OK (13 tests)
+
+
+PASS: PowerShell parser restore-ultra-pilot.ps1 LF
+PASS: PowerShell parser restore-ultra-pilot.ps1 CRLF
+PASS: PowerShell parser apply-ultra-pilot.ps1 LF
+PASS: PowerShell parser apply-ultra-pilot.ps1 CRLF
+PASS: exact patch result and idempotence for LF
+PASS: exact patch result and idempotence for CRLF
+PASS: local audio branch compatibility common/src/main/java/com/shilapi/xcertplay/CarPlayHostActivity.kt
+PASS: local audio branch compatibility shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayConfig.kt
+PASS: local audio branch compatibility shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlist.kt
+PASS: local audio branch compatibility shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlaySession.kt
+PASS: all eight resource sets parse and contain the same eight keys
+PASS: Ultra settings card belongs to Advanced only
+PASS: package contains source changes only; no credentials, binaries, Frida or root-helper changes
+
+ 
+ /tmp/jansi-2.4.0-dc379b8f361c5742-libjansi.so.lck (No such file or directory)
+
+PASS: debug adapter compiled against real VoyahClient + DiagnosticExportStore and Android API; FileProvider is a compile seam.
+ /tmp/jansi-2.4.0-8ee08191fa7e8fcc-libjansi.so.lck (No such file or directory)
+
+PASS: release AirPlay API + facade compiled without debug classes; no CAF/RCS/pilot classes in release output.
+Kotlin syntax OK: CarPlayHostActivity.kt
+Kotlin syntax OK: DiPlayActivity.kt
+ 

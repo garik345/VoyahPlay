@@ -49,7 +49,7 @@ object VoyahSettings {
         slider("Скорость прокрутки", 26, (1500 - VoyahTrackOutput.scrollInterval(a)) / 50,
             { "${1500 - it * 50} мс на символ · вправо быстрее" },
             { VoyahTrackOutput.setScroll(a, VoyahTrackOutput.visibleCharacters(a), 1500 - it * 50) })
-        slider("Символов одновременно", 24, VoyahTrackOutput.visibleCharacters(a) - 6,
+        slider("Символов одновременно", 14, VoyahTrackOutput.visibleCharacters(a) - 6,
             { (it + 6).toString() },
             { VoyahTrackOutput.setScroll(a, it + 6, VoyahTrackOutput.scrollInterval(a)) })
         parent.addView(label(a, "Изменения сохраняются сразу. Значок трубки остаётся; обнаруженный звонок CarPlay прерывает строку.", theme))

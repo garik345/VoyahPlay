@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_auto_car_hotspot_system_description">Activa el punto de acceso guardado del coche al abrir VoyahPlay y antes de una conexión inalámbrica. VoyahPlay necesita el acceso de Android «Modificar ajustes del sistema»; no se requiere ADB. Para tener el punto de acceso tras un reinicio completo, activa también abrir VoyahPlay al arrancar el coche. El punto de acceso no se desactiva automáticamente.</string>
+    <string name="settings_call_speakerphone">Llamadas por el altavoz</string>
+    <string name="settings_call_speakerphone_description">Para un teléfono o una tableta Android usados como unidad principal: reproduce las llamadas de CarPlay por su altavoz en lugar del auricular y usa su micrófono manos libres. Déjalo desactivado en la unidad principal de un coche. Se aplica desde la próxima llamada.</string>
+    <string name="settings_car_hotspot_control">Punto de acceso del coche</string>
+    <string name="settings_navigation_attenuation">Volumen de las indicaciones de navegación</string>
+    <string name="settings_navigation_attenuation_description">Reduce solo las indicaciones de navegación de CarPlay, sin cambiar música ni llamadas. Se aplica al instante; sigue funcionando el volumen de navegación de la unidad.</string>
+    <string name="settings_navigation_attenuation_value">%1$d dB</string>
+    <string name="settings_wifi_direct_scan_pause">Pausar la búsqueda de Wi-Fi del coche con CarPlay · requiere ADB</string>
+    <string name="settings_wifi_direct_scan_pause_description">Con Wi-Fi Direct el coche busca redes Wi-Fi cada pocos segundos, y cada búsqueda hace que la música y el vídeo se corten. Con esta opción, VoyahPlay pausa la búsqueda mientras CarPlay está activo. Entonces el coche tampoco se conecta solo a una red conocida, como el punto de acceso de tu teléfono, hasta que CarPlay termina; puedes conectarte a mano en los ajustes de Wi-Fi del coche. Desactívala para que el coche se conecte solo. Se aplica en la próxima conexión.</string>
+    <string name="settings_write_settings_allow">Permitir acceso</string>
+    <string name="settings_write_settings_granted">Acceso «Modificar ajustes del sistema»: permitido</string>
+    <string name="settings_write_settings_missing">El acceso «Modificar ajustes del sistema» aún no está permitido. Permítelo para que VoyahPlay pueda activar el punto de acceso.</string>
+    <string name="wheel_key_role_media_play_pause">Reproducir/pausar</string>
+    <string name="wheel_media_navigation_reserved">Las teclas de navegación, Inicio, volumen, asistente de voz y multimedia conservan sus funciones originales. Elige otra tecla.</string>
+    <string name="wheel_media_play_pause">Tecla reproducir/pausar del volante</string>
+    <string name="wheel_media_play_pause_description">Asigna una tecla disponible del volante o teclado para alternar reproducción y pausa en CarPlay. Funciona con CarPlay conectado, también en segundo plano con el servicio de teclas activo. Durante llamadas o sin conexión, conserva su función original. El vehículo puede reservar ciertas teclas.</string>
+    <string name="voyah_video_pipeline">Video processing</string>
+    <string name="voyah_controls_title">Vehicle controls</string>
+    <string name="voyah_signs_title">Road sign recognition: TSR / ISA</string>
+    <string name="voyah_cluster_title">Instrument cluster</string>
+    <string name="voyah_maneuvers_title">CarPlay maneuvers on the instrument cluster</string>
+    <string name="voyah_maneuvers_hint">Arrow, distance and road. Reconnect CarPlay after enabling during a route.</string>
+    <string name="voyah_helper_title">VoyahPlay root helper</string>
+</resources>

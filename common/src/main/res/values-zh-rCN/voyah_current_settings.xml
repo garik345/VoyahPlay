@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_auto_car_hotspot_system_description">打开 VoyahPlay 时及无线连接前开启已保存的车辆热点。VoyahPlay 需要 Android 的“修改系统设置”权限；无需 ADB。若要在完全重启后也有热点，请同时开启“车辆启动后打开 VoyahPlay”。热点不会自动关闭。</string>
+    <string name="settings_call_speakerphone">通话使用扬声器</string>
+    <string name="settings_call_speakerphone_description">适用于用作车机的 Android 手机或平板：CarPlay 通话从扬声器播放而不是听筒，并使用免提麦克风。车机上请保持关闭。从下一次通话开始生效。</string>
+    <string name="settings_car_hotspot_control">车辆热点</string>
+    <string name="settings_navigation_attenuation">导航播报音量</string>
+    <string name="settings_navigation_attenuation_description">仅降低 CarPlay 导航播报音量，不影响音乐和通话。调整立即生效，车机自身的导航音量仍可使用。</string>
+    <string name="settings_navigation_attenuation_value">%1$d dB</string>
+    <string name="settings_wifi_direct_scan_pause">CarPlay 期间暂停车机 Wi-Fi 搜索 · 需要 ADB</string>
+    <string name="settings_wifi_direct_scan_pause_description">Wi-Fi 直连时，车机每隔几秒搜索一次 Wi-Fi 网络，每次搜索都会让音乐和画面卡顿。开启后，CarPlay 运行期间 VoyahPlay 会暂停这个搜索。这段时间车机也不会自动连接已知网络（例如手机热点），可以在车机 Wi-Fi 设置里手动连接；CarPlay 结束后恢复。关闭后车机可以自动连接。下次连接时生效。</string>
+    <string name="settings_write_settings_allow">允许权限</string>
+    <string name="settings_write_settings_granted">“修改系统设置”权限：已允许</string>
+    <string name="settings_write_settings_missing">尚未允许“修改系统设置”权限。请允许，以便 VoyahPlay 开启热点。</string>
+    <string name="wheel_key_role_media_play_pause">播放／暂停</string>
+    <string name="wheel_media_navigation_reserved">遥控器的导航、主页、音量、语音助手及现有媒体按键保留原有功能。请选择其他空闲按键。</string>
+    <string name="wheel_media_play_pause">方向盘播放／暂停按钮</string>
+    <string name="wheel_media_play_pause_description">将空闲的方向盘或键盘按键映射为 CarPlay 音乐播放／暂停。CarPlay 连接时可用；后台运行需要启用方向盘按键服务。通话或断开连接时保留车辆原有功能。车机可能拦截部分按键。</string>
+    <string name="voyah_video_pipeline">Video processing</string>
+    <string name="voyah_controls_title">Vehicle controls</string>
+    <string name="voyah_signs_title">Road sign recognition: TSR / ISA</string>
+    <string name="voyah_cluster_title">Instrument cluster</string>
+    <string name="voyah_maneuvers_title">CarPlay maneuvers on the instrument cluster</string>
+    <string name="voyah_maneuvers_hint">Arrow, distance and road. Reconnect CarPlay after enabling during a route.</string>
+    <string name="voyah_helper_title">VoyahPlay root helper</string>
+</resources>

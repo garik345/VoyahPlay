@@ -129,8 +129,8 @@ object AirPlayPersistence {
     private const val SAFE_AREA_KEY_PREFIX = "safe_area_"
     private const val CUSTOM_ICON_FILE = "airplay-icon.png"
 
-    const val DEFAULT_MANUFACTURER = "DiPlay"
-    const val DEFAULT_MODEL = "DiPlay"
+    const val DEFAULT_MANUFACTURER = "Voyah"
+    const val DEFAULT_MODEL = "Free"
     const val DEFAULT_OEM_LABEL = "BYD"
     const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
 
@@ -246,7 +246,7 @@ object AirPlayPersistence {
 
     fun loadAudioFocusAutoYield(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_AUDIO_FOCUS_AUTO_YIELD, true)
+            .getBoolean(KEY_AUDIO_FOCUS_AUTO_YIELD, false)
 
     fun saveAudioFocusAutoYield(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -323,11 +323,7 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadMfiTarget(context: Context): MfiTarget {
-        val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_MFI_TARGET, null)
-        return MfiTarget.entries.firstOrNull { it.name == stored } ?: MfiTarget.LOCAL
-    }
+    fun loadMfiTarget(context: Context): MfiTarget = MfiTarget.LOCAL
 
     fun saveMfiTarget(context: Context, target: MfiTarget) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -643,7 +639,7 @@ object AirPlayPersistence {
 
     fun loadFps(context: Context): Int = AirPlayDisplaySettings.sanitizeFps(
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_FPS, 30),
+            .getInt(KEY_FPS, 60),
     )
 
     /** Music buffer for the session's transport. Wireless and wired USB have separate settings. */

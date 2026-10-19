@@ -1,0 +1,100 @@
+[
+  {
+    "path": "common/src/main/java/com/shilapi/xcertplay/CarPlayHostActivity.kt",
+    "edits": [
+      {
+        "old": "            mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),\n",
+        "new": "            mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),\n            protocolExtension = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.createExtension(this),\n"
+      }
+    ]
+  },
+  {
+    "path": "common/src/main/java/com/shilapi/xcertplay/DiPlayActivity.kt",
+    "edits": [
+      {
+        "old": "    DISPLAY_AND_PERFORMANCE,\n    EXPERIMENTAL_DISPLAY,\n    ADVANCED_MEDIA,\n    AMBIENT_LIGHTING,\n    CAR_BUTTON,\n    AUDIO_ROUTING,\n",
+        "new": "    DISPLAY_AND_PERFORMANCE,\n    EXPERIMENTAL_DISPLAY,\n    ADVANCED_MEDIA,\n    ULTRA_CLIMATE,\n    AMBIENT_LIGHTING,\n    CAR_BUTTON,\n    AUDIO_ROUTING,\n"
+      },
+      {
+        "old": "            SettingsSection.CLUSTER_MAP,\n            SettingsSection.EXPERIMENTAL_DISPLAY,\n            SettingsSection.ADVANCED_MEDIA,\n            SettingsSection.NAVIGATION_WHEEL,\n            SettingsSection.AMBIENT_LIGHTING,\n        ),\n",
+        "new": "            SettingsSection.CLUSTER_MAP,\n            SettingsSection.EXPERIMENTAL_DISPLAY,\n            SettingsSection.ADVANCED_MEDIA,\n            SettingsSection.ULTRA_CLIMATE,\n            SettingsSection.NAVIGATION_WHEEL,\n            SettingsSection.AMBIENT_LIGHTING,\n        ),\n"
+      },
+      {
+        "old": "    }\n\n    private fun allSettingsSections(content: LinearLayout) {\n        filteredSection(content, SettingsSection.CARPLAY_CONTROLS,\n            getString(R.string.carplay_controls), R.drawable.ic_dp_controls) { card ->\n            val gestureFingers = listOf(0, 2, 3, 4)\n",
+        "new": "    }\n\n    private fun allSettingsSections(content: LinearLayout) {\n        if (com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.available) {\n            filteredSection(content, SettingsSection.ULTRA_CLIMATE,\n                getString(R.string.voyah_ultra_title), R.drawable.ic_dp_advanced) { card ->\n                toggle(card, getString(R.string.voyah_ultra_toggle), getString(R.string.voyah_ultra_description),\n                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isEnabled(this)) { enabled ->\n                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveEnabled(this, enabled)\n                    markReconnectNeeded()\n                }\n                card.addView(label(getString(R.string.voyah_ultra_readonly), 14, MUTED))\n            }\n        }\n        filteredSection(content, SettingsSection.CARPLAY_CONTROLS,\n            getString(R.string.carplay_controls), R.drawable.ic_dp_controls) { card ->\n            val gestureFingers = listOf(0, 2, 3, 4)\n"
+      },
+      {
+        "old": "            card.addView(exportButton, matchButton(10, 60))\n            card.addView(button(getString(R.string.choose_save_location), false) { chooseReportDestination() }, matchButton(10, 60))\n            card.addView(button(getString(R.string.settings_report_on_phone), false) { openBackup(SettingsCategory.DIAGNOSTICS) }, matchButton(10, 60))\n            val destination = getString(R.string.reports_save_to_downloads_diplay)\n            card.addView(label(destination + getString(R.string.nothing_is_sent_automatically_protocol_payloads_and_creden), 14, MUTED).apply { setPadding(0, dp(12), 0, 0) })\n            toggle(card, getString(R.string.settings_fps_counter), getString(R.string.settings_fps_counter_description),\n",
+        "new": "            card.addView(exportButton, matchButton(10, 60))\n            card.addView(button(getString(R.string.choose_save_location), false) { chooseReportDestination() }, matchButton(10, 60))\n            card.addView(button(getString(R.string.settings_report_on_phone), false) { openBackup(SettingsCategory.DIAGNOSTICS) }, matchButton(10, 60))\n            if (com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.available) {\n                card.addView(button(getString(R.string.voyah_ultra_probe), false) {\n                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.probeClimate(this)\n                }, matchButton(10, 60))\n                card.addView(button(getString(R.string.voyah_ultra_report), false) {\n                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.showStatus(this)\n                }, matchButton(10, 60))\n                card.addView(button(getString(R.string.voyah_ultra_export), false) {\n                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.exportReport(this)\n                }, matchButton(10, 60))\n            }\n            val destination = getString(R.string.reports_save_to_downloads_diplay)\n            card.addView(label(destination + getString(R.string.nothing_is_sent_automatically_protocol_payloads_and_creden), 14, MUTED).apply { setPadding(0, dp(12), 0, 0) })\n            toggle(card, getString(R.string.settings_fps_counter), getString(R.string.settings_fps_counter_description),\n"
+      }
+    ]
+  },
+  {
+    "path": "common/src/main/java/com/shilapi/xcertplay/voyah/VoyahClient.java",
+    "edits": [
+      {
+        "old": "    // Shared across both activities: a stuck synchronous Binder cannot accumulate threads/tasks.\n    private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();\n    private static final AtomicBoolean BUSY = new AtomicBoolean();\n    private final Context context;\n    private final Handler main = new Handler(Looper.getMainLooper());\n    private Request current;\n",
+        "new": "    // Shared across both activities: a stuck synchronous Binder cannot accumulate threads/tasks.\n    private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();\n    private static final AtomicBoolean BUSY = new AtomicBoolean();\n    private static volatile VoyahValues latestSnapshot;\n    /** Last completed, uncancelled read. Callers must check receivedAt; this is still OEM cache data. */\n    public static VoyahValues latestSnapshot() { return latestSnapshot; }\n    private final Context context;\n    private final Handler main = new Handler(Looper.getMainLooper());\n    private Request current;\n"
+      },
+      {
+        "old": "                release(request);\n                if (current != request || request.cancelled) return;\n                current = null;\n                listener.complete(values, failure);\n            });\n        });\n",
+        "new": "                release(request);\n                if (current != request || request.cancelled) return;\n                current = null;\n                if (values != null && failure == null) latestSnapshot = values;\n                listener.complete(values, failure);\n            });\n        });\n"
+      }
+    ]
+  },
+  {
+    "path": "shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayConfig.kt",
+    "edits": [
+      {
+        "old": "    val speechWithout8And16Khz: Boolean = false,\n)",
+        "new": "    val speechWithout8And16Khz: Boolean = false,\n    /** Optional debug protocol implementation; null preserves the normal receiver. */\n    val protocolExtension: AirPlayProtocolExtension? = null,\n)"
+      }
+    ]
+  },
+  {
+    "path": "shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlayInfoPlist.kt",
+    "edits": [
+      {
+        "old": "            val legacy = features(config)\n            info[\"videoPlaybackInfo\"] = VideoInCar.info(legacy, VideoInCar.allowed)\n        }\n        return info\n    }\n\n",
+        "new": "            val legacy = features(config)\n            info[\"videoPlaybackInfo\"] = VideoInCar.info(legacy, VideoInCar.allowed)\n        }\n        config.protocolExtension?.decorateInfo(info)\n        return info\n    }\n\n"
+      }
+    ]
+  },
+  {
+    "path": "shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlaySession.kt",
+    "edits": [
+      {
+        "old": "    private val listener: AirPlaySessionListener,\n    private val media: AirPlayMediaHandler,\n) : Closeable {\n    internal val pairSetup = PairSetup(identity, pairings)\n    internal val pairVerify = PairVerify(identity, pairings)\n    internal var cipher: ControlCipher? = null\n",
+        "new": "    private val listener: AirPlaySessionListener,\n    private val media: AirPlayMediaHandler,\n) : Closeable {\n    private val protocolExtension = config.protocolExtension?.forSession()\n    internal val pairSetup = PairSetup(identity, pairings)\n    internal val pairVerify = PairVerify(identity, pairings)\n    internal var cipher: ControlCipher? = null\n"
+      },
+      {
+        "old": "        if (!closed.compareAndSet(false, true)) return\n        mainScreenToken = null\n        clearClusterContent()\n        safeClose(socket)\n        try {\n            media.onSessionClosed(this)\n",
+        "new": "        if (!closed.compareAndSet(false, true)) return\n        mainScreenToken = null\n        clearClusterContent()\n        runCatching { protocolExtension?.onSessionClosed(this) }\n        safeClose(socket)\n        try {\n            media.onSessionClosed(this)\n"
+      },
+      {
+        "old": "                else RtspMessage.Response(headers = mapOf(\"Content-Type\" to OCTET_CONTENT_TYPE), body = body)\n            }\n            path.endsWith(\"/info\") -> {\n                val info = AirPlayInfoPlist.build(config)\n                if (request.body.isNotEmpty()) {\n                    val requestInfo = try {\n",
+        "new": "                else RtspMessage.Response(headers = mapOf(\"Content-Type\" to OCTET_CONTENT_TYPE), body = body)\n            }\n            path.endsWith(\"/info\") -> {\n                protocolExtension?.onInfoRequest(request.body)\n                val info = AirPlayInfoPlist.build(config)\n                if (request.body.isNotEmpty()) {\n                    val requestInfo = try {\n"
+      },
+      {
+        "old": "    }\n\n    private fun notifySetupResponseSent() {\n        try {\n            media.onSetupResponseSent(this)\n        } catch (error: Exception) {\n",
+        "new": "    }\n\n    private fun notifySetupResponseSent() {\n        runCatching { protocolExtension?.onSetupResponseSent(this) }\n            .onFailure { debugLog(\"Protocol extension SETUP failed: ${it.message}\") }\n        try {\n            media.onSetupResponseSent(this)\n        } catch (error: Exception) {\n"
+      },
+      {
+        "old": "        val videoPlaybackEnabled = VideoInCar.FEATURE in features\n        val videoDelivery = videoPlaybackAvailability.setFeatureEnabled(videoPlaybackEnabled)\n        debugLog(\"airplay video playback negotiated=$videoPlaybackEnabled availability=$videoDelivery\")\n        response[\"enabledFeatures\"] = features\n        return RtspMessage.Response(\n            headers = mapOf(\"Content-Type\" to PLIST_CONTENT_TYPE),\n",
+        "new": "        val videoPlaybackEnabled = VideoInCar.FEATURE in features\n        val videoDelivery = videoPlaybackAvailability.setFeatureEnabled(videoPlaybackEnabled)\n        debugLog(\"airplay video playback negotiated=$videoPlaybackEnabled availability=$videoDelivery\")\n        protocolExtension?.onFeaturesNegotiated(features)\n        response[\"enabledFeatures\"] = features\n        return RtspMessage.Response(\n            headers = mapOf(\"Content-Type\" to PLIST_CONTENT_TYPE),\n"
+      },
+      {
+        "old": "                    }\n                }\n                STREAM_TYPE_DATA -> {\n                    val streamResponse = media.onDataStream(this, stream)\n                    debugLog(\n                        \"airplay data stream type=$type accepted=${streamResponse != null} \" +\n                            \"dataPort=${streamResponse?.get(\"dataPort\") ?: \"none\"}\",\n",
+        "new": "                    }\n                }\n                STREAM_TYPE_DATA -> {\n                    val streamResponse = protocolExtension?.openDataStream(this, stream)\n                        ?: media.onDataStream(this, stream)\n                    debugLog(\n                        \"airplay data stream type=$type accepted=${streamResponse != null} \" +\n                            \"dataPort=${streamResponse?.get(\"dataPort\") ?: \"none\"}\",\n"
+      },
+      {
+        "old": "        } catch (_: Exception) {\n            null\n        }\n        val types = teardownStreamTypes(decodedBody)\n\n        debugLog(\n            \"airplay TEARDOWN types=${types ?: \"all\"} activeBefore=$activeStreams \" +\n",
+        "new": "        } catch (_: Exception) {\n            null\n        }\n        val defaultTypes = teardownStreamTypes(decodedBody)\n        val types = if (protocolExtension == null) defaultTypes\n            else protocolExtension.mediaTeardownTypes(asMap(decodedBody), defaultTypes)\n        protocolExtension?.onTeardown(this, asMap(decodedBody))\n\n        debugLog(\n            \"airplay TEARDOWN types=${types ?: \"all\"} activeBefore=$activeStreams \" +\n"
+      },
+      {
+        "old": "    if (config.bufferedAudioOutputEnabled && proposed.orEmpty().contains(MAIN_BUFFERED_FEATURE)) features.add(MAIN_BUFFERED_FEATURE)\n    return features",
+        "new": "    if (config.bufferedAudioOutputEnabled && proposed.orEmpty().contains(MAIN_BUFFERED_FEATURE)) features.add(MAIN_BUFFERED_FEATURE)\n    config.protocolExtension?.enabledFeatures(proposed)?.forEach { if (it !in features) features.add(it) }\n    return features"
+      }
+    ]
+  }
+]

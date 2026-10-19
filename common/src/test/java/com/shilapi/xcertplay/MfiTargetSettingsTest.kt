@@ -46,37 +46,16 @@ class MfiTargetSettingsTest {
         CarPlayBackgroundSession.clear()
     }
 
-    @Test fun connectionSettingsSwitchFromCh341BackToLocalWithoutConnecting() {
-        AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
-        renderConnection()
-        assertEquals("${activity.getString(R.string.mfi_certificate_signing_target)} · ${activity.getString(R.string.usb_ch341)}",
-            targetButton().text.toString())
-        assertTrue(views(page).filterIsInstance<TextView>().any {
-            it.text == activity.getString(R.string.settings_mfi_target_description)
-        })
-
-        targetButton().performClick()
-        val dialog = ShadowAlertDialog.getLatestAlertDialog()
-        assertEquals(activity.getString(R.string.local_offline), dialog.listView.adapter.getItem(0))
-        dialog.listView.performItemClick(null, 0, 0)
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(Looper.getMainLooper()).idle()
-
-        assertEquals(MfiTarget.LOCAL, AirPlayPersistence.loadMfiTarget(activity))
-        assertEquals("${activity.getString(R.string.mfi_certificate_signing_target)} · ${activity.getString(R.string.local_offline)}",
-            targetButton().text.toString())
+    @Test fun connectionSettingsAlwaysUseOfflineLocalWithoutACertificateSelector() {
+        for (old in MfiTarget.entries) {
+            AirPlayPersistence.saveMfiTarget(activity,old)
+            renderConnection()
+            assertEquals(MfiTarget.LOCAL,AirPlayPersistence.loadMfiTarget(activity))
+            assertTrue(views(page).filterIsInstance<Button>().none {
+                it.text.startsWith(activity.getString(R.string.mfi_certificate_signing_target))
+            })
+        }
     }
-
-    @Test fun expertTargetsSetOutsideTheTwoChoicesAreNotOverwritten() {
-        AirPlayPersistence.saveMfiTarget(activity, MfiTarget.REMOTE)
-        renderConnection()
-
-        assertTrue(views(page).filterIsInstance<Button>().none {
-            it.text.startsWith(activity.getString(R.string.mfi_certificate_signing_target))
-        })
-        assertEquals(MfiTarget.REMOTE, AirPlayPersistence.loadMfiTarget(activity))
-    }
-
     private fun renderConnection() {
         ReflectionHelpers.setField(activity, "page", "settings")
         ReflectionHelpers.setField(activity, "settingsCategory", SettingsCategory.CONNECTION)

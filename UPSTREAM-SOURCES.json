@@ -1,0 +1,20 @@
+{
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/RcsChannel.kt": "b44219f495766964e3442ac76bda02b8e3bdefa9",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/RcsDataStream.kt": "f9206258d7f1f48e2476e2119fd6a90674ea370a",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafConfigTree.kt": "64f6d3d27c08219f4aa9b5e328707cff853d89e4",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafDirectionalMessages.kt": "e120ffbec37103304d68dd4967174276a01392d7",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafMessage.kt": "dabadca712ac9ce5470821fb20394207d53a1f7b",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CarAccessoryMessages.kt": "5f2c211762a1501573b46e6dd8f77c76909d996e",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafRcsCodec.kt": "3a70c97f9c61630ea6a039ca40bfdcbdebce37b3",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafPlugin.kt": "4ae13b380479a8264f8969306aa713503a5755fb",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafTransactionTracker.kt": "e156610a5fa147f921ad1c892b51f7905e7acfa9",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafProtocolSession.kt": "b7efb1f1218a512383ab0e02725a36c13bf18bf4",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafTypeCatalog.kt": "7ae68494111d5af2a0c87b5325f92497225d134f",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/caf/CafCommand.kt": "101a4b638bf0439eca2b972e56b6d20593e89333",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/catalog/RcsClientType.kt": "a8d2ab58398b499654a687c486f424b0568509e1",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/opack/OpackCodec.kt": "cbb711e5012888c5c57eacb6c12dfc11b651437b",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/transport/ApTransportPackage.kt": "457ff996efa1c0986726357fbb3ddb2e9d84ef78",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/transport/RcsFrameCodec.kt": "c8867805208c74275e40c550bb64b693868a34b6",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/rcs/uisync/CarPlayUiSyncProtocol.kt": "dba1139e2ef00c46c218b53400668585c9bce21f",
+  "shared/src/main/java/com/shilapi/xcertplay/airplay/ProtocolTraceFormatter.kt": "f27295a5c7b70ea0b24fa5668032b0e8f10d90ef"
+}

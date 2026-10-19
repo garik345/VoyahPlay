@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_ultra_title">CarPlay Ultra：駕駛座空調（實驗性）</string>
+    <string name="voyah_ultra_toggle">向 iPhone 傳送駕駛座空調資料</string>
+    <string name="voyah_ultra_description">debug 測試。儲存設定並重新連接 CarPlay 後生效。iPhone 是否接受設定及是否顯示空調介面尚未確認。</string>
+    <string name="voyah_ultra_readonly">僅讀取駕駛座設定溫度（°C）。不宣告車內溫度感測器、收音機或車輛控制。</string>
+    <string name="voyah_ultra_probe">Ultra：檢查空調資料</string>
+    <string name="voyah_ultra_report">Ultra：檢視日誌</string>
+    <string name="voyah_ultra_export">Ultra：儲存日誌</string>
+    <string name="voyah_ultra_working">正在準備 Ultra 報告…</string>
+</resources>

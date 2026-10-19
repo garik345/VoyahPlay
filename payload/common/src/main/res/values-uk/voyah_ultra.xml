@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voyah_ultra_title">CarPlay Ultra: клімат водія (експериментально)</string>
+    <string name="voyah_ultra_toggle">Передавати клімат водія в iPhone</string>
+    <string name="voyah_ultra_description">Тест debug. Застосовується після збереження налаштувань і повторного підключення CarPlay. Прийняття конфігурації iPhone та екран клімату ще не підтверджено.</string>
+    <string name="voyah_ultra_readonly">Лише читання заданої температури водія в °C. Датчик температури салону, радіо й керування автомобілем не заявляються.</string>
+    <string name="voyah_ultra_probe">Ultra: перевірити дані клімату</string>
+    <string name="voyah_ultra_report">Ultra: переглянути журнал</string>
+    <string name="voyah_ultra_export">Ultra: зберегти журнал</string>
+    <string name="voyah_ultra_working">Підготовка звіту Ultra…</string>
+</resources>

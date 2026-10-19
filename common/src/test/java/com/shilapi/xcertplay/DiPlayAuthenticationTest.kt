@@ -40,10 +40,10 @@ class DiPlayAuthenticationTest {
         assertThrows(Exception::class.java) { DiPlayBootstrap.ensure(context, MfiTarget.LOCAL) }
     }
 
-    @Test fun savedUsbChoiceSurvivesBootstrapWithoutLocalAssets() {
+    @Test fun savedUsbChoiceUsesLocalAndStillRequiresLocalAssets() {
         AirPlayPersistence.saveMfiTarget(context, MfiTarget.USB_CH341)
-        DiPlayBootstrap.ensure(context, AirPlayPersistence.loadMfiTarget(context))
-        assertEquals(MfiTarget.USB_CH341, AirPlayPersistence.loadMfiTarget(context))
+        assertThrows(Exception::class.java) { DiPlayBootstrap.ensure(context,AirPlayPersistence.loadMfiTarget(context)) }
+        assertEquals(MfiTarget.LOCAL,AirPlayPersistence.loadMfiTarget(context))
         assertFalse(directory.exists())
         assertFalse(File(context.noBackupFilesDir, "offline-mfi-staging").exists())
     }

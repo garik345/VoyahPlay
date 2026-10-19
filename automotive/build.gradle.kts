@@ -16,8 +16,8 @@ android {
         applicationId = "com.shilapi.xcertplay"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1202
-        versionName = "0.2.19-voyahplay.0.1.18"
+        versionCode = 1206
+        versionName = "0.2.19-voyahplay.0.1.22"
 
     }
 

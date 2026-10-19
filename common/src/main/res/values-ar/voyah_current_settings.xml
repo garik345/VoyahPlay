@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_auto_car_hotspot_system_description">يشغّل نقطة اتصال السيارة المحفوظة عند فتح VoyahPlay وقبل الاتصال اللاسلكي. يحتاج VoyahPlay إلى إذن Android «تعديل إعدادات النظام»؛ لا يلزم ADB. لتتوفر نقطة الاتصال بعد إعادة التشغيل الكاملة، فعّل أيضًا فتح VoyahPlay بعد تشغيل السيارة. لا يتم إيقاف نقطة الاتصال تلقائيًا.</string>
+    <string name="settings_call_speakerphone">المكالمات عبر مكبّر الصوت</string>
+    <string name="settings_call_speakerphone_description">لهاتف أو جهاز لوحي بنظام Android يُستخدم كوحدة وسائط: يشغّل مكالمات CarPlay عبر مكبّر الصوت بدلًا من سمّاعة الأذن ويستخدم ميكروفون التحدث الحر. اتركه متوقفًا في وحدة وسائط السيارة. يُطبَّق من المكالمة التالية.</string>
+    <string name="settings_car_hotspot_control">نقطة اتصال السيارة</string>
+    <string name="settings_navigation_attenuation">مستوى صوت إرشادات الملاحة</string>
+    <string name="settings_navigation_attenuation_description">يخفض صوت إرشادات ملاحة CarPlay فقط دون تغيير صوت الموسيقى أو المكالمات. يُطبَّق التغيير فورًا وتظل وحدة السيارة تتحكم بمستوى صوت الملاحة.</string>
+    <string name="settings_navigation_attenuation_value">%1$d ديسيبل</string>
+    <string name="settings_wifi_direct_scan_pause">إيقاف بحث السيارة عن Wi-Fi أثناء CarPlay · يتطلب ADB</string>
+    <string name="settings_wifi_direct_scan_pause_description">مع Wi-Fi Direct تبحث السيارة عن شبكات Wi-Fi كل بضع ثوانٍ، وكل بحث يجعل الموسيقى والفيديو يتقطعان. عند تشغيل هذا الخيار يوقف VoyahPlay البحث أثناء تشغيل CarPlay. عندها لا تتصل السيارة تلقائيًا بشبكة معروفة، مثل نقطة اتصال هاتفك، حتى ينتهي CarPlay؛ ويمكنك الاتصال بها يدويًا من إعدادات Wi-Fi في السيارة. أوقفه لتتصل السيارة تلقائيًا. يُطبَّق عند الاتصال التالي.</string>
+    <string name="settings_write_settings_allow">السماح بالإذن</string>
+    <string name="settings_write_settings_granted">إذن «تعديل إعدادات النظام»: مسموح</string>
+    <string name="settings_write_settings_missing">إذن «تعديل إعدادات النظام» غير مسموح بعد. اسمح به ليتمكن VoyahPlay من تشغيل نقطة الاتصال.</string>
+    <string name="wheel_key_role_media_play_pause">تشغيل/إيقاف مؤقت</string>
+    <string name="wheel_media_navigation_reserved">أزرار التنقل والصفحة الرئيسية والصوت والمساعد الصوتي والوسائط محجوزة لوظائفها الأصلية. اختر زرًا آخر.</string>
+    <string name="wheel_media_play_pause">زر تشغيل/إيقاف مؤقت على المقود</string>
+    <string name="wheel_media_play_pause_description">عيّن زرًا متاحًا على المقود أو لوحة المفاتيح لتبديل تشغيل موسيقى CarPlay. يعمل أثناء الاتصال، وفي الخلفية عند تفعيل خدمة أزرار المقود. أثناء المكالمات أو عدم الاتصال، يحتفظ الزر بوظيفته الأصلية. قد يمنع نظام السيارة وصول بعض الأزرار.</string>
+    <string name="voyah_video_pipeline">Video processing</string>
+    <string name="voyah_controls_title">Vehicle controls</string>
+    <string name="voyah_signs_title">Road sign recognition: TSR / ISA</string>
+    <string name="voyah_cluster_title">Instrument cluster</string>
+    <string name="voyah_maneuvers_title">CarPlay maneuvers on the instrument cluster</string>
+    <string name="voyah_maneuvers_hint">Arrow, distance and road. Reconnect CarPlay after enabling during a route.</string>
+    <string name="voyah_helper_title">VoyahPlay root helper</string>
+</resources>

@@ -50,7 +50,7 @@ object VoyahTrackOutput {
     @JvmStatic fun isBusy(): Boolean = busy.get() || synchronized(lock) { notice != null }
 
     @JvmStatic fun visibleCharacters(context: Context): Int =
-        context.getSharedPreferences("voyah_track", Context.MODE_PRIVATE).getInt("width", 10).coerceIn(6, 30)
+        context.getSharedPreferences("voyah_track", Context.MODE_PRIVATE).getInt("width", 10).coerceIn(6, 20)
     @JvmStatic fun scrollInterval(context: Context): Int =
         context.getSharedPreferences("voyah_track", Context.MODE_PRIVATE).getInt("step_ms", 650).coerceIn(200, 1500)
     private fun loadScroll(context: Context) {
@@ -58,7 +58,7 @@ object VoyahTrackOutput {
     }
     @JvmStatic fun setScroll(context: Context, characters: Int, interval: Int) {
         context.getSharedPreferences("voyah_track", Context.MODE_PRIVATE).edit()
-            .putInt("width", characters.coerceIn(6, 30)).putInt("step_ms", interval.coerceIn(200, 1500)).apply()
+            .putInt("width", characters.coerceIn(6, 20)).putInt("step_ms", interval.coerceIn(200, 1500)).apply()
         synchronized(lock) {
             loadScroll(context)
             if (notice != null) since = SystemClock.elapsedRealtime()

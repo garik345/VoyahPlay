@@ -77,10 +77,15 @@ public final class VoyahTweaksFullscreen {
         app = activity.getApplicationContext();
         Activity current = host.get();
         if (active) {
+            preferences(app).edit().putBoolean("enabled", hideDock).apply();
             windowResumed = true;
+            if (!hideDock) preferences(app).edit().putBoolean("restore_pending", true).apply();
             if (current != activity) refreshUntil = 0;
             if (current != activity || hidden != hideDock) generation++;
-            if (hidden != hideDock) windowRequests.clear();
+            if (hidden != hideDock) {
+                windowRequests.clear();
+                if (!hideDock) preferences(app).edit().putBoolean("restore_pending", true).apply();
+            }
             host = new WeakReference<>(activity); hidden = hideDock;
             MAIN.removeCallbacks(LEAVE);
             MAIN.removeCallbacks(HEARTBEAT); MAIN.post(HEARTBEAT);
@@ -100,9 +105,7 @@ public final class VoyahTweaksFullscreen {
     private static RootProcess.Result call(RootHelperProtocol.Request request) throws Exception {
         if (!compatible) {
             RootProcess.Result info = RootHelperClient.call(RootHelperProtocol.Action.INFO, 8);
-            if (!info.successful() || !info.output.contains("CAPABILITIES=" + TweaksBoundsRoot.CAPABILITY)
-                    || !info.output.contains("HELPER_VERSION=" + RootHelperProtocol.VERSION + "\n"))
-                throw new IOException("Обновите root-помощник: root-helper.ps1 -Mode Install.\n" + info.output);
+            new RootHelperStatus(info, android.os.Process.myUid()).requireCompatible();
             compatible = true;
         }
         RootProcess.Result result = RootHelperClient.call(android.os.Process.myUid(), request, 18);

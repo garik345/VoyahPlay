@@ -22,16 +22,23 @@ public final class VoyahRootModule {
             long started = SystemClock.elapsedRealtime(); boolean ok = false; String text;
             try {
                 RootProcess.Result info = RootHelperClient.call(RootHelperProtocol.Action.INFO, 10);
-                if (!info.successful() || !info.output.contains("HELPER_VERSION=" + RootHelperProtocol.VERSION + "\n")) {
-                    text = "Обновите root-помощник: root-helper.ps1 -Mode Install.\n" + info.output;
+                RootHelperStatus state = new RootHelperStatus(info, android.os.Process.myUid());
+                if (request.action == RootHelperProtocol.Action.INFO) {
+                    ok = state.ready; text = state.report();
+                } else if (request.action == RootHelperProtocol.Action.ROOT && state.ready) {
+                    RootProcess.Result result = RootHelperClient.call(android.os.Process.myUid(), request, 15);
+                    ok = result.successful(); text = state.report() + "\n" + result.output;
                 } else {
-                    RootProcess.Result result = request.action == RootHelperProtocol.Action.INFO ? info
-                            : RootHelperClient.call(android.os.Process.myUid(), request, 15);
+                    state.requireCompatible();
+                    RootProcess.Result result = RootHelperClient.call(android.os.Process.myUid(), request, 15);
                     ok = result.successful(); text = result.output;
                 }
+            } catch (RootHelperClient.Unavailable error) {
+                text = "HELPER_CONNECTED=0\nEXPECTED_HELPER_VERSION=" + RootHelperProtocol.VERSION +
+                        "\nHELPER_SOCKET=" + RootHelperProtocol.socketName(android.os.Process.myUid()) + "\n" + error.getMessage();
             } catch (Exception error) { text = error.getClass().getSimpleName() + ": " + error.getMessage(); }
             final boolean success = ok;
-            final String report = "Длительность: " + (SystemClock.elapsedRealtime() - started) + " мс\n"
+            final String report = com.shilapi.xcertplay.voyah.VoyahBuildInfo.summary(app) + "\nHELPER_ACTION=" + request.action + "\nДлительность: " + (SystemClock.elapsedRealtime() - started) + " мс\n"
                     + "Результат: " + (ok ? "успех" : "ошибка") + "\n" + text;
             app.getSharedPreferences("voyah_root_helper", 0).edit().putString("report", report).apply();
             // Old APK preferences cannot reactivate the removed module.

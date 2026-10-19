@@ -11,6 +11,7 @@ import android.hardware.usb.UsbManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.RectF
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.graphics.Typeface
@@ -121,16 +122,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private data class SettingsBaseline(
         val safeAreaRects: MutableMap<DisplaySize, SafeAreaRect?>,
         val customIconBytes: ByteArray?,
-    )
-
-    private data class PendingAssignedSiriDoublePress(
-        val physicalKey: Triple<Int, Int, Int>,
-        val assignedKey: WheelKey,
-        val keyCode: Int,
-        val session: AirPlaySession,
-        val confirmedAtMillis: Long,
-        val intervalMillis: Int,
-        val triggerDelayMillis: Int,
     )
 
     private var connectionPanel: View? = null
@@ -295,12 +286,18 @@ class CarPlayHostActivity : ComponentActivity() {
     private var comfortBar: com.shilapi.xcertplay.voyah.VoyahComfortBar? = null
     private var comfortHeight = 0
     private var sessionComfortHeight = 0
+    private var comfortSides = 0
+    private var sessionComfortSides = 0
     private var comfortHostActive = false
+    private var builtVideoSurfaceKey = -1
+    private var sessionMediaKey = ""
     private val comfortPreferences by lazy { getSharedPreferences("voyah_vehicle", MODE_PRIVATE) }
     private val comfortPreferenceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key?.startsWith("comfort_") == true) updateComfortBar()
     }
     private var videoView: View? = null
+    private var blackCornerRadiusDp = 0
+    private var mainDisplayDisableSafeArea = false
     private var blackCornerOverlay: CarPlayBlackCornerOverlay? = null
     private var pendingIphoneCornerMask: Pair<AirPlaySession, Pair<ByteArray, Int>>? = null
     private var iphoneCornerMaskDecodeGeneration = 0
@@ -506,16 +503,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var failurePendingAfterMenu: CarPlayStatus.Failed? = null
     private val shuttingDown = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val requestDelayedAssignedSiri = Runnable {
-        val pending = delayedDoubleSiri
-        delayedDoubleSiri = null
-        if (pending == null || !WheelZoomSettings.siriDoublePress(this) ||
-            !WheelZoomSettings.isSiriKey(this, pending.assignedKey) ||
-            activeAirPlaySession !== pending.session || inCall(this)) return@Runnable
-        val sent = controller?.requestSiri() == true
-        appendLog("Siri: assigned double key ${pending.keyCode} sent=$sent " +
-            "intervalMs=${pending.intervalMillis} delayMs=${pending.triggerDelayMillis}")
-    }
+
     private var sidePanel: LinearLayout? = null
     private var sidePanelBattery: TextView? = null
     private var sidePanelShown = false
@@ -610,6 +598,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.shilapi.xcertplay.voyah.VoyahSettingsProfile.apply(this)
+        com.shilapi.xcertplay.telecom.PhoneAudioRoute.attach(applicationContext)
         NavigationWidgetUpdater.attach(applicationContext)
         CarPlayCallKeys.install(applicationContext)
         CenterMapOverlay.requestShow = ::showCenterMap
@@ -674,6 +664,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun loadPersistedSettings() {
+        blackCornerRadiusDp = AirPlayPersistence.loadBlackCornerRadiusDp(this)
+        mainDisplayDisableSafeArea = AirPlayPersistence.loadMainDisplayDisableSafeArea(this)
         carPlayDock = CarPlayDock.load(this)
         carPlayNightMode = AirPlayPersistence.loadCarPlayNightMode(this)
         ambientLightThreshold = AirPlayPersistence.loadAmbientLightThreshold(this)
@@ -697,7 +689,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 AirPlayPersistence.loadAdvancedAudioChannelMapping(this)
         navigationStreamType = AirPlayPersistence.loadNavigationStreamType(this)
         debugLogsEnabled = AirPlayPersistence.loadDebugLogsEnabled(this)
-        autoStartOnBoot = AirPlayPersistence.loadAutoStartOnBoot(this)
+        autoStartOnBoot = false
         manufacturer = AirPlayPersistence.loadManufacturer(this)
         model = AirPlayPersistence.loadModel(this)
         oemLabel = AirPlayPersistence.loadOemLabel(this)
@@ -814,6 +806,23 @@ class CarPlayHostActivity : ComponentActivity() {
         requiredWirelessPermissions().all {
             checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
         }
+
+    private fun missingWirelessPermissions(): List<String> =
+        requiredWirelessPermissions().filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+
+    /**
+     * Once the wireless start permissions were refused, by the driver or silently by Android (#290), the
+     * screen names the access to allow instead of waiting for the iPhone. Allowing it in the app permissions
+     * brings the driver back here, where the start goes on.
+     */
+    private fun showMissingWirelessPermission() {
+        if (wirelessPermissionsReady || !wirelessEnabled) {
+            wirelessPermissionsRefused = false
+            return
+        }
+        if (!wirelessPermissionsRefused) return
+        setConnectionStage(getString(WirelessPermissions.refusalMessage(missingWirelessPermissions())))
+    }
 
     private fun requiredWirelessPermissions(): List<String> = when {
         wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI ->
@@ -1336,7 +1345,6 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
         super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
-        if (isInMultiWindowMode) cancelTemporarySystemBars()
         applyFullscreenMode()
         videoView?.post {
             val view = videoView ?: return@post
@@ -1386,28 +1394,34 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun updateComfortBar() {
         val bar = comfortBar ?: return
-        val height = com.shilapi.xcertplay.voyah.VoyahComfortBar.reservedHeight(this)
-        val changed = height != comfortHeight
-        comfortHeight = height
+        val area = com.shilapi.xcertplay.voyah.VoyahComfortLayout.insets(this)
+        val sides = area.left + area.right * 4096
+        val changed = area.bottom != comfortHeight || sides != comfortSides
+        comfortHeight = area.bottom
+        comfortSides = sides
         bar.refreshVisibility()
         bar.setHostActive(comfortHostActive)
-        for (candidate in listOf(videoView, gestureOverlay, connectionPanel)) {
+        for (candidate in listOf(videoView, blackCornerOverlay, gestureOverlay, connectionPanel)) {
             val view = candidate ?: continue
             val params = view.layoutParams as? FrameLayout.LayoutParams ?: continue
-            if (params.bottomMargin != height) {
-                params.bottomMargin = height
+            if (params.bottomMargin != area.bottom || params.leftMargin != area.left || params.rightMargin != area.right) {
+                params.bottomMargin = area.bottom
+                params.leftMargin = area.left
+                params.rightMargin = area.right
                 view.layoutParams = params
             }
         }
+        settingsGestureHint?.text = settingsAccessHint()
         if (changed) {
             controller?.sendTouch(emptyList())
             resetSidePanel()
-            // TextureView/SurfaceView layout callbacks feed the reduced dimensions to CarPlay.
+            // The video and touch views share the same reduced rectangle.
             videoView?.post { videoView?.let { scheduleDisplaySize(it.width, it.height) } }
         }
     }
 
     private fun buildContentView(): View {
+        builtVideoSurfaceKey = com.shilapi.xcertplay.voyah.VoyahMediaSettings.surfaceKey(this)
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         val video = TextureView(this).apply {
             isOpaque = false
@@ -1504,7 +1518,7 @@ class CarPlayHostActivity : ComponentActivity() {
         panel.addView(gestureHint)
         paintWaitingScreen = {
             // The connection screen is DiPlay chrome: follow the app theme, not the day/night mode sent to CarPlay.
-            val colors = WaitingScreenColors.of(appNight)
+            val colors = WaitingScreenColors.of(darkMode)
             viewport.setBackgroundColor(colors.background)
             title.setTextColor(colors.text)
             stage.setTextColor(colors.text)
@@ -1569,10 +1583,8 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         ViewCompat.requestApplyInsets(viewport)
         comfortBar = com.shilapi.xcertplay.voyah.VoyahComfortBar(this, root) { openSettingsMenu() }.also {
-            root.addView(it, FrameLayout.LayoutParams(-1, com.shilapi.xcertplay.voyah.VoyahComfortBar.HEIGHT_PX, Gravity.BOTTOM))
+            root.addView(it, FrameLayout.LayoutParams(-1, -1))
         }
-        settingsMenu = buildSettingsMenu().apply { visibility = View.GONE }
-        root.addView(settingsMenu, FrameLayout.LayoutParams(-1, -1))
         safeAreaEditor = buildSafeAreaEditor().apply { visibility = View.GONE }
         root.addView(safeAreaEditor, FrameLayout.LayoutParams(-1, -1))
         videoView = video
@@ -1583,7 +1595,7 @@ class CarPlayHostActivity : ComponentActivity() {
         connectionPanel = viewport
         updateDebugOverlays()
         updateComfortBar()
-        return root
+        return com.shilapi.xcertplay.voyah.VoyahFullscreenContent.wrap(this, root)
     }
 
     // DiPlay's side panel: placed over the part of the stream CarPlay leaves black (placeSidePanel), so it
@@ -1679,557 +1691,6 @@ class CarPlayHostActivity : ComponentActivity() {
         sidePanelBattery?.visibility = if (battery == null) View.GONE else View.VISIBLE
     }
 
-    private fun buildSettingsMenu(): View {
-        val overlay = FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
-            isClickable = true
-        }
-        val panel = FrameLayout(this).apply {
-            setBackgroundColor(MENU_BACKGROUND)
-        }
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(48), dp(36), dp(48), dp(36))
-        }
-        content.addView(
-            menuText(getString(R.string.carplay_settings), 32f, Color.WHITE, bold = true).apply {
-                setPadding(dp(56), 0, 0, 0)
-            },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        val connectionGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(settingsCategoryHeader("Подключение iPhone"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(32) })
-        content.addView(connectionGroup, LinearLayout.LayoutParams(-1, -2))
-        val imageGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(settingsCategoryHeader("Настройка изображения"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(32) })
-        content.addView(imageGroup, LinearLayout.LayoutParams(-1, -2))
-        val audioGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(settingsCategoryHeader("Настройка аудио"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(32) })
-        content.addView(audioGroup, LinearLayout.LayoutParams(-1, -2))
-        val dockGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(settingsCategoryHeader("Док дополнительных кнопок"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(32) })
-        content.addView(dockGroup, LinearLayout.LayoutParams(-1, -2))
-        val clusterGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(settingsCategoryHeader("Вывод на приборную панель"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(32) })
-        content.addView(clusterGroup, LinearLayout.LayoutParams(-1, -2))
-        val vehicleGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(settingsCategoryHeader("Изменение настроек авто"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(32) })
-        content.addView(vehicleGroup, LinearLayout.LayoutParams(-1, -2))
-        val actionsGroup = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(settingsCategoryHeader("Сохранение, тесты и обслуживание"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(32) })
-        content.addView(actionsGroup, LinearLayout.LayoutParams(-1, -2))
-        if (sessionDisplay?.viewAreas?.sidePanel() != null) {
-            imageGroup.addView(Button(this).apply {
-                text = getString(if (sidePanelShown) R.string.side_panel_full_screen else R.string.side_panel_show)
-                textSize = 20f
-                setOnClickListener {
-                    cancelSettingsEdits()
-                    showSidePanel(!sidePanelShown)
-                }
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        }
-        connectionGroup.addView(
-            settingsCategoryHeader(getString(R.string.connection)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(32) },
-        )
-
-        connectionGroup.addView(
-            buildMfiTargetSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(14) },
-        )
-
-        val wirelessRowResult = ConnectionSettingsSection.createWirelessCarPlayRow(
-            context = this,
-            checked = wirelessEnabled,
-            theme = SettingsTheme.OVERLAY,
-        ) { checked ->
-            if (wirelessEnabled == checked) return@createWirelessCarPlayRow
-            wirelessEnabled = checked
-            hotspotStatus = HotspotStatus(state = if (wirelessEnabled) getString(R.string.hotspot_state_stopped) else getString(R.string.hotspot_state_off))
-            updateHotspotStatusBlock()
-            appendLog(
-                "Wireless CarPlay ${if (wirelessEnabled) "enabled" else "disabled"}; " +
-                    "applies when settings close",
-            )
-            requestStartupPrerequisites()
-        }
-        connectionGroup.addView(
-            wirelessRowResult.rowView,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        connectionGroup.addView(
-            buildHotspotModeSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        connectionGroup.addView(
-            menuText(getString(R.string.hotspot_status), 20f, MENU_SECONDARY),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(18) },
-        )
-        val hotspotStatusView = menuText("", 16f, MENU_ACCENT)
-        connectionGroup.addView(
-            hotspotStatusView,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(6) },
-        )
-
-        connectionGroup.addView(
-            settingsCategoryHeader(getString(R.string.location)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(36) },
-        )
-        connectionGroup.addView(
-            buildLocationReportingSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        connectionGroup.addView(
-            settingsCategoryHeader(getString(R.string.voyah_settings_startup)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(36) },
-        )
-        connectionGroup.addView(
-            settingsSwitchRow(
-                label = getString(R.string.auto_start_on_boot),
-                checked = autoStartOnBoot,
-                description = getString(R.string.start_carplay_automatically_after_device_boot),
-            ) { checked ->
-                autoStartOnBoot = checked
-                appendLog("Boot auto-start ${if (checked) "enabled" else "disabled"}")
-            },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        if (advancedAudioChannelMappingSupported) {
-            audioGroup.addView(
-                settingsCategoryHeader(getString(R.string.audio)),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(36) },
-            )
-            audioGroup.addView(
-                settingsSwitchRow(
-                    label = getString(R.string.advanced_audio_channel_mapping),
-                    checked = advancedAudioChannelMapping,
-                    description = getString(R.string.use_usage_content_type_routing_instead_of_stream_type),
-                ) { checked ->
-                    advancedAudioChannelMapping = checked
-                    appendLog(
-                        "Advanced audio channel mapping ${if (checked) "enabled" else "disabled"}; " +
-                            "applies when settings close",
-                    )
-                    updateResolutionMenu()
-                },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(12) },
-            )
-        }
-
-        connectionGroup.addView(
-            settingsCategoryHeader(getString(R.string.voyah_settings_identity)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(36) },
-        )
-        connectionGroup.addView(
-            buildIdentitySettingsSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-        imageGroup.addView(
-            buildAirPlayIconSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(26) },
-        )
-        imageGroup.addView(
-            buildDrivingSideSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(26) },
-        )
-        imageGroup.addView(
-            buildDockSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(26) },
-        )
-        imageGroup.addView(
-            settingsCategoryHeader(getString(R.string.voyah_settings_video)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(40) },
-        )
-
-        val resolutionControl = DisplaySettingsSection.createResolutionSlider(
-            context = this,
-            initialPercent = displayScalePercent,
-            theme = SettingsTheme.OVERLAY,
-        ) { percent ->
-            displayScalePercent = percent
-            displayScaleTenths = CarPlayDisplayScale.sanitize((percent + 5) / 10)
-            updateResolutionMenu()
-        }
-        val resolutionValue = resolutionControl.valueTextView
-        imageGroup.addView(
-            resolutionControl.container,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-
-        imageGroup.addView(
-            buildStepSliderSection(
-                title = getString(R.string.frame_rate),
-                values = (
-                    AirPlayDisplaySettings.MIN_FPS..AirPlayDisplaySettings.MAX_FPS
-                    step AirPlayDisplaySettings.FPS_STEP
-                    ).toList(),
-                selectedValue = fps,
-                label = { "$it fps" },
-                onValueChanged = { value ->
-                    fps = value
-                    updateResolutionMenu()
-                },
-            ),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(24) },
-        )
-
-        imageGroup.addView(
-            settingsChoiceRow(
-                label = getString(R.string.physical_size_basis),
-                options = listOf(
-                    AirPlayPhysicalSizeBasis.WIDTH to getString(R.string.widest_width),
-                    AirPlayPhysicalSizeBasis.HEIGHT to getString(R.string.longest_height),
-                ),
-                selected = physicalSizeBasis,
-            ) { value ->
-                physicalSizeBasis = value
-                updateResolutionMenu()
-            },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(24) },
-        )
-
-        imageGroup.addView(
-            buildStepSliderSection(
-                title = getString(R.string.physical_length),
-                values = (
-                    AirPlayDisplaySettings.MIN_WIDTH_PHYSICAL_MM..
-                        AirPlayDisplaySettings.MAX_WIDTH_PHYSICAL_MM
-                    step AirPlayDisplaySettings.WIDTH_PHYSICAL_MM_STEP
-                    ).toList(),
-                selectedValue = widthPhysicalMm,
-                label = { "$it mm" },
-                onValueChanged = { value ->
-                    widthPhysicalMm = value
-                    updateResolutionMenu()
-                },
-            ),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(16) },
-        )
-
-        val hevcRow = DisplaySettingsSection.createHevcRow(
-            context = this,
-            checked = hevcEnabled,
-            theme = SettingsTheme.OVERLAY,
-        ) { checked ->
-            if (hevcEnabled == checked) return@createHevcRow
-            hevcEnabled = checked
-            appendLog(
-                "HEVC (H.265) ${if (hevcEnabled) "enabled" else "disabled"}; " +
-                    "applies when settings close",
-            )
-            updateResolutionMenu()
-        }
-        imageGroup.addView(
-            hevcRow.rowView,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        val softwareHevcRow = DisplaySettingsSection.createSoftwareHevcRow(
-            context = this,
-            checked = hevcSoftwareDecoderEnabled,
-            theme = SettingsTheme.OVERLAY,
-        ) { checked ->
-            if (hevcSoftwareDecoderEnabled == checked) return@createSoftwareHevcRow
-            hevcSoftwareDecoderEnabled = checked
-            appendLog(
-                "HEVC software decoder ${if (hevcSoftwareDecoderEnabled) "enabled" else "disabled"}; " +
-                    "applies when settings close",
-            )
-            updateResolutionMenu()
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            imageGroup.addView(
-                softwareHevcRow.rowView,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(16) },
-            )
-        }
-
-        imageGroup.addView(
-            buildSafeAreaSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        imageGroup.addView(
-            settingsCategoryHeader(getString(R.string.voyah_settings_window)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(40) },
-        )
-        imageGroup.addView(
-            buildFullscreenSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        actionsGroup.addView(
-            settingsCategoryHeader(getString(R.string.diagnostics)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-        actionsGroup.addView(
-            buildDebugLogsSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            imageGroup.addView(
-                settingsCategoryHeader(getString(R.string.android_9_compatibility)),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(40) },
-            )
-            imageGroup.addView(
-                menuText(
-                    getString(R.string.settings_android9_compat),
-                    16f,
-                    MENU_SECONDARY,
-                ),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(12) },
-            )
-        }
-
-        val preview = menuText("", 17f, MENU_SECONDARY)
-        imageGroup.addView(
-            preview,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        val save = Button(this).apply {
-            text = getString(R.string.save_and_reconnect)
-            isAllCaps = false
-            textSize = 17f
-            setTextColor(MENU_BUTTON_TEXT)
-            backgroundTintList = ColorStateList.valueOf(MENU_ACCENT)
-            minHeight = dp(52)
-            setOnClickListener { saveSettingsAndReconnect() }
-        }
-        actionsGroup.addView(
-            save,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(46) },
-        )
-
-        val exitApplicationButton = Button(this).apply {
-            text = getString(R.string.exit_application)
-            isAllCaps = false
-            textSize = 17f
-            setTextColor(Color.WHITE)
-            backgroundTintList = ColorStateList.valueOf(MENU_DANGER)
-            minHeight = dp(52)
-            setOnClickListener { exitApplication() }
-        }
-        actionsGroup.addView(
-            exitApplicationButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        actionsGroup.addView(Button(this).apply {
-            text = getString(R.string.language_app_language)
-            isAllCaps = false
-            setOnClickListener { AppLocale.showPicker(this@CarPlayHostActivity) }
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
-
-        imageGroup.addView(SettingsWidgets.createCategoryHeader(this, "Системный полноэкранный режим", SettingsTheme.OVERLAY))
-        com.shilapi.xcertplay.voyah.root.RootModuleSettings.add(this, imageGroup, actionsGroup, SettingsTheme.OVERLAY)
-
-        dockGroup.addView(SettingsWidgets.createCategoryHeader(this, "Нижняя панель автомобиля", SettingsTheme.OVERLAY))
-        com.shilapi.xcertplay.voyah.VoyahComfortBar.addSettings(this, dockGroup, SettingsTheme.OVERLAY)
-        clusterGroup.addView(SettingsWidgets.createCategoryHeader(this, "Музыка на приборной панели", SettingsTheme.OVERLAY))
-        com.shilapi.xcertplay.voyah.VoyahSettings.addTracks(this, clusterGroup, SettingsTheme.OVERLAY)
-        vehicleGroup.addView(SettingsWidgets.createCategoryHeader(this, "Распознавание знаков TSR / ISA", SettingsTheme.OVERLAY))
-        com.shilapi.xcertplay.voyah.VoyahSettings.addSigns(this, vehicleGroup, SettingsTheme.OVERLAY, actionsGroup)
-
-        val openDiPlaySettingsButton = Button(this).apply {
-            text = "${getString(R.string.app_name)} ${getString(R.string.settings)}"
-            isAllCaps = false
-            textSize = 17f
-            setTextColor(Color.WHITE)
-            backgroundTintList = ColorStateList.valueOf(MENU_TRACK_OFF)
-            minHeight = dp(52)
-            setOnClickListener {
-                cancelSettingsEdits()
-                showDiPlayHome("settings")
-            }
-        }
-        actionsGroup.addView(
-            openDiPlaySettingsButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        val pageHost = FrameLayout(this)
-        val selectedPage = settingsMenuCategoryKey.takeIf(pages::containsKey) ?: "connection"
-        settingsMenuCategoryKey = selectedPage
-        pages.forEach { (key, page) ->
-            page.visibility = if (key == selectedPage) View.VISIBLE else View.GONE
-            pageHost.addView(page, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT))
-        }
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            addView(
-                pageHost,
-                ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-        }
-        panel.addView(
-            scroll,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
-        panel.addView(
-            Button(this).apply {
-                text = "X"
-                isAllCaps = false
-                textSize = 22f
-                setTextColor(Color.WHITE)
-                backgroundTintList = ColorStateList.valueOf(MENU_TRACK_OFF)
-                contentDescription = getString(R.string.discard_changes_and_exit_settings)
-                minWidth = 0
-                minHeight = 0
-                setPadding(0, 0, 0, 0)
-                setOnClickListener { cancelSettingsEdits() }
-            },
-            FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.START).apply {
-                leftMargin = dp(16)
-                topMargin = dp(16)
-            },
-        )
-        overlay.addView(
-            panel,
-            FrameLayout.LayoutParams(
-                minOf(resources.displayMetrics.widthPixels, MAX_SETTINGS_MENU_WIDTH_PX),
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER,
-            ),
-        )
-        overlay.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-            val desiredWidth = minOf(view.width, MAX_SETTINGS_MENU_WIDTH_PX)
-            val params = panel.layoutParams
-            if (params.width != desiredWidth) {
-                params.width = desiredWidth
-                panel.layoutParams = params
-            }
-        }
-
-        resolutionValueView = resolutionValue
-        resolutionPreviewView = preview
-        this.hotspotStatusView = hotspotStatusView
-        updateHotspotStatusBlock()
-        updateResolutionMenu()
-        return overlay
-    }
-
     private fun persistMenuSettings() {
         AirPlayPersistence.saveWirelessEnabled(this, wirelessEnabled)
         AirPlayPersistence.saveMfiTarget(this, mfiTarget)
@@ -2244,7 +1705,7 @@ class CarPlayHostActivity : ComponentActivity() {
         AirPlayPersistence.saveManualHotspotChannel(this, manualHotspotChannel)
         AirPlayPersistence.saveManualHotspotSecurity(this, manualHotspotSecurity)
         AirPlayPersistence.saveLocationReportingEnabled(this, locationReportingEnabled)
-        AirPlayPersistence.saveAutoStartOnBoot(this, autoStartOnBoot)
+        AirPlayPersistence.saveAutoStartOnBoot(this, false)
         AirPlayPersistence.saveAdvancedAudioChannelMapping(this, advancedAudioChannelMapping)
         AirPlayPersistence.saveDisplayScaleTenths(this, displayScaleTenths)
         AirPlayPersistence.saveDisplayScalePercent(this, displayScalePercent)
@@ -2261,7 +1722,6 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayDock.save(this, carPlayDock)
         AirPlayPersistence.saveHideTopBar(this, hideTopBar)
         AirPlayPersistence.saveHideBottomBar(this, hideBottomBar)
-        AirPlayPersistence.saveTemporarySystemBars(this, temporarySystemBarsEnabled)
         AirPlayPersistence.saveSafeAreaDrawOutside(this, safeAreaDrawOutside)
     }
 
@@ -2753,6 +2213,7 @@ class CarPlayHostActivity : ComponentActivity() {
             hideBottomBar = hideBottomBar,
             onHideTopBarChanged = { checked ->
                 hideTopBar = checked
+                AirPlayPersistence.saveHideTopBar(this, checked)
                 applyFullscreenMode()
                 refreshDisplaySizeAfterLayout()
             },
@@ -2771,18 +2232,6 @@ class CarPlayHostActivity : ComponentActivity() {
                 ).apply { topMargin = dp(10) },
             )
         }
-        section.addView(
-            settingsSwitchRow(
-                getString(R.string.temporary_system_bars),
-                temporarySystemBarsEnabled,
-                getString(R.string.temporary_system_bars_description),
-            ) { checked ->
-                temporarySystemBarsEnabled = checked
-                if (!checked) cancelTemporarySystemBars()
-            },
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                .apply { topMargin = dp(12) },
-        )
         return section
     }
 
@@ -3258,7 +2707,7 @@ class CarPlayHostActivity : ComponentActivity() {
         color: Int,
         bold: Boolean = false,
     ): TextView = TextView(this).apply {
-        this.text = text
+        this.text = com.shilapi.xcertplay.voyah.VoyahSettingsMenu.caption(text)
         textSize = sizeSp
         setTextColor(color)
         typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
@@ -3587,6 +3036,10 @@ class CarPlayHostActivity : ComponentActivity() {
             icons = listOf(loadAirPlayIcon()),
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
             mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),
+            speechWithout8And16Khz = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
+                com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.USB_SPEECH),
+            disableAudioOutput = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
+                com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.BLUETOOTH_AUDIO),
         )
     }
 
@@ -3761,6 +3214,7 @@ class CarPlayHostActivity : ComponentActivity() {
             preferSoftwareHevcDecoder = hevcSoftwareDecoderEnabled,
             advancedAudioChannelMapping = advancedAudioChannelMapping,
             audioFocusEnabled = AirPlayPersistence.loadAudioFocusEnabled(this),
+            audioFocusAutoYield = com.shilapi.xcertplay.voyah.VoyahAudioFocusSettings.autoYield(this),
             mediaChannel = AirPlayPersistence.loadMediaAudioChannel(this),
             navigationChannel = AirPlayPersistence.loadNavigationAudioChannel(this),
             navigationAttenuationDb = AirPlayPersistence.loadNavigationAudioAttenuationDb(this),
@@ -3778,6 +3232,15 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
             },
             onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
+            callEchoCancellation = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
+                com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.CALL_ECHO),
+            callVoiceFilter = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
+                com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.CALL_VOICE),
+            videoPacingDelayMillis = if (builtVideoSurfaceKey and 1 != 0) smoothVideoDelayMillis(fps) else 0,
+            mainVideoFrameRate = if (builtVideoSurfaceKey and 1 != 0 || AirPlayPersistence.loadLowLatencyDecoder(this)) fps else 0,
+            mtkDecoderTuningEnabled = AirPlayPersistence.loadMtkDecoderTuning(this),
+            vendorLowLatencyDecoder = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
+                com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.LOW_LATENCY),
         )
     }
 
@@ -3938,6 +3401,7 @@ class CarPlayHostActivity : ComponentActivity() {
         updateClusterMapShown()
         sink = snapshot.sink
         sessionDisplay = snapshot.display
+        sessionMediaKey = snapshot.mediaSettingsKey
         resetSidePanel()
         if (snapshot.display.viewAreas?.let { it.kindOf(it.current) == CarPlayViewAreas.Kind.SIDE_PANEL } == true) {
             // The live stream can outlast its Activity. Restore the Android view covering its
@@ -3948,7 +3412,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         MapMirrors.reapply()
         CarPlayBackgroundSession.store(snapshot.controller, snapshot.sink, snapshot.width, snapshot.height,
-            this, snapshot.display) { completion ->
+            this, snapshot.display, snapshot.mediaSettingsKey) { completion ->
             runOnUiThread {
                 shutdown(false, "DiPlay disconnect", completion)
                 finish()
@@ -4009,7 +3473,7 @@ class CarPlayHostActivity : ComponentActivity() {
         mfiTarget = AirPlayPersistence.loadMfiTarget(this)
         runCatching { DiPlayBootstrap.ensure(this, mfiTarget) }
         val config = createRuntimeConfig()
-        val effectiveSize = if (comfortHeight == 0 && isMultiWindowActive() && !AirPlayPersistence.loadAdaptPipResolution(this) &&
+        val effectiveSize = if (comfortHeight == 0 && comfortSides == 0 && isMultiWindowActive() && !AirPlayPersistence.loadAdaptPipResolution(this) &&
             maximumDetectedWidthPixels >= size.width && maximumDetectedHeightPixels >= size.height &&
             (maximumDetectedWidthPixels > size.width || maximumDetectedHeightPixels > size.height)) {
             DisplaySize(maximumDetectedWidthPixels, maximumDetectedHeightPixels)
@@ -4093,9 +3557,11 @@ class CarPlayHostActivity : ComponentActivity() {
             viewAreas = pendingViewAreas,
         )
         sessionDisplay = display
+        sessionMediaKey = com.shilapi.xcertplay.voyah.VoyahMediaSettings.sessionKey(this)
         sessionComfortHeight = comfortHeight
+        sessionComfortSides = comfortSides
         videoView?.let { updateVideoLayout(it.width, it.height) }
-        CarPlayBackgroundSession.store(next, renderer, size.width, size.height, this, display) { completion ->
+        CarPlayBackgroundSession.store(next, renderer, size.width, size.height, this, display, sessionMediaKey) { completion ->
             runOnUiThread {
                 shutdown(terminateProcess = false, reason = "DiPlay disconnect", completion = completion)
                 finish()
@@ -4242,7 +3708,7 @@ class CarPlayHostActivity : ComponentActivity() {
      * a turn without a square canvas), which the usual path handles.
      */
     private fun applyViewArea(size: DisplaySize, display: CarPlaySessionDisplay): Boolean {
-        if (sessionComfortHeight != comfortHeight) return false
+        if (sessionComfortHeight != comfortHeight || sessionComfortSides != comfortSides) return false
         val areas = display.viewAreas ?: return false
         if (controller == null || menuOpen || handshakeResetInProgress || shuttingDown.get()) return false
         val split = isMultiWindowActive()
@@ -4295,7 +3761,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun displayLayoutChanged(newSize: DisplaySize? = activeDisplaySize): Boolean {
         val display = sessionDisplay ?: return false
-        if (sessionComfortHeight != comfortHeight) return true
+        if (sessionComfortHeight != comfortHeight || sessionComfortSides != comfortSides) return true
         if (display.rotation != displayRotation()) return true
         if (display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar) return true
         if (newSize != null && newSize.width > 0 && newSize.height > 0) {
@@ -4479,33 +3945,17 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun showDiPlayHome(page: String = "home") {
         controller?.sendTouch(emptyList())
         OwnScreenStart.start(this, Intent(this, DiPlayActivity::class.java)
-            .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT), ::appendLog)
+            .putExtra("page", page).putExtra("from_carplay_settings", page == "settings")
+            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT), ::appendLog)
     }
 
     private fun settingsAccessHint(): String =
-        "Настройки VoyahPlay: удерживайте кнопку «Свет» на нижней панели."
+        "Настройки VoyahPlay: удерживайте кнопку «${com.shilapi.xcertplay.voyah.VoyahComfortLayout.titles[com.shilapi.xcertplay.voyah.VoyahComfortLayout.settingsKey(this)]}»."
 
     private fun openSettingsMenu() {
         comfortBar?.dismissExtra()
-        if (menuOpen) return
-        controller?.sendTouch(emptyList())
-        loadPersistedSettings()
-        settingsBaseline = captureSettingsBaseline()
-        // Rebuild controls from saved values so a cancelled edit cannot reappear on reopening.
-        settingsMenu?.let { previous ->
-            val parent = previous.parent as ViewGroup
-            val index = parent.indexOfChild(previous)
-            parent.removeView(previous)
-            settingsMenu = buildSettingsMenu()
-            parent.addView(settingsMenu, index, FrameLayout.LayoutParams(-1, -1))
-        }
-        menuOpen = true
-        gestureOverlay?.visibility = View.GONE
-        settingsMenu?.visibility = View.VISIBLE
-        safeAreaEditor?.visibility = View.GONE
-        updateSafeAreaSummary()
-        updateResolutionMenu()
-        updateDebugOverlays()
+        closePicturePanel()
+        showDiPlayHome("settings")
     }
 
     private fun openPicturePanel() {
@@ -4564,6 +4014,11 @@ class CarPlayHostActivity : ComponentActivity() {
                 ", MFI ${mfiTargetLabel(mfiTarget)}" +
                 ", Wi-Fi session ${hotspotModeLabel(wirelessHotspotMode)}",
         )
+        if (builtVideoSurfaceKey != com.shilapi.xcertplay.voyah.VoyahMediaSettings.surfaceKey(this)) {
+            // Rebuild the video View first; onResume reconnects any session with old media options.
+            recreate()
+            return
+        }
         val failure = failurePendingAfterMenu
         failurePendingAfterMenu = null
         val recoveryPending = recoveryPendingAfterMenu || failure != null
@@ -4578,13 +4033,14 @@ class CarPlayHostActivity : ComponentActivity() {
             createStatusReporter(restartGeneration)(failure)
         } else if (handshakeResetInProgress) {
             startAfterHandshakeReset = true
-        } else if ((reconnect || recoveryPending) && controller != null) {
+        } else if ((reconnect || recoveryPending || sessionMediaKey !=
+                com.shilapi.xcertplay.voyah.VoyahMediaSettings.sessionKey(this)) && controller != null) {
             restartCarPlay(if (reconnect) "Settings saved; reconnecting" else "Connection lost while settings were open; reconnecting")
         } else {
             maybeStartCarPlay()
         }
         // Panel preferences save immediately, including when other menu edits are cancelled.
-        if (sessionComfortHeight != comfortHeight) refreshDisplaySizeAfterLayout()
+        if (sessionComfortHeight != comfortHeight || sessionComfortSides != comfortSides) refreshDisplaySizeAfterLayout()
     }
 
     private fun exitApplication() {
@@ -4630,7 +4086,10 @@ class CarPlayHostActivity : ComponentActivity() {
                 if (!texture.isAttachedToWindow) return true
                 removeVideoSurfaceProbe()
                 if (isDestroyed || videoView !== texture) return true
-                val mode = carPlayVideoSurfaceMode(texture.isHardwareAccelerated)
+                val unsafeDecoder = textureUnsafeVideoDecoder()
+                val mode = carPlayVideoSurfaceMode(texture.isHardwareAccelerated,
+                    smoothVideo = builtVideoSurfaceKey and 1 != 0,
+                    directVideoOutput = builtVideoSurfaceKey and 2 != 0, textureUnsafeDecoder = unsafeDecoder != null)
                 appendLog("Video output mode=$mode windowHardwareAccelerated=${texture.isHardwareAccelerated}")
                 if (mode == CarPlayVideoSurfaceMode.TEXTURE) return true
                 useFallbackVideoSurface(texture, unsafeDecoder)
@@ -4685,7 +4144,7 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         root.addView(viewport, index, texture.layoutParams)
-        appendLog("Using SurfaceView video output: window has no hardware acceleration; picture adjustments unavailable")
+        appendLog("Using SurfaceView video output: hardware=${texture.isHardwareAccelerated} options=$builtVideoSurfaceKey; picture adjustments unavailable")
     }
 
     private fun attachSurface(surface: Surface) {
@@ -4845,13 +4304,12 @@ class CarPlayHostActivity : ComponentActivity() {
         voyahDock.setHidden(hideBottom)
         WindowCompat.setDecorFitsSystemWindows(window, !(hideTop && hideBottom))
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        val peek = temporarySystemBarsVisible && !multiWindow && !harmanFullscreenEnabled
-        if (hideTop && !peek) {
+        if (hideTop) {
             controller.hide(WindowInsetsCompat.Type.statusBars())
         } else {
             controller.show(WindowInsetsCompat.Type.statusBars())
         }
-        if (hideBottom && !peek) {
+        if (hideBottom) {
             controller.hide(WindowInsetsCompat.Type.navigationBars())
         } else {
             controller.show(WindowInsetsCompat.Type.navigationBars())
@@ -4868,27 +4326,6 @@ class CarPlayHostActivity : ComponentActivity() {
             if (hideBottom) flags = flags or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
             if (hideTop || hideBottom) flags = flags or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
             window.decorView.systemUiVisibility = flags
-        }
-    }
-
-    /** Temporary reveal without persisting bar visibility or changing AirPlay's negotiated size. */
-    private fun showTemporarySystemBars(): Boolean {
-        if (!temporarySystemBarsEnabled || gestureFingerCount == 0 || menuOpen ||
-            harmanFullscreenEnabled || isMultiWindowActive() || (!hideTopBar && !hideBottomBar)) {
-            return false
-        }
-        mainHandler.removeCallbacks(hideTemporarySystemBars)
-        temporarySystemBarsVisible = true
-        applyFullscreenMode()
-        mainHandler.postDelayed(hideTemporarySystemBars, 5_000L)
-        return true
-    }
-
-    private fun cancelTemporarySystemBars() {
-        mainHandler.removeCallbacks(hideTemporarySystemBars)
-        if (temporarySystemBarsVisible) {
-            temporarySystemBarsVisible = false
-            applyFullscreenMode()
         }
     }
 
@@ -5011,6 +4448,7 @@ internal object CarPlayBackgroundSession {
         val width: Int,
         val height: Int,
         val display: CarPlaySessionDisplay,
+        val mediaSettingsKey: String,
     )
 
     private var controller: CarPlayController? = null
@@ -5018,18 +4456,19 @@ internal object CarPlayBackgroundSession {
     private var width = 0
     private var height = 0
     private var display: CarPlaySessionDisplay? = null
+    private var mediaSettingsKey = ""
 
     @Synchronized
     fun snapshot(): Snapshot? {
         val currentController = controller ?: return null
         val currentSink = sink ?: return null
         val currentDisplay = display ?: return null
-        return Snapshot(currentController, currentSink, width, height, currentDisplay)
+        return Snapshot(currentController, currentSink, width, height, currentDisplay, mediaSettingsKey)
     }
 
     @Synchronized
     fun store(controller: CarPlayController, sink: AndroidMediaSink, width: Int, height: Int,
-        owner: Any, display: CarPlaySessionDisplay, stop: (() -> Unit) -> Unit) {
+        owner: Any, display: CarPlaySessionDisplay, mediaSettingsKey: String = "", stop: (() -> Unit) -> Unit) {
         this.stopAction = stop
         this.owner = owner
         this.controller = controller
@@ -5037,6 +4476,7 @@ internal object CarPlayBackgroundSession {
         this.width = width
         this.height = height
         this.display = display
+        this.mediaSettingsKey = mediaSettingsKey
     }
 
     @Synchronized

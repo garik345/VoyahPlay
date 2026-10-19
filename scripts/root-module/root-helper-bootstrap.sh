@@ -41,8 +41,16 @@ if ! number "$uid" || [ "$uid" -lt 10000 ] || [ "$uid" -ge 20000 ]; then
     esac
 fi
 echo "APP_UID=$uid"
+echo "HELPER_SNAPSHOT_UID=${old_uid:-none}"
+echo EXPECTED_HELPER_VERSION=1.1.2
 if [ "$MODE" = status ]; then
     [ -f "$ROOT/app.apk" ] && number "$old_uid" || { echo HELPER_NOT_INSTALLED; exit 2; }
+    if [ "$uid" != "$old_uid" ]; then
+        echo HELPER_UID_MATCH=0
+        echo "HELPER_REPAIR=Run root-helper.ps1 -Mode Install after installing the current APK"
+    else
+        echo HELPER_UID_MATCH=1
+    fi
     run_apk "$ROOT/app.apk" --probe "$old_uid"
     exit $?
 fi
