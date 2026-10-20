@@ -17,8 +17,16 @@ import kotlin.math.min
 data class RcsMessage(
     val messageType: Int,
     val body: ByteArray,
+    val kind: Int = 0,
+    val token: Long = 0,
+    private val headerTemplate: ByteArray? = null,
 ) {
-    fun encoded(): ByteArray = ApTransportPackageCodec.create(messageType, body).encoded()
+    fun encoded(): ByteArray {
+        val header = headerTemplate?.copyOf() ?: ByteArray(32)
+        java.nio.ByteBuffer.wrap(header).putInt(4, kind).putLong(20, token)
+        return ApTransportPackageCodec.create(messageType, body, header).encoded()
+    }
+    fun reply(): RcsMessage = RcsMessage(messageType, ByteArray(0), ApTransportPackageCodec.KIND_RPLY, token, headerTemplate)
 
     companion object {
         fun comm(body: ByteArray): RcsMessage =
@@ -160,7 +168,7 @@ class RcsChannel private constructor(
             "RCS RX type=0x${packageValue.messageType.toString(16)}" +
                 " bytes=${packageValue.body.size} bodyHex=${packageValue.body.toHex()}",
         )
-        return RcsMessage(packageValue.messageType, packageValue.body)
+        return RcsMessage(packageValue.messageType, packageValue.body, packageValue.kind, packageValue.token, packageValue.headerCopy())
     }
 
     private fun trace(message: String) {

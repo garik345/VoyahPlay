@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="voyah_ultra_title">CarPlay Ultra：驾驶员空调（实验性）</string>
-    <string name="voyah_ultra_toggle">向 iPhone 发送驾驶员空调数据</string>
-    <string name="voyah_ultra_description">debug 测试。保存设置并重新连接 CarPlay 后生效。iPhone 是否接受配置及是否显示空调界面尚未确认。</string>
-    <string name="voyah_ultra_readonly">仅读取驾驶员设定温度（°C）。不声明车内温度传感器、收音机或车辆控制。</string>
+    <string name="voyah_ultra_title">CarPlay Ultra：空调与舒适功能（实验性）</string>
+    <string name="voyah_ultra_toggle">通过 CarPlay Ultra 连接空调与舒适功能</string>
+    <string name="voyah_ultra_description">debug 测试。保存后请重新连接 CarPlay。支持主副驾驶设定温度、空调电源、A/C、风量、AUTO、内循环、车窗除雾和舒适功能，并读取车辆状态确认。iPhone 空调界面尚未确认。</string>
+    <string name="voyah_ultra_readonly">写入需要 WRITE_CANBUS。不会声明车内温度传感器、MAX A/C 或收音机。仅按 iPhone 的明确请求执行命令。</string>
     <string name="voyah_ultra_probe">Ultra：检查空调数据</string>
     <string name="voyah_ultra_report">Ultra：查看日志</string>
     <string name="voyah_ultra_export">Ultra：保存日志</string>

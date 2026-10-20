@@ -15,6 +15,24 @@ public final class VoyahComfortValues {
         Integer value = values.get(name);
         return value == null ? -1 : value;
     }
+    public Integer seatLevel(int side, boolean ventilation) {
+        if (!available || side < 0 || side > 1) return null;
+        String prefix = ventilation ? "FRONT_SEAT_VENTILATION" : "FRONT_SEAT_HEATING";
+        String suffix = side == 0 ? "_LEFT" : "_RIGHT";
+        return effectiveLevel(get(prefix + "_SWITCH" + suffix), get(prefix + "_COMMAND" + suffix));
+    }
+    public Integer wheelHeatingLevel() {
+        if (!available) return null;
+        int state = get("STEER_WHEEL_HEAT_SWITCH");
+        if (state == 1) return Integer.valueOf(0);
+        if (state == 2) return Integer.valueOf(1);
+        return null;
+    }
+    public static Integer effectiveLevel(int state, int level) {
+        if (state == 1) return Integer.valueOf(0);
+        if (state == 2 && level >= 1 && level <= 3) return Integer.valueOf(level);
+        return null;
+    }
     private static String raw(int value) {
         return value == -1 || value == Integer.MIN_VALUE ? "нет данных" : Integer.toString(value);
     }

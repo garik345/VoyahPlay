@@ -1,0 +1,195 @@
+{
+  "base": "7a7cd349d4929017a003a89586a88a629170979b",
+  "version": "0.1.24",
+  "wire_rev": "opack-5-hvac",
+  "files": {
+    "Docs/oem-hvac-20261020.md": {
+      "before": null,
+      "after": "d1e81e9a65dde98c2472b6753073ec7242bd8bab8199e041e72690573ccbcca8"
+    },
+    "README.md": {
+      "before": "1ab096b10d778e79c62398fe6f0bb88274769243ebd2ca5103a3e92b771ef470",
+      "after": "48ee3fac679590a63336e74f52742d88267b2b1c4bb639506366e81c9053ee17"
+    },
+    "SHA256.json": {
+      "before": "45b9cfc3ca2477f9601ca8134188668b717bf3ae6c1d6740fe003865ad21e26a",
+      "after": "b9e5411a96de3b1a540244b1d39e81a56f1e813001302c2162308b48fec05d4c"
+    },
+    "TEST-ULTRA.md": {
+      "before": "980838716a4501c80f1ce3bb9d55e2e928dec137eb56cfbed2d667833a8baf91",
+      "after": "e7572513c44d4d8590d367bdaf9af43262fdfc8091834918baf97812a3052cbb"
+    },
+    "VALIDATION.md": {
+      "before": "e8e4c89a64b57b05c622aae93e993f6eeae45cbf5f092b9c3efbe14d2af3b82d",
+      "after": "b0cc64b97a3b1373d8f3add9251cb26dbcb674eb35e10808e1805549ee3ac5a5"
+    },
+    "automotive/build.gradle.kts": {
+      "before": "eba504d37e53d56fe08b74932f0130b663a09b584a0996d0667d2075fd4c9c74",
+      "after": "b7ce95377c19df5f670e3b67b0caa14ca3bf98b63bc3112c40f2d53000f9988f"
+    },
+    "common/src/debug/java/com/shilapi/xcertplay/voyah/VoyahHvac.kt": {
+      "before": null,
+      "after": "c971c8716c827752cc13d79f774a2c39c5f3a226b0fbf6810d47deae6d50916f"
+    },
+    "common/src/debug/java/com/shilapi/xcertplay/voyah/ultra/VoyahUltraSettings.kt": {
+      "before": "f3ce57ddf6e804b991824e2b9d1ad723c123e8898060fe1fb1ffb816376802d1",
+      "after": "e5825ecaf1207c475e39a18dfd43a89dff8875ade8ff94e828aba36e6a36ca90"
+    },
+    "common/src/main/java/com/shilapi/xcertplay/voyah/VoyahClient.java": {
+      "before": "26c18f47f9f709eda2aa04481dca22d400bafd790095e6d92146beb89f98eea5",
+      "after": "f04fca2713cdd09cf1abeb3303c65da232c5ac5fd5c6ba37e726c680011c6e34"
+    },
+    "common/src/main/java/com/shilapi/xcertplay/voyah/VoyahComfortValues.java": {
+      "before": "df620e745dba16f11d6a78ad760ec058e6ccee5fdeace09fce00a4b6ee2d2d67",
+      "after": "3aba865b7ced6022f0e0e28d54740b9ff5a55ab202d50faca8e35c0eeb4dddf2"
+    },
+    "common/src/main/java/com/shilapi/xcertplay/voyah/VoyahControls.java": {
+      "before": "06f99b3c93b9639e2846d4d53dc559d15e8a80f60bf963051f421143c250bb7d",
+      "after": "889a130da9ec7dec8b3dd77ba2e7287ce8104f23d4d1ddba4796eef69dc163a0"
+    },
+    "common/src/main/java/com/shilapi/xcertplay/voyah/VoyahValues.java": {
+      "before": "9aa801a0f1813e4babd114fb65ea5488c12da87090f237a1b6f87b3443112864",
+      "after": "fed70b8706d3fd3c818180f83c6dd46444bbaafd19d3cf26fcbe6abe50f75326"
+    },
+    "common/src/main/res/values/voyah_ultra.xml": {
+      "before": "0c86d64cde334f5e1daec5ae9f53769c3ace5e003e92e9f29cf4ea29972724a1",
+      "after": "7fd22f6dca635aa4854ea3613e008712063ca11995492246b58c3ad6b6a39e11"
+    },
+    "common/src/main/res/values-ar/voyah_ultra.xml": {
+      "before": "949b8377e2af59814bb3d26dde278788d5e48e97122e3ca4e8501c5211edefce",
+      "after": "4d877cc282b1839f40568bc7801b990d357149888b53f55a342dc1630d1e1cd3"
+    },
+    "common/src/main/res/values-es/voyah_ultra.xml": {
+      "before": "e28fccba898b3c8646f67aa9e57858a5737850bb8d40329d16af79c20568c686",
+      "after": "30e34061ba15e59c116da18a98bd9216ad6cb1cf9b590c6b67928f023dca3fc6"
+    },
+    "common/src/main/res/values-ja/voyah_ultra.xml": {
+      "before": "b4359426bfe996420456057ff950c350aed2c14a5b23894819340a6dff1af06d",
+      "after": "b26da571ff5bace31982b35b23d0ee80a658c456265d1950be4fad3cbf9aec28"
+    },
+    "common/src/main/res/values-ru/voyah_ultra.xml": {
+      "before": "79ffb0472bd1fb7aa61d67baed552d46ed7f8940500759878ffe4ef8de8ac9be",
+      "after": "4ba3edac75d957bb12c217e0ec865141b0c1c149af9d0a718007a5e01250cbca"
+    },
+    "common/src/main/res/values-uk/voyah_ultra.xml": {
+      "before": "1a6b6c54d1b3b6f2ebb07e61c845d639128555892f8900878b1be2adeb897e93",
+      "after": "3c99770b52c4a5ca86f7da27a2379bb1c5bc8f7f1fea0daa3ecc08420d457473"
+    },
+    "common/src/main/res/values-zh-rCN/voyah_ultra.xml": {
+      "before": "66b29e4c777d9bb752f67e38ba130b8f06e82f3379745b79041c3005e2f5ea02",
+      "after": "f60fae238a558230d0e402501e6424b9cfa327912f64f41075f849b15191bc4b"
+    },
+    "common/src/main/res/values-zh-rTW/voyah_ultra.xml": {
+      "before": "2faaab00539d386376bd34dcc8ad52803efb600e100740c1a565455c71720a0d",
+      "after": "3f16840302d0a98b2dd92776402d208308f5c7d8a170290b3703f4bf1f54b133"
+    },
+    "common/src/testDebug/java/com/shilapi/xcertplay/voyah/VoyahHvacSchemaTest.kt": {
+      "before": null,
+      "after": "50aeb6fa66c603594c5e71abb6dc3d7bbdbfb57a60447961f37d4ae0c675c0da"
+    },
+    "mobile/build.gradle.kts": {
+      "before": "3dca3055d9557178e870d83500ad2e9cd321c7450bfcc061a2867255ad35e40a",
+      "after": "211742666f6d83defa24eb1cdba5c128ffdff394220900a6d741f25bbad6f28b"
+    },
+    "payload/common/src/debug/java/com/shilapi/xcertplay/voyah/ultra/VoyahUltraSettings.kt": {
+      "before": "f3ce57ddf6e804b991824e2b9d1ad723c123e8898060fe1fb1ffb816376802d1",
+      "after": "e5825ecaf1207c475e39a18dfd43a89dff8875ade8ff94e828aba36e6a36ca90"
+    },
+    "payload/common/src/main/res/values/voyah_ultra.xml": {
+      "before": "0c86d64cde334f5e1daec5ae9f53769c3ace5e003e92e9f29cf4ea29972724a1",
+      "after": "7fd22f6dca635aa4854ea3613e008712063ca11995492246b58c3ad6b6a39e11"
+    },
+    "payload/common/src/main/res/values-ar/voyah_ultra.xml": {
+      "before": "949b8377e2af59814bb3d26dde278788d5e48e97122e3ca4e8501c5211edefce",
+      "after": "4d877cc282b1839f40568bc7801b990d357149888b53f55a342dc1630d1e1cd3"
+    },
+    "payload/common/src/main/res/values-es/voyah_ultra.xml": {
+      "before": "e28fccba898b3c8646f67aa9e57858a5737850bb8d40329d16af79c20568c686",
+      "after": "30e34061ba15e59c116da18a98bd9216ad6cb1cf9b590c6b67928f023dca3fc6"
+    },
+    "payload/common/src/main/res/values-ja/voyah_ultra.xml": {
+      "before": "b4359426bfe996420456057ff950c350aed2c14a5b23894819340a6dff1af06d",
+      "after": "b26da571ff5bace31982b35b23d0ee80a658c456265d1950be4fad3cbf9aec28"
+    },
+    "payload/common/src/main/res/values-ru/voyah_ultra.xml": {
+      "before": "79ffb0472bd1fb7aa61d67baed552d46ed7f8940500759878ffe4ef8de8ac9be",
+      "after": "4ba3edac75d957bb12c217e0ec865141b0c1c149af9d0a718007a5e01250cbca"
+    },
+    "payload/common/src/main/res/values-uk/voyah_ultra.xml": {
+      "before": "1a6b6c54d1b3b6f2ebb07e61c845d639128555892f8900878b1be2adeb897e93",
+      "after": "3c99770b52c4a5ca86f7da27a2379bb1c5bc8f7f1fea0daa3ecc08420d457473"
+    },
+    "payload/common/src/main/res/values-zh-rCN/voyah_ultra.xml": {
+      "before": "66b29e4c777d9bb752f67e38ba130b8f06e82f3379745b79041c3005e2f5ea02",
+      "after": "f60fae238a558230d0e402501e6424b9cfa327912f64f41075f849b15191bc4b"
+    },
+    "payload/common/src/main/res/values-zh-rTW/voyah_ultra.xml": {
+      "before": "2faaab00539d386376bd34dcc8ad52803efb600e100740c1a565455c71720a0d",
+      "after": "3f16840302d0a98b2dd92776402d208308f5c7d8a170290b3703f4bf1f54b133"
+    },
+    "payload/shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/RcsChannel.kt": {
+      "before": "a201eedcba90903955910b641eca7a11c663909f1fb59a4b4816fbfd554a6205",
+      "after": "60f91fae15fc1cf1828b1dc09e36f067498680133b568fef346519e16a0fb303"
+    },
+    "payload/shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/caf/CafMessage.kt": {
+      "before": "deb29daf4719c250aeb7c92fce40d277608de147981f06623342b65a498b0b48",
+      "after": "7963ce2aaa9b77e9384035f3ef1dcf8f15b7e5befda30b203e99b9e9df4259d3"
+    },
+    "payload/shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/caf/CafRcsCodec.kt": {
+      "before": "65bae8b96cc7c9bc962eb914359a16eb5055ff60f778112c9ed5bbabb3a9e4e0",
+      "after": "e28035829b4b363053150ec39fbae49e6696827a2daa858ac5b4b26315de397b"
+    },
+    "payload/shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/transport/ApTransportPackage.kt": {
+      "before": "f3b21167ed829903620e58602a2ffc5db6c93bc88d4221941f0035feb0a692ca",
+      "after": "bf834975402f762142e75f4c1afb3a8c6536e8818f02efac0121b971138941c8"
+    },
+    "payload/shared/src/debug/java/com/shilapi/xcertplay/airplay/ultra/VoyahClimateAccessory.kt": {
+      "before": "5e09b43c110b1bd69fffe3c84383e802c6f6169332136fb49e417a780147a967",
+      "after": "05503bf410ff6c6e1b880b8284c0e6b99d47deec59dca1ef8cef8182bf235337"
+    },
+    "payload/shared/src/debug/java/com/shilapi/xcertplay/airplay/ultra/VoyahUltraProtocol.kt": {
+      "before": "1095a64aeb5ce34886046edce3344d4e4dcebb16f32c5acd6ba379059fe75304",
+      "after": "07b486d4e8a0b5176e3e3724608fe65d6d6b968ed8d8b73b437fadfb0c79d5f5"
+    },
+    "payload/shared/src/testDebug/java/com/shilapi/xcertplay/airplay/ultra/VoyahUltraPilotTest.kt": {
+      "before": "0a9b3ed18bb1f1ae9a238798e970eb7f3d1c9a44fc23fbf0c754475b06d42482",
+      "after": "b6a3a371870b09316aade4d2e4912bcecd629bfb66d18583b5448a633cc93a21"
+    },
+    "shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/RcsChannel.kt": {
+      "before": "a201eedcba90903955910b641eca7a11c663909f1fb59a4b4816fbfd554a6205",
+      "after": "60f91fae15fc1cf1828b1dc09e36f067498680133b568fef346519e16a0fb303"
+    },
+    "shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/caf/CafMessage.kt": {
+      "before": "deb29daf4719c250aeb7c92fce40d277608de147981f06623342b65a498b0b48",
+      "after": "7963ce2aaa9b77e9384035f3ef1dcf8f15b7e5befda30b203e99b9e9df4259d3"
+    },
+    "shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/caf/CafRcsCodec.kt": {
+      "before": "65bae8b96cc7c9bc962eb914359a16eb5055ff60f778112c9ed5bbabb3a9e4e0",
+      "after": "e28035829b4b363053150ec39fbae49e6696827a2daa858ac5b4b26315de397b"
+    },
+    "shared/src/debug/java/com/shilapi/xcertplay/airplay/rcs/transport/ApTransportPackage.kt": {
+      "before": "f3b21167ed829903620e58602a2ffc5db6c93bc88d4221941f0035feb0a692ca",
+      "after": "bf834975402f762142e75f4c1afb3a8c6536e8818f02efac0121b971138941c8"
+    },
+    "shared/src/debug/java/com/shilapi/xcertplay/airplay/ultra/VoyahClimateAccessory.kt": {
+      "before": "5e09b43c110b1bd69fffe3c84383e802c6f6169332136fb49e417a780147a967",
+      "after": "05503bf410ff6c6e1b880b8284c0e6b99d47deec59dca1ef8cef8182bf235337"
+    },
+    "shared/src/debug/java/com/shilapi/xcertplay/airplay/ultra/VoyahUltraProtocol.kt": {
+      "before": "1095a64aeb5ce34886046edce3344d4e4dcebb16f32c5acd6ba379059fe75304",
+      "after": "07b486d4e8a0b5176e3e3724608fe65d6d6b968ed8d8b73b437fadfb0c79d5f5"
+    },
+    "shared/src/main/java/com/shilapi/xcertplay/airplay/AirPlaySession.kt": {
+      "before": "8733143d984c14b60b3cee63febfb10f9306de6f1fe9039321ccb3a0d43c6dbd",
+      "after": "7526250ee6fbd42a539c44300c354b24d8ec33d78144843512385f3d5ffd24a5"
+    },
+    "shared/src/testDebug/java/com/shilapi/xcertplay/airplay/ultra/VoyahUltraHvacTest.kt": {
+      "before": null,
+      "after": "dcce6bce06b2f0de0f09329221198214069ed42f7ddcc835472942f074c82314"
+    },
+    "shared/src/testDebug/java/com/shilapi/xcertplay/airplay/ultra/VoyahUltraPilotTest.kt": {
+      "before": "0a9b3ed18bb1f1ae9a238798e970eb7f3d1c9a44fc23fbf0c754475b06d42482",
+      "after": "b6a3a371870b09316aade4d2e4912bcecd629bfb66d18583b5448a633cc93a21"
+    }
+  }
+}

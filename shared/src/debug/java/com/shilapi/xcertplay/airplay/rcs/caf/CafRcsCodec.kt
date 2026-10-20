@@ -7,14 +7,19 @@ import com.shilapi.xcertplay.airplay.rcs.opack.OpackCodec
 /**
  * CAF carrier codec.
  *
- * RCS body:
- * `bplist({"params":{"data": outerOpack}})`
+ * RCS body is direct outer OPACK on the observed iPhone. The older
+ * `bplist({"params":{"data": outerOpack}})` carrier is accepted per channel.
  *
  * Outer OPACK:
  * `{"pluginID": NSNumber, "pluginData": NSData(innerOpack)}`
  */
+enum class CafBodyEncoding { OPACK, BPLIST_WRAPPED }
+
 object CafRcsCodec {
-    fun encode(envelope: CafEnvelope): CafRcsFrame {
+    fun encoding(body: ByteArray): CafBodyEncoding =
+        if (body.take(8).toByteArray().contentEquals("bplist00".toByteArray())) CafBodyEncoding.BPLIST_WRAPPED else CafBodyEncoding.OPACK
+
+    fun encode(envelope: CafEnvelope, encoding: CafBodyEncoding = CafBodyEncoding.OPACK): CafRcsFrame {
         envelope.message.validateWireShape()
         if (envelope.pluginId < 0) {
             throw CafProtocolException("pluginId must not be negative")
@@ -31,21 +36,18 @@ object CafRcsCodec {
             "pluginID" to envelope.pluginId,
             "pluginData" to OpackCodec.encode(inner),
         )
-        val body = BplistCodec.encode(
-            linkedMapOf(
-                "params" to linkedMapOf(
-                    "data" to OpackCodec.encode(outer),
-                ),
-            ),
-        )
+        val packed = OpackCodec.encode(outer)
+        val body = if (encoding == CafBodyEncoding.OPACK) packed else BplistCodec.encode(
+            linkedMapOf("params" to linkedMapOf("data" to packed)))
         return CafRcsFrame(envelope, body)
     }
 
     fun decode(rcsBody: ByteArray): CafEnvelope {
-        val wrapper = requireMap(BplistCodec.decode(rcsBody), "RCS body")
-        val params = requireMap(wrapper["params"], "RCS body params")
-        val outerBytes = params["data"] as? ByteArray
-            ?: throw CafProtocolException("RCS body params.data must be NSData")
+        val outerBytes = if (encoding(rcsBody) == CafBodyEncoding.OPACK) rcsBody else {
+            val wrapper = requireMap(BplistCodec.decode(rcsBody), "RCS body")
+            val params = requireMap(wrapper["params"], "RCS body params")
+            params["data"] as? ByteArray ?: throw CafProtocolException("RCS body params.data must be NSData")
+        }
         val outer = requireMap(OpackCodec.decode(outerBytes), "CAF outer OPACK")
         val pluginId = CafNumbers.toLong(outer["pluginID"], "CAF pluginID")
         val innerBytes = outer["pluginData"] as? ByteArray
@@ -56,7 +58,8 @@ object CafRcsCodec {
         val command = CafCommand.find(commandName)
             ?: throw CafProtocolException("Unknown CAF command '$commandName'")
         val transactionId = inner["transactionID"]?.let {
-            CafNumbers.toLong(it, "CAF transactionID")
+            if (it is java.math.BigInteger && it.signum() >= 0 && it.bitLength() <= 64) it.toLong()
+            else CafNumbers.toLong(it, "CAF transactionID")
         }
         val errors = inner["errors"]?.let {
             CafNumbers.toLongMap(it, "CAF errors")

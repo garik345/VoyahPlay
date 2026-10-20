@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="voyah_ultra_title">CarPlay Ultra：運転席の空調（実験的機能）</string>
-    <string name="voyah_ultra_toggle">運転席の空調データをiPhoneに送信</string>
-    <string name="voyah_ultra_description">debugテストです。設定を保存してCarPlayを再接続すると適用されます。iPhoneでの構成の受け入れと空調画面の表示は未確認です。</string>
-    <string name="voyah_ultra_readonly">運転席の設定温度（°C）の読み取りのみ。車内温度センサー、ラジオ、車両操作には対応していません。</string>
+    <string name="voyah_ultra_title">CarPlay Ultra：空調と快適機能（実験的機能）</string>
+    <string name="voyah_ultra_toggle">CarPlay Ultra で空調と快適機能を連携</string>
+    <string name="voyah_ultra_description">debug テスト。保存後に CarPlay を再接続してください。運転席・助手席の設定温度、空調電源、A/C、風量、AUTO、内気循環、窓の曇り取り、快適機能を車両状態で確認します。iPhone の空調画面は未確認です。</string>
+    <string name="voyah_ultra_readonly">書き込みには WRITE_CANBUS が必要です。室温センサー、MAX A/C、ラジオは通知しません。iPhone の明示的な要求時のみ操作します。</string>
     <string name="voyah_ultra_probe">Ultra：空調データを確認</string>
     <string name="voyah_ultra_report">Ultra：ログを表示</string>
     <string name="voyah_ultra_export">Ultra：ログを保存</string>

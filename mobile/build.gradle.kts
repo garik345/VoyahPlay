@@ -17,8 +17,8 @@ android {
         applicationId = "dev.voyah.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 43
-        versionName = "0.2.19-voyahplay.0.1.23"
+        versionCode = 44
+        versionName = "0.2.19-voyahplay.0.1.24"
 
     }
 

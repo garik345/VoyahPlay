@@ -23,7 +23,9 @@ data class CafRcsFrame(
     val envelope: CafEnvelope,
     val rcsBody: ByteArray,
 ) {
-    fun asRcsMessage(): RcsMessage = RcsMessage.comm(rcsBody)
+    fun asRcsMessage(): RcsMessage = RcsMessage(
+        com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackageCodec.MESSAGE_TYPE_CMND, rcsBody,
+        com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackageCodec.KIND_ASYN)
 }
 
 class CafMessageReader internal constructor(

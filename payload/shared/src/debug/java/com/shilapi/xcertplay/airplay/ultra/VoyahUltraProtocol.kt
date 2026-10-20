@@ -14,7 +14,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 interface UltraClimateSource : Closeable {
+    val supportedControls: Set<UltraClimateControl> get() = emptySet()
+    val supportedHvac: Set<UltraHvacControl> get() = emptySet()
     fun start(onSample: (UltraClimateSample?) -> Unit)
+    fun write(control: UltraClimateControl, level: Int): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
+    fun writeHvac(control: UltraHvacControl, value: Any): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
 }
 
 /** Debug-only VSP/CAF pilot. The existing iAP2, video, audio and pairing paths stay in charge. */
@@ -38,10 +42,19 @@ class VoyahUltraProtocol(
     override fun decorateInfo(info: MutableMap<String, Any?>) {
         info["vehicleStateProtocolInfo"] = linkedMapOf(
             "protocolVersion" to "1.0", "pluginCount" to 1,
-            "pluginConfigs" to listOf(mapOf("pluginID" to VoyahClimateAccessory.PLUGIN_ID)),
-            "pluginMapping" to mapOf("org.voyahplay.climate.test" to VoyahClimateAccessory.PLUGIN_ID),
+            "pluginConfigs" to listOf(linkedMapOf<String, Any?>("name" to VoyahClimateAccessory.PLUGIN_NAME,
+                "pluginID" to VoyahClimateAccessory.PLUGIN_ID).apply { putAll(newAccessory().config()) }),
+            "pluginMapping" to mapOf(VoyahClimateAccessory.PLUGIN_NAME to VoyahClimateAccessory.PLUGIN_ID),
         )
-        log("INFO VSP=1 plugin=1 climate=driver-target READ_ONLY=1")
+        // Describe only existing screens, without inventing a cluster or advertising UI Sync.
+        info["displayPanels"] = (info["displays"] as? List<*>).orEmpty().filterIsInstance<Map<*, *>>().mapNotNull { d ->
+            val uuid = d["uuid"] as? String ?: return@mapNotNull null
+            linkedMapOf<String, Any?>("uid" to "$uuid-panel", "widthPixels" to d["widthPixels"],
+                "heightPixels" to d["heightPixels"], "widthPhysical" to d["widthPhysical"], "heightPhysical" to d["heightPhysical"],
+                "properties" to if ((d["type"] as? Number)?.toInt() == 111) listOf("showsInstruments") else emptyList<String>(),
+                "initialVideoStreams" to listOf(mapOf("uuid" to uuid, "originXPixels" to 0, "originYPixels" to 0, "zIndex" to 0)))
+        }
+        log("INFO VSP=1 plugin=0 WIRE_REV=$WIRE_REV hvac=${source.supportedHvac.joinToString()} comfort=${source.supportedControls.joinToString()} panels=${(info["displayPanels"] as List<*>).size} sample=${sample?.driverTargetCelsius}")
     }
 
     override fun enabledFeatures(proposed: List<*>?): List<String> {
@@ -57,7 +70,8 @@ class VoyahUltraProtocol(
 
     override fun onFeaturesNegotiated(features: List<String>) {
         negotiated = FEATURE in features
-        log("NEGOTIATED VSP=${if (negotiated) 1 else 0}; enabled=${features.joinToString(",")}")
+        log("NEGOTIATED VSP=${if (negotiated) 1 else 0}; enabled=${features.joinToString(",")} WIRE_REV=$WIRE_REV")
+        if (negotiated) beginSource()
     }
 
     override fun openDataStream(session: AirPlaySession, stream: Map<String, Any?>): Map<String, Any?>? {
@@ -159,21 +173,36 @@ class VoyahUltraProtocol(
 
     private fun beginSource() {
         if (closed.get() || !sourceStarted.compareAndSet(false, true)) return
+        log("VEHICLE SOURCE START WIRE_REV=$WIRE_REV")
         source.start { value ->
             if (closed.get()) return@start
-            val changed = sample?.driverTargetCelsius != value?.driverTargetCelsius
+            val changed = sample?.driverTargetCelsius != value?.driverTargetCelsius || sample?.hvacValues != value?.hvacValues || sample?.comfortLevels != value?.comfortLevels
             sample = value
-            if (changed) log("VEHICLE driverTargetC=${value?.driverTargetCelsius ?: "unavailable"}")
+            if (changed) log("VEHICLE driverTargetC=${value?.driverTargetCelsius ?: "unavailable"} hvac=${value?.hvacValues} comfort=${value?.comfortLevels}")
             channels.values.forEach { it.publish() }
         }
     }
+
+    private fun newAccessory() = VoyahClimateAccessory({ sample }, clock, source.supportedControls,
+        { control, level ->
+            if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
+                log("OEM WRITE request comfort=$control value=$level")
+                source.write(control, level).also { log("OEM WRITE result confirmed=${it.confirmed} ${it.message}") }
+            }
+        }, source.supportedHvac, { control, value ->
+            if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
+                log("OEM WRITE request hvac=$control value=$value")
+                source.writeHvac(control, value).also { log("OEM WRITE result confirmed=${it.confirmed} ${it.message}") }
+            }
+        })
 
     private fun log(text: String) { runCatching { trace(text.take(3000)) } }
 
     private inner class Channel(val data: RcsDataStream, val connectionId: String?) : RcsDataStreamHandler, Closeable {
         val attached = AtomicBoolean(false)
         private val stopped = AtomicBoolean(false)
-        private val accessory = VoyahClimateAccessory({ sample }, clock)
+        private val accessory = newAccessory()
+        private var encoding = CafBodyEncoding.OPACK
         private val worker = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(64),
             { runnable -> Thread(runnable, "voyah-ultra-caf").apply { isDaemon = true } })
 
@@ -184,19 +213,28 @@ class VoyahUltraProtocol(
 
         override fun onMessage(stream: RcsDataStream, message: RcsMessage) {
             if (message.body.size > 262_144) { log("RCS body exceeds pilot limit"); close(); return }
+            val transport = com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackageCodec
+            if (message.kind == transport.KIND_RPLY) { log("CAF transport reply token=${message.token}"); return }
+            if (message.kind == transport.KIND_SYNC) data.send(message.reply())
             enqueue {
-                if (message.messageType != com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackageCodec.MESSAGE_TYPE_COMM)
-                    throw CafProtocolException("Expected CAF comm package")
+                if (message.messageType != transport.MESSAGE_TYPE_COMM && message.messageType != transport.MESSAGE_TYPE_CMND)
+                    throw CafProtocolException("Expected CAF comm/cmnd package")
+                encoding = CafRcsCodec.encoding(message.body)
                 val request = CarAccessoryMessages.reader(message.body)
+                log("CAF transport kind=${message.kind} token=${message.token} encoding=$encoding")
                 log("CAF RX plugin=${request.pluginId} command=${request.command.wireName} values=${ProtocolTraceFormatter.pretty(request.values())}")
+                if (request.command == CafCommand.CONFIG_REQUEST) {
+                    val tree = accessory.config()["accessories"] as List<*>
+                    log("CAF CONFIG WIRE_REV=$WIRE_REV accessories=${tree.size} hvac=${source.supportedHvac} comfort=${source.supportedControls} driver=${sample?.driverTargetCelsius}")
+                }
                 accessory.handle(request)?.let(::send)
             }
         }
 
         fun publish() = enqueue { accessory.changed()?.let(::send) }
         private fun send(frame: CafRcsFrame) {
-            log("CAF TX command=${frame.envelope.message.command.wireName} values=${ProtocolTraceFormatter.pretty(frame.envelope.message.values)}")
-            data.send(frame.asRcsMessage())
+            log("CAF TX command=${frame.envelope.message.command.wireName} values=${ProtocolTraceFormatter.pretty(frame.envelope.message.values)} errors=${frame.envelope.message.errors}")
+            data.send(CafRcsCodec.encode(frame.envelope, encoding).asRcsMessage())
         }
         private fun enqueue(action: () -> Unit) {
             if (stopped.get()) return
@@ -215,5 +253,5 @@ class VoyahUltraProtocol(
         }
     }
 
-    companion object { const val FEATURE = "vehicleStateProtocol" }
+    companion object { const val FEATURE = "vehicleStateProtocol"; const val WIRE_REV = "opack-5-hvac" }
 }

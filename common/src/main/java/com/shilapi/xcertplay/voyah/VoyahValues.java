@@ -1,6 +1,9 @@
 package com.shilapi.xcertplay.voyah;
 
 import java.util.Locale;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Collections;
 
 /** Display-only values. A read time is not a vehicle signal timestamp. */
 public final class VoyahValues {
@@ -9,6 +12,9 @@ public final class VoyahValues {
     public final long receivedAt;
     private final int[] doors, windows;
     private final VoyahComfortValues comfort;
+    private final Map<String, Number> climate;
+    public VoyahComfortValues comfortValues() { return comfort; }
+    public Map<String, Number> climateValues() { return climate; }
 
     public VoyahValues(float battery, float fuel, float left, float right, int fan, long time) {
         this(battery, fuel, left, right, fan, time, null, null);
@@ -20,6 +26,12 @@ public final class VoyahValues {
 
     public VoyahValues(float battery, float fuel, float left, float right, int fan, long time,
             int[] doors, int[] windows, VoyahComfortValues comfort) {
+        this(battery, fuel, left, right, fan, time, doors, windows, comfort, null);
+    }
+
+    public VoyahValues(float battery, float fuel, float left, float right, int fan, long time,
+            int[] doors, int[] windows, VoyahComfortValues comfort, Map<String, Number> climate) {
+        this.climate = Collections.unmodifiableMap(climate == null ? new HashMap<>() : new HashMap<>(climate));
         this.comfort = comfort;
         this.doors = doors == null ? null : doors.clone();
         this.windows = windows == null ? null : windows.clone();

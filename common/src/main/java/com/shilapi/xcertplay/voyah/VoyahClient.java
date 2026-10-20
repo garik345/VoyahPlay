@@ -95,7 +95,7 @@ public final class VoyahClient {
                     climate == null ? -1 : climate.optInt("airWindSpeed", -1), sampledAt,
                     states(doors, "fLDoor", "fRDoor", "rLDoor", "rRDoor"),
                     states(windows, "fLWindow", "fRWindow", "rLWindow", "rRWindow"),
-                    new VoyahComfortValues(comfort, comfortAvailable));
+                    new VoyahComfortValues(comfort, comfortAvailable), numbers(climate));
             } catch (Exception e) {
                 error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             } finally {
@@ -112,6 +112,18 @@ public final class VoyahClient {
                 listener.complete(values, failure);
             });
         });
+    }
+
+    private static Map<String, Number> numbers(JSONObject data) {
+        Map<String, Number> result = new LinkedHashMap<>();
+        if (data != null) {
+            Iterator<String> keys = data.keys();
+            while (keys.hasNext()) {
+                String key = keys.next(); Object value = data.opt(key);
+                if (value instanceof Number) result.put(key, (Number) value);
+            }
+        }
+        return result;
     }
 
     private static int[] states(JSONObject data, String... keys) {

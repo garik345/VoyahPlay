@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="voyah_ultra_title">CarPlay Ultra: климат водителя (экспериментально)</string>
-    <string name="voyah_ultra_toggle">Передавать климат водителя в iPhone</string>
-    <string name="voyah_ultra_description">Тест debug. Применяется после сохранения настроек и повторного подключения CarPlay. Принятие конфигурации iPhone и экран климата пока не подтверждены.</string>
-    <string name="voyah_ultra_readonly">Только чтение заданной температуры водителя в °C. Датчик температуры салона, радио и управление автомобилем не заявляются.</string>
+    <string name="voyah_ultra_title">CarPlay Ultra: климат и комфорт (экспериментально)</string>
+    <string name="voyah_ultra_toggle">Климат и комфорт через CarPlay Ultra</string>
+    <string name="voyah_ultra_description">Тест debug. После сохранения переподключите CarPlay. Температуры водителя и пассажира, питание климата, A/C, вентилятор, AUTO, рециркуляция, обдув стёкол и комфорт — с проверкой состояния автомобиля. Появление меню на iPhone ещё не подтверждено.</string>
+    <string name="voyah_ultra_readonly">Запись требует WRITE_CANBUS. Датчик салона, MAX A/C и радио не заявляются. Команды выполняются только по явному запросу iPhone.</string>
     <string name="voyah_ultra_probe">Ultra: проверить данные климата</string>
     <string name="voyah_ultra_report">Ultra: посмотреть журнал</string>
     <string name="voyah_ultra_export">Ultra: сохранить журнал</string>

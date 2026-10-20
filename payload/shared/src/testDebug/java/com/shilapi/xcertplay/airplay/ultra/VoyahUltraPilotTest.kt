@@ -19,9 +19,9 @@ class VoyahUltraPilotTest {
 
     @Test fun configContainsOnlyOneReadOnlyDriverSetPointAndKnownTypes() {
         val config = CafConfigTree.decode(accessory().config())
-        val climate = config.accessories.single()
+        val climate = config.accessories.first()
         assertEquals("Climate", CafTypeCatalog.find(CafTypeKind.ACCESSORY, climate.type)?.name)
-        val service = climate.services.single()
+        val service = climate.services.first()
         assertEquals("Temperature", CafTypeCatalog.find(CafTypeKind.SERVICE, service.type)?.name)
         val target = service.characteristics.first()
         assertEquals("TargetTemperature", CafTypeCatalog.find(CafTypeKind.CHARACTERISTIC, target.type)?.name)
@@ -33,7 +33,7 @@ class VoyahUltraPilotTest {
 
     @Test fun invalidAndExpiredSamplesNeverBecomeZeroOrARealTemperature() {
         val a = accessory()
-        fun target(): Any? = reader(a.handle(reader(CarAccessoryMessages.readRequest(1, 1, listOf(11))))!!).valuesMap()[11]
+        fun target(): Any? = reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 1, listOf(11))))!!).valuesMap()[11]
         sample = null; assertNull(target())
         sample = UltraClimateSample(Double.NaN, now); assertNull(target())
         sample = UltraClimateSample(33.0, now); assertNull(target())
@@ -43,7 +43,7 @@ class VoyahUltraPilotTest {
 
     @Test fun subscriptionsPublishChangesAndInvalidationButNotDuplicates() {
         val a = accessory()
-        val initial = a.handle(reader(CarAccessoryMessages.registerRequest(1, 1)))!!
+        val initial = a.handle(reader(CarAccessoryMessages.registerRequest(0, 1)))!!
         assertEquals(22.5, reader(initial).valuesMap()[11])
         assertNull(a.changed())
         sample = UltraClimateSample(24.0, now)
@@ -56,26 +56,31 @@ class VoyahUltraPilotTest {
 
     @Test fun unregisterStopsNotificationsAndNewInstanceStartsWithoutSubscription() {
         val a = accessory()
-        a.handle(reader(CarAccessoryMessages.registerRequest(1, 1, CafRegistration.Identifiers(listOf(11)))))
-        a.handle(reader(CarAccessoryMessages.unregisterRequest(1, 2, listOf(11))))
+        a.handle(reader(CarAccessoryMessages.registerRequest(0, 1, CafRegistration.Identifiers(listOf(11)))))
+        a.handle(reader(CarAccessoryMessages.unregisterRequest(0, 2, listOf(11))))
         sample = UltraClimateSample(23.0, now)
         assertNull(a.changed()); assertNull(accessory().changed())
     }
 
     @Test fun writesControlsAndUnknownPluginsAreRejectedRatherThanAcknowledged() {
         val a = accessory()
-        for (frame in listOf(CarAccessoryMessages.writeRequest(1, 2, mapOf(11L to 28.0)),
-            CarAccessoryMessages.controlRequest(1, 3, mapOf(11L to 28.0)),
+        for (frame in listOf(CarAccessoryMessages.writeRequest(0, 2, mapOf(11L to 28.0)),
+            CarAccessoryMessages.controlRequest(0, 3, mapOf(11L to 28.0)),
             CarAccessoryMessages.readRequest(77, 4, listOf(11)))) {
             val response = reader(a.handle(reader(frame))!!)
-            assertEquals(CafCommand.GENERAL_ERROR, response.command)
-            assertEquals(-50L, response.requireError())
+            if (frame.envelope.message.command == CafCommand.WRITE_REQUEST) {
+                assertEquals(CafCommand.WRITE_RESPONSE, response.command)
+                assertEquals(mapOf(11L to -50L), response.errors())
+            } else {
+                assertEquals(CafCommand.GENERAL_ERROR, response.command)
+                assertEquals(-50L, response.requireError())
+            }
         }
         assertEquals(22.5, sample?.driverTargetCelsius)
     }
 
     @Test fun mixedReadReturnsOnlyKnownIdsAndExplicitErrorForUnknownId() {
-        val response = reader(accessory().handle(reader(CarAccessoryMessages.readRequest(1, 5, listOf(11, 999))))!!)
+        val response = reader(accessory().handle(reader(CarAccessoryMessages.readRequest(0, 5, listOf(11, 999))))!!)
         assertEquals(mapOf(11L to 22.5), response.valuesMap())
         assertEquals(mapOf(999L to -50L), response.errors())
     }
@@ -104,7 +109,7 @@ class VoyahUltraPilotTest {
         val config = config().copy(microphone = true, hevc = true, mainBufferedAudio = true)
         val normal = AirPlayInfoPlist.build(config)
         val pilot = AirPlayInfoPlist.build(config.copy(protocolExtension = VoyahUltraProtocol({ FakeSource() }, { now }, {})))
-        assertArrayEquals(BplistCodec.encode(normal), BplistCodec.encode(pilot - "vehicleStateProtocolInfo"))
+        assertArrayEquals(BplistCodec.encode(normal), BplistCodec.encode(pilot - "vehicleStateProtocolInfo" - "displayPanels"))
     }
 
     @Test fun encryptedCafRoundTripReadsAndSubscribesToRealSourceUpdates() {
@@ -118,20 +123,20 @@ class VoyahUltraPilotTest {
                 InetAddress.getByName("127.0.0.1"), mapOf("streamConnectionID" to 123L))
             protocol.attachPending()
             RcsChannel.connect(InetSocketAddress("127.0.0.1", response["dataPort"] as Int), tx, rx).use { phone ->
-                phone.send(CarAccessoryMessages.configRequest(1, 1).asRcsMessage())
+                phone.send(CarAccessoryMessages.configRequest(0, 1).asRcsMessage())
                 val config = CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body)
                 assertEquals(CafCommand.CONFIG_RESPONSE, config.command)
-                assertEquals(1, config.configTree(CafFirmwareConfigTreeDecoder).accessories.size)
+                assertEquals(2, config.configTree(CafFirmwareConfigTreeDecoder).accessories.size)
                 source.emit(UltraClimateSample(24.5, now))
-                phone.send(CarAccessoryMessages.registerRequest(1, 2, CafRegistration.Identifiers(listOf(11))).asRcsMessage())
+                phone.send(CarAccessoryMessages.registerRequest(0, 2, CafRegistration.Identifiers(listOf(11))).asRcsMessage())
                 val initial = CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body)
                 assertEquals(24.5, initial.valuesMap()[11])
                 source.emit(UltraClimateSample(25.0, now))
                 val update = CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body)
                 assertEquals(CafCommand.UPDATE_NOTIFY, update.command)
                 assertEquals(25.0, update.valuesMap()[11])
-                phone.send(CarAccessoryMessages.writeRequest(1, 3, mapOf(11L to 28.0)).asRcsMessage())
-                assertEquals(CafCommand.GENERAL_ERROR, CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body).command)
+                phone.send(CarAccessoryMessages.writeRequest(0, 3, mapOf(11L to 28.0)).asRcsMessage())
+                assertEquals(CafCommand.WRITE_RESPONSE, CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body).command)
             }
         } finally { protocol.close() }
         assertEquals(1, source.starts.get()); assertEquals(1, source.stops.get())
@@ -146,7 +151,8 @@ class VoyahUltraPilotTest {
         a.onFeaturesNegotiated(listOf("vehicleStateProtocol")); b.onFeaturesNegotiated(listOf("vehicleStateProtocol"))
         assertTrue(a !== b)
         a.close(); b.close()
-        assertTrue(created.isEmpty()) // Never start a CAN poll before a CAF peer opens.
+        assertEquals(2, created.size)
+        assertTrue(created.all { it.starts.get() == 1 && it.stops.get() == 1 }) // Warm up at VSP negotiation; session-owned.
     }
 
     @Test fun tearingDownOneCafStreamKeepsTheOtherAndDoesNotTargetTheIapTunnel() {
@@ -162,7 +168,7 @@ class VoyahUltraPilotTest {
             RcsChannel.connect(InetSocketAddress("127.0.0.1", a["dataPort"] as Int), tx, rx).use { first ->
                 RcsChannel.connect(InetSocketAddress("127.0.0.1", b["dataPort"] as Int), tx, rx).use { second ->
                     for (phone in listOf(first, second)) {
-                        phone.send(CarAccessoryMessages.registerRequest(1, 1).asRcsMessage())
+                        phone.send(CarAccessoryMessages.registerRequest(0, 1).asRcsMessage())
                         assertEquals(CafCommand.REGISTER_RESPONSE, CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body).command)
                     }
                     val body = mapOf("streams" to listOf(mapOf("type" to 130, "streamID" to a["streamID"])))

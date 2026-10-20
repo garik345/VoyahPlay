@@ -573,7 +573,7 @@ class AirPlaySession(
             }
             path.endsWith("/info") -> {
                 protocolExtension?.onInfoRequest(request.body)
-                val info = AirPlayInfoPlist.build(config)
+                val info = AirPlayInfoPlist.build(config.copy(protocolExtension = protocolExtension))
                 if (request.body.isNotEmpty()) {
                     val requestInfo = try {
                         BplistCodec.decode(request.body).toString()

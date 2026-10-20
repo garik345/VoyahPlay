@@ -104,6 +104,7 @@ public final class VoyahControls {
                     break;
                 }
                 case "sign-warning":ensure(Field.WARNING,value);break;
+                case "wheel-set":ensure(Field.WHEEL,value);break;
                 case "wheel-toggle":{
                     int current=get(Field.WHEEL);
                     if(!Field.WHEEL.accepts(current))throw new IOException("Состояние руля неизвестно");
