@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_launcher_hint">Con CarPlay abierto, vuelve a tocar el icono de VoyahPlay en el dock del coche para abrir los ajustes.</string>
+</resources>

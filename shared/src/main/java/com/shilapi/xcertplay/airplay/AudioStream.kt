@@ -51,7 +51,7 @@ class AudioStream(
     private val receivedPackets = AtomicInteger()
     private val decryptedPackets = AtomicInteger()
     private val authenticationFailures = AtomicInteger()
-    private var dataSocket: DatagramSocket? = null
+    @Volatile private var dataSocket: DatagramSocket? = null
     private var controlSocket: DatagramSocket? = null
     private var dataThread: Thread? = null
     private var controlThread: Thread? = null
@@ -78,6 +78,13 @@ class AudioStream(
             start()
         }
         return data.localPort to control.localPort
+    }
+
+    /** The reference receiver uses the same bound RTP socket for downlink and microphone uplink. */
+    fun sendMicrophone(packet: ByteArray, host: InetAddress, port: Int) {
+        val socket = dataSocket ?: throw IOException("Audio RTP socket not listening")
+        if (closed.get()) throw IOException("Audio RTP stream closed")
+        socket.send(DatagramPacket(packet, packet.size, host, port))
     }
 
     override fun close() {

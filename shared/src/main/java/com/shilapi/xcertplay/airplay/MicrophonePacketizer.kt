@@ -2,6 +2,11 @@ package com.shilapi.xcertplay.airplay
 
 import java.net.InetAddress
 
+/** The audio stream owns its socket; capture may send through it but must never close it. */
+fun interface MicrophoneTransport {
+    fun send(packet: ByteArray)
+}
+
 /** Everything one captured microphone stream needs to send samples to the phone. */
 data class MicrophoneConfig(
     val audioType: String,
@@ -21,6 +26,8 @@ data class MicrophoneConfig(
      * rule. The report's "Audio: rtp clock" line measures the iPhone's own clock for each stream.
      */
     val opusClockRate: Int = OPUS_CAPTURE_RATE,
+    /** Telephony returns audio from the RTP data port acknowledged in SETUP. */
+    val transport: MicrophoneTransport? = null,
 ) {
     val samplesPerPacket: Int
         get() = if (codec == AudioCodecKind.OPUS) {

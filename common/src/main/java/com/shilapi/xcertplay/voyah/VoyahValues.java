@@ -12,9 +12,15 @@ public final class VoyahValues {
     public final long receivedAt;
     private final int[] doors, windows;
     private final VoyahComfortValues comfort;
-    private final Map<String, Number> climate;
+    private final Map<String, Number> climate, fuelRaw, odometer, tires;
     public VoyahComfortValues comfortValues() { return comfort; }
     public Map<String, Number> climateValues() { return climate; }
+    /** OEM FuelLevel fields as read; empty when the getter was unavailable. */
+    public Map<String, Number> fuelValues() { return fuelRaw; }
+    /** OEM Odometer fields as read (mileage and range candidates); empty when unavailable. */
+    public Map<String, Number> odometerValues() { return odometer; }
+    /** OEM TPMSInfo fields as read (pressures in bar); empty when unavailable. */
+    public Map<String, Number> tireValues() { return tires; }
 
     public VoyahValues(float battery, float fuel, float left, float right, int fan, long time) {
         this(battery, fuel, left, right, fan, time, null, null);
@@ -31,7 +37,16 @@ public final class VoyahValues {
 
     public VoyahValues(float battery, float fuel, float left, float right, int fan, long time,
             int[] doors, int[] windows, VoyahComfortValues comfort, Map<String, Number> climate) {
-        this.climate = Collections.unmodifiableMap(climate == null ? new HashMap<>() : new HashMap<>(climate));
+        this(battery, fuel, left, right, fan, time, doors, windows, comfort, climate, null, null, null);
+    }
+
+    public VoyahValues(float battery, float fuel, float left, float right, int fan, long time,
+            int[] doors, int[] windows, VoyahComfortValues comfort, Map<String, Number> climate,
+            Map<String, Number> fuelRaw, Map<String, Number> odometer, Map<String, Number> tires) {
+        this.climate = copy(climate);
+        this.fuelRaw = copy(fuelRaw);
+        this.odometer = copy(odometer);
+        this.tires = copy(tires);
         this.comfort = comfort;
         this.doors = doors == null ? null : doors.clone();
         this.windows = windows == null ? null : windows.clone();
@@ -41,6 +56,10 @@ public final class VoyahValues {
         this.right = valid(right, 16, 32);
         this.fan = fan >= 0 && fan <= 10 ? fan : null;
         this.receivedAt = time;
+    }
+
+    private static Map<String, Number> copy(Map<String, Number> values) {
+        return Collections.unmodifiableMap(values == null ? new HashMap<>() : new HashMap<>(values));
     }
 
     private static Float valid(float value, float min, float max) {

@@ -18,7 +18,8 @@ class VoyahHvacSchemaTest {
         }
         assertEquals(1, VoyahHvacSchema.wireValue(C.FRONT_DEFROST, 1))
         assertEquals(0, VoyahHvacSchema.wireValue(C.REAR_DEFROST, 0))
-        assertEquals(8, VoyahHvacSchema.wireValue(C.FAN, 8))
+        assertEquals(8, VoyahHvacSchema.wireValue(C.FAN, 7))
+        assertEquals(5, VoyahHvacSchema.wireValue(C.FAN, 4))
     }
     @Test fun circulationDoesNotRepeatAPulseWithoutConfirmedProgress() {
         assertTrue(VoyahHvacSchema.cycleAdvanced(0, 2))
@@ -28,6 +29,15 @@ class VoyahHvacSchemaTest {
         assertFalse(VoyahHvacSchema.cycleAdvanced(1, null))
         assertEquals(1, VoyahHvacSchema.wireValue(C.FRONT_DEFROST, 0))
     }
+    @Test fun automaticRecirculationHasItsOwnFlagAndIsNotAnUnknownManualState() {
+        for (mode in 0..2) {
+            val raw = mapOf("airCirculationMode" to mode)
+            assertEquals(mode == 0, VoyahHvacSchema.decode(raw)[C.RECIRCULATION])
+            assertEquals(mode == 2, VoyahHvacSchema.decodeReadings(raw)[
+                com.shilapi.xcertplay.airplay.ultra.UltraClimateReading.RECIRCULATION_AUTO])
+        }
+        assertNull(VoyahHvacSchema.decode(mapOf("airCirculationMode" to -1))[C.RECIRCULATION])
+    }
     @Test fun allReviewedAirEnumOrdinalsMatchSdkAndCanApk() {
         assertEquals(listOf(2,3,7,4,0,6,10,8,9), C.entries.map { VoyahHvacSchema.field(it).ordinal })
         assertEquals(listOf(3,4,8,5,1,7,11,9,10), C.entries.map { VoyahHvacSchema.field(it).id })
@@ -36,7 +46,7 @@ class VoyahHvacSchemaTest {
         val values = VoyahHvacSchema.decode(mapOf("airSWStatus" to 1,"airACStatus" to 0,"airMode" to 1,
             "airCirculationMode" to 1,"airLeftTemperature" to 22.5f,"airRightTemperature" to 23.0f,"airWindSpeed" to 4))
         assertEquals(true, values[C.POWER]); assertEquals(false, values[C.AC]); assertEquals(true, values[C.AUTO])
-        assertEquals(true, values[C.RECIRCULATION]); assertEquals(22.5, values[C.DRIVER_TARGET]); assertEquals(4L, values[C.FAN])
+        assertEquals(false, values[C.RECIRCULATION]); assertEquals(22.5, values[C.DRIVER_TARGET]); assertEquals(4L, values[C.FAN])
         assertNull(values[C.FRONT_DEFROST])
     }
     @Test fun unknownAndInvalidStatesStayUnknown() {

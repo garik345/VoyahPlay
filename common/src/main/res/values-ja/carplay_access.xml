@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_launcher_hint">CarPlayの表示中に車のドックのVoyahPlayアイコンをもう一度タップすると、設定が開きます。</string>
+</resources>

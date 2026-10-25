@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_vehicle_data">Vehicle data</string>
+    <string name="carplay_tire_front_left">Front left tire</string>
+    <string name="carplay_tire_front_right">Front right tire</string>
+    <string name="carplay_tire_rear_left">Rear left tire</string>
+    <string name="carplay_tire_rear_right">Rear right tire</string>
+    <string name="carplay_vehicle_range">Total range</string>
+    <string name="carplay_vehicle_odometer">Odometer</string>
+    <string name="carplay_vehicle_fuel">Fuel level</string>
+    <string name="carplay_vehicle_unavailable">No data</string>
+    <string name="carplay_vehicle_bar">bar</string>
+    <string name="carplay_vehicle_km">km</string>
+    <string name="carplay_vehicle_battery">Battery</string>
+    <string name="carplay_vehicle_electric_range">Electric range</string>
+    <string name="carplay_vehicle_drive_mode">Drive mode</string>
+    <string name="carplay_drive_eco">Eco</string>
+    <string name="carplay_drive_comfort">Comfort</string>
+    <string name="carplay_drive_sport">Sport</string>
+    <string name="carplay_drive_offroad">Off-road</string>
+    <string name="carplay_drive_individual">Individual</string>
+    <string name="carplay_drive_snow">Snow</string>
+    <string name="carplay_vehicle_controls">Vehicle controls</string>
+    <string name="carplay_driver_massage">Driver massage</string>
+    <string name="carplay_passenger_massage">Passenger massage</string>
+    <string name="carplay_driver_massage_program">Driver massage program</string>
+    <string name="carplay_passenger_massage_program">Passenger massage program</string>
+    <string name="carplay_vehicle_lights">Exterior lights</string>
+    <string name="carplay_vehicle_menu">Vehicle menu</string>
+    <string name="carplay_control_off">Off</string>
+    <string name="carplay_massage_wave">Wave</string>
+    <string name="carplay_massage_rollers">Rollers</string>
+    <string name="carplay_light_position">Position lights</string>
+    <string name="carplay_light_low_beam">Low beam</string>
+    <string name="carplay_light_auto">Auto</string>
+    <string name="carplay_vehicle_fuel_range">Petrol range</string>
+</resources>

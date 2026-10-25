@@ -19,16 +19,17 @@ class VoyahUltraPilotTest {
 
     @Test fun configContainsOnlyOneReadOnlyDriverSetPointAndKnownTypes() {
         val config = CafConfigTree.decode(accessory().config())
-        val climate = config.accessories.first()
+        val climate = config.accessories.first { it.type.value == 0x01000001L }
         assertEquals("Climate", CafTypeCatalog.find(CafTypeKind.ACCESSORY, climate.type)?.name)
-        val service = climate.services.first()
-        assertEquals("Temperature", CafTypeCatalog.find(CafTypeKind.SERVICE, service.type)?.name)
-        val target = service.characteristics.first()
+        assertEquals("Cabin", CafTypeCatalog.find(CafTypeKind.SERVICE, climate.services.first().type)?.name)
+        val service = climate.services.first { CafTypeCatalog.find(CafTypeKind.SERVICE, it.type)?.name == "Temperature" }
+        val target = service.characteristics.first { it.type.value == 0x31000017L }
         assertEquals("TargetTemperature", CafTypeCatalog.find(CafTypeKind.CHARACTERISTIC, target.type)?.name)
         assertEquals(false, target.writable)
         assertEquals(CafFormatValue.Floating(22.5), target.initialValue)
         assertTrue(service.characteristics.all { it.writable == false })
-        assertFalse(service.characteristics.any { it.type.value == 0x31000019L })
+        // The car has no cabin reading, so the phone's current temperature carries the zone's set point.
+        assertEquals(CafFormatValue.Floating(22.5), service.characteristics.first { it.type.value == 0x31000019L }.initialValue)
     }
 
     @Test fun invalidAndExpiredSamplesNeverBecomeZeroOrARealTemperature() {
@@ -47,10 +48,11 @@ class VoyahUltraPilotTest {
         assertEquals(22.5, reader(initial).valuesMap()[11])
         assertNull(a.changed())
         sample = UltraClimateSample(24.0, now)
-        assertEquals(mapOf(11L to 24.0), reader(a.changed()!!).valuesMap())
+        // The driver zone's current temperature (16) mirrors its set point while the car has no cabin reading.
+        assertEquals(mapOf(11L to 24.0, 16L to 24.0), reader(a.changed()!!).valuesMap())
         assertNull(a.changed())
         now += 6_001
-        assertEquals(mapOf(11L to null), reader(a.changed()!!).valuesMap())
+        assertEquals(mapOf(11L to null, 16L to null), reader(a.changed()!!).valuesMap())
         assertNull(a.changed())
     }
 
@@ -92,15 +94,15 @@ class VoyahUltraPilotTest {
         assertEquals(listOf("iAPChannel", "viewAreas"), setupEnabledFeatures(config, listOf("vehicleStateProtocol")))
     }
 
-    @Test fun pilotOnlyAcknowledgesVspWhenProposedAndHasNoSyntheticClusterOrRadio() {
+    @Test fun pilotAcknowledgesVspAndUiSyncOnlyWhenProposedAndHasNoSyntheticClusterOrRadio() {
         val pilot = VoyahUltraProtocol({ FakeSource() }, { now }, {})
         val config = config().copy(protocolExtension = pilot)
         val info = AirPlayInfoPlist.build(config)
         assertEquals(1, (info["displays"] as List<*>).size)
         assertTrue(info.containsKey("vehicleStateProtocolInfo"))
-        assertFalse(info.containsKey("uiSyncInfo"))
+        assertEquals(emptyMap<String, Any?>(), info["uiSyncInfo"])
         assertEquals(listOf("iAPChannel", "viewAreas"), setupEnabledFeatures(config, emptyList<String>()))
-        assertEquals(listOf("iAPChannel", "viewAreas", "vehicleStateProtocol"),
+        assertEquals(listOf("iAPChannel", "viewAreas", "vehicleStateProtocol", "uiSync"),
             setupEnabledFeatures(config, listOf("vehicleStateProtocol", "uiSync", "fileTransfer")))
         assertTrue(pilot.forSession() !== pilot)
     }
@@ -109,13 +111,13 @@ class VoyahUltraPilotTest {
         val config = config().copy(microphone = true, hevc = true, mainBufferedAudio = true)
         val normal = AirPlayInfoPlist.build(config)
         val pilot = AirPlayInfoPlist.build(config.copy(protocolExtension = VoyahUltraProtocol({ FakeSource() }, { now }, {})))
-        assertArrayEquals(BplistCodec.encode(normal), BplistCodec.encode(pilot - "vehicleStateProtocolInfo" - "displayPanels"))
+        assertArrayEquals(BplistCodec.encode(normal), BplistCodec.encode(pilot - "vehicleStateProtocolInfo" - "displayPanels" - "uiSyncInfo"))
     }
 
     @Test fun encryptedCafRoundTripReadsAndSubscribesToRealSourceUpdates() {
         val source = FakeSource()
         val trace = mutableListOf<String>()
-        val protocol = VoyahUltraProtocol({ source }, { now }) { synchronized(trace) { trace.add(it) } }
+        val protocol = VoyahUltraProtocol({ source }, { now }, { synchronized(trace) { trace.add(it) } })
         val rx = ByteArray(32) { it.toByte() }; val tx = ByteArray(32) { (it + 33).toByte() }
         protocol.onFeaturesNegotiated(listOf("vehicleStateProtocol"))
         try {
@@ -126,7 +128,8 @@ class VoyahUltraPilotTest {
                 phone.send(CarAccessoryMessages.configRequest(0, 1).asRcsMessage())
                 val config = CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body)
                 assertEquals(CafCommand.CONFIG_RESPONSE, config.command)
-                assertEquals(2, config.configTree(CafFirmwareConfigTreeDecoder).accessories.size)
+                // Navigation, automaker settings, climate, vehicle resources; fuel, trip computer, tires, audio.
+                assertEquals(8, config.configTree(CafFirmwareConfigTreeDecoder).accessories.size)
                 source.emit(UltraClimateSample(24.5, now))
                 phone.send(CarAccessoryMessages.registerRequest(0, 2, CafRegistration.Identifiers(listOf(11))).asRcsMessage())
                 val initial = CarAccessoryMessages.reader(phone.receiveNext(3_000)!!.body)

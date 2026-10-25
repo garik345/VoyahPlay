@@ -156,6 +156,13 @@ enum class CafControlSender(val wireName: String) {
     ;
 
     companion object {
+        fun fromWireValue(value: Any?): CafControlSender = when (value) {
+            is String -> fromWireName(value)
+            0, 0L -> DEVICE
+            1, 1L -> ACCESSORY
+            else -> throw CafProtocolException("Unknown CAF control sender '$value'")
+        }
+
         fun fromWireName(value: String): CafControlSender =
             entries.firstOrNull { it.wireName == value }
                 ?: throw CafProtocolException("Unknown CAF control sender '$value'")
@@ -368,7 +375,7 @@ object CafFirmwareConfigTreeDecoder : CafConfigTreeDecoder {
         return CafControlMetadata(
             type = map.requiredType("type", label),
             iid = map.requiredIid("iid", label),
-            sender = CafControlSender.fromWireName(map.requiredString("sender", label)),
+            sender = CafControlSender.fromWireValue(map["sender"]),
             hasResponse = map.requiredBoolean("hasResponse", label),
             priority = map.optionalLong("priority", label),
             requestParameters = map.optionalList(

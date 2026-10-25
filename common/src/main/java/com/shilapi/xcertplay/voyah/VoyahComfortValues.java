@@ -28,6 +28,29 @@ public final class VoyahComfortValues {
         if (state == 2) return Integer.valueOf(1);
         return null;
     }
+    public Integer massageLevel(int side) {
+        if (!available || side < 0 || side > 1) return null;
+        String suffix = side == 0 ? "_LEFT" : "_RIGHT";
+        return effectiveLevel(get("FRONT_SEAT_MASS_SWITCH" + suffix), get("FRONT_SEAT_MASS_INTEN" + suffix));
+    }
+    public Integer massageProgram(int side) {
+        if (!available || side < 0 || side > 1) return null;
+        int value = get("FRONT_SEAT_MASS_COMMAND" + (side == 0 ? "_LEFT" : "_RIGHT"));
+        return value == 1 || value == 2 ? Integer.valueOf(value) : null;
+    }
+    public Integer driveMode() {
+        if (!available) return null;
+        int value = get("DRIVING_MODE_SET");
+        return value >= 1 && value <= 6 ? Integer.valueOf(value) : null;
+    }
+    /** The selected step is retained by OEM while the switch is off; it is not an active level. */
+    public Integer selectedSeatLevel(int side, boolean ventilation) {
+        if (!available || side < 0 || side > 1) return null;
+        String name = (ventilation ? "FRONT_SEAT_VENTILATION" : "FRONT_SEAT_HEATING") +
+            "_COMMAND" + (side == 0 ? "_LEFT" : "_RIGHT");
+        int level = get(name);
+        return level >= 1 && level <= 3 ? Integer.valueOf(level) : null;
+    }
     public static Integer effectiveLevel(int state, int level) {
         if (state == 1) return Integer.valueOf(0);
         if (state == 2 && level >= 1 && level <= 3) return Integer.valueOf(level);

@@ -100,8 +100,14 @@ data class AirPlayConfig(
     val speechWithout8And16Khz: Boolean = false,
     /** Optional debug protocol implementation; null preserves the normal receiver. */
     val protocolExtension: AirPlayProtocolExtension? = null,
+    /** Answer MFi4 mutual authentication and offer it in CarPlayStartSession (3.0 identity only). */
+    val mutualAuthentication: Boolean = false,
 )
 
 /** The offer, SETUP and controls must all honor the user's audio-output setting. */
 internal val AirPlayConfig.bufferedAudioOutputEnabled: Boolean
     get() = mainBufferedAudio && !disableAudioOutput
+
+internal fun AirPlayConfig.displayIdentifier(streamType: Int): String =
+    protocolExtension?.displayIdentifier(streamType)
+        ?: if (streamType == 111) AirPlayInfoPlist.ALT_UUID else AirPlayInfoPlist.MAIN_UUID

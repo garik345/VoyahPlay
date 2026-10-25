@@ -7,6 +7,7 @@ import com.shilapi.xcertplay.iap2.session.Iap2Session
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import com.shilapi.xcertplay.iap2.wire.Iap2Parameter
 import com.shilapi.xcertplay.transport.Iap2VehicleStatus.electricVehicleComponents
+import com.shilapi.xcertplay.transport.Iap2VehicleStatus.vehicleInformationComponent
 import java.io.IOException
 import kotlin.math.min
 
@@ -58,6 +59,10 @@ data class Iap2IdentificationConfig(
     val chargingConnectors: EvChargingConnectors = EvChargingConnectors.CCS2_TYPE2,
     /** Also offer wheel speed ($PASCD) in the location component; needs [locationInformationEnabled]. */
     val vehicleSpeedEnabled: Boolean = false,
+    /** Declares the car itself (name, engines) when no EV status is declared; never on Bluetooth bootstrap. */
+    val vehicleInformation: Iap2VehicleInformation? = null,
+    /** Optional catalog theme; transport field 6 names its asset, not its SDK version. */
+    val carPlayTheme: Iap2CarPlayTheme? = null,
 ) {
     constructor(
         name: String,
@@ -130,6 +135,7 @@ internal fun Iap2IdentificationConfig.forWirelessLink(
             locationInformationEnabled = false,
             vehicleStatusEnabled = false,
             vehicleSpeedEnabled = false,
+            vehicleInformation = null,
         )
         Iap2WirelessLinkRole.RUNTIME_TUNNEL -> wirelessConfig
     }
@@ -358,6 +364,7 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                         void(2)
                         u8(3, config.carPlayUsbInterfaceNumber)
                         void(4)
+                        config.carPlayTheme?.let { string(6, it.asset.assetId) }
                     }
                 } else {
                     group(17) {
@@ -375,9 +382,11 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                         u16(3, 1)
                         void(4)
                         void(5)
+                        config.carPlayTheme?.let { string(6, it.asset.assetId) }
                     }
                 }
                 if (config.vehicleStatusEnabled) electricVehicleComponents(config.manufacturer, config.chargingConnectors)
+                else config.vehicleInformation?.let { vehicleInformationComponent(it) }
                 if (config.locationInformationEnabled) {
                     group(22) {
                         u16(0, 0)

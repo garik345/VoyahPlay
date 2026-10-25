@@ -8,4 +8,8 @@
     <string name="voyah_ultra_report">Ultra: view capture</string>
     <string name="voyah_ultra_export">Ultra: export capture</string>
     <string name="voyah_ultra_working">Preparing Ultra report…</string>
+    <string name="voyah_ultra_asset_probe_toggle">Ultra: record asset package transfer (experimental)</string>
+    <string name="voyah_ultra_asset_probe_description">Debug test. Applies at the next CarPlay connection. Accepts fileTransfer offered by iPhone and only records what it sends, without processing the package or running vehicle commands. UI Sync works independently of this switch. May interrupt the CarPlay session: turn it off if CarPlay stops connecting.</string>
+    <string name="voyah_ultra_mutual_auth_toggle">Ultra: MFi4 mutual authentication (experimental)</string>
+    <string name="voyah_ultra_mutual_auth_description">Debug test. Applies at the next CarPlay connection. Offers iPhone the MFi 4.0 mutual authentication with the 3.0 identity that already signs MFiSAP; iPhone may then treat the car as a CarPlay Ultra accessory. If CarPlay stops connecting, turn it off.</string>
 </resources>

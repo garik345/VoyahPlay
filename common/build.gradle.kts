@@ -47,6 +47,8 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.ui)
     implementation("com.google.zxing:core:3.5.3")
+    // The OEM RdsPlayer playlist uses legacy MediaSessionCompat.QueueItem Parcelables.
+    debugImplementation("androidx.media:media:1.6.0")
     testImplementation(libs.junit)
     // The bridge snapshot parser also runs as a plain JVM test.
     testImplementation("org.json:json:20240303")

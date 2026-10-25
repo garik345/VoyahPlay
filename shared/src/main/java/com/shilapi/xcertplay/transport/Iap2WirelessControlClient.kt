@@ -277,6 +277,9 @@ class Iap2WirelessControlClient(
                 deviceIdentifier = endpoint.deviceIdentifier,
                 publicKey = endpoint.publicKey,
                 sourceVersion = endpoint.sourceVersion,
+                sdkVersion = endpoint.carPlayTheme?.sdkVersion,
+                clusterAsset = endpoint.carPlayTheme?.asset,
+                mutualAuth = endpoint.mutualAuthentication,
             )
 
         private fun later(
@@ -307,6 +310,9 @@ class Iap2WirelessCarPlayEndpoint(
     val publicKey: String,
     val sourceVersion: String,
     accessPointBssid: ByteArray? = null,
+    /** CarPlayStartSession field 8: the accessory answers MFi4 mutual authentication. */
+    val mutualAuthentication: Boolean? = null,
+    val carPlayTheme: Iap2CarPlayTheme? = null,
 ) {
     val ipAddresses: List<String> = ipAddresses.toList()
     val accessPointBssid: ByteArray? = accessPointBssid?.copyOf()

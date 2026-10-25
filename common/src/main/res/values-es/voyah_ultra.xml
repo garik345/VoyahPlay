@@ -8,4 +8,8 @@
     <string name="voyah_ultra_report">Ultra: ver registro</string>
     <string name="voyah_ultra_export">Ultra: guardar registro</string>
     <string name="voyah_ultra_working">Preparando informe Ultra…</string>
+    <string name="voyah_ultra_asset_probe_toggle">Ultra: registrar la transferencia del paquete de recursos (experimental)</string>
+    <string name="voyah_ultra_asset_probe_description">Prueba de depuración. Se aplica en la próxima conexión de CarPlay. Acepta fileTransfer del iPhone y solo registra lo recibido, sin procesar el paquete ni ejecutar órdenes en el vehículo. UI Sync funciona independientemente de este interruptor. Puede interrumpir la sesión de CarPlay: desactívela si CarPlay deja de conectarse.</string>
+    <string name="voyah_ultra_mutual_auth_toggle">Ultra: autenticación mutua MFi4 (experimental)</string>
+    <string name="voyah_ultra_mutual_auth_description">Prueba de depuración. Se aplica en la próxima conexión de CarPlay. Ofrece al iPhone la autenticación mutua MFi 4.0 con la misma identidad 3.0 que ya firma MFiSAP; el iPhone puede tratar entonces el coche como un accesorio CarPlay Ultra. Si CarPlay deja de conectarse, desactívela.</string>
 </resources>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_launcher_hint">Когда CarPlay открыт, повторно нажмите значок VoyahPlay в штатном доке, чтобы открыть настройки.</string>
+</resources>

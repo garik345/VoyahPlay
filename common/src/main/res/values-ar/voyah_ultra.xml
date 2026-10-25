@@ -8,4 +8,8 @@
     <string name="voyah_ultra_report">Ultra: عرض السجل</string>
     <string name="voyah_ultra_export">Ultra: حفظ السجل</string>
     <string name="voyah_ultra_working">جارٍ إعداد تقرير Ultra…</string>
+    <string name="voyah_ultra_asset_probe_toggle">Ultra: تسجيل نقل حزمة الموارد (تجريبي)</string>
+    <string name="voyah_ultra_asset_probe_description">اختبار تصحيح. يُطبق عند اتصال CarPlay التالي. يقبل fileTransfer من iPhone ويسجل ما يستلمه فقط، دون معالجة الحزمة أو تنفيذ أوامر في السيارة. يعمل UI Sync بشكل مستقل عن هذا المفتاح. قد يقطع جلسة CarPlay: أوقفه إذا توقف CarPlay عن الاتصال.</string>
+    <string name="voyah_ultra_mutual_auth_toggle">Ultra: المصادقة المتبادلة MFi4 (تجريبي)</string>
+    <string name="voyah_ultra_mutual_auth_description">اختبار تصحيح. يُطبق عند اتصال CarPlay التالي. يعرض على iPhone المصادقة المتبادلة MFi 4.0 بنفس هوية 3.0 التي توقّع MFiSAP؛ قد يعامل iPhone السيارة بعدها كملحق CarPlay Ultra. إذا توقف CarPlay عن الاتصال فأوقفه.</string>
 </resources>

@@ -1,5 +1,8 @@
 package com.shilapi.xcertplay.airplay.rcs.uisync
 
+// Historical symbolic model inferred from local Swift headers. This is NOT the numeric
+// CarPlayClusterControl wire codec; the active endpoint uses CarPlayUiSyncSession.
+
 import com.shilapi.xcertplay.airplay.BplistCodec
 import com.shilapi.xcertplay.airplay.rcs.RcsMessage
 

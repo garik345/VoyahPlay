@@ -571,6 +571,14 @@ class CarPlayController(
     }
 
     /** Immutable stream geometry retained when a new host adopts this background controller. */
+    /** Offered only when enabled and the MFi identity is 3.0, as MFi4 signs with that identity. */
+    private fun mutualAuthentication(): Boolean? {
+        if (!airPlayConfig.mutualAuthentication) return null
+        val major = runCatching { mfiSession?.client?.protocolMajor() }.getOrNull()
+        debugLog("mfi4 mutual authentication offer protocolMajor=$major")
+        return if (major == 3) true else null
+    }
+
     fun configuredClusterSize(): Pair<Int, Int>? = airPlayConfig.cluster?.let { it.widthPixels to it.heightPixels }
 
     /** A visible physical map and its session/stream generation; null for a paused/virtual/turn-card route. */
@@ -1513,6 +1521,8 @@ class CarPlayController(
                 publicKey = identity.publicKeyHex,
                 sourceVersion = airPlayConfig.sourceVersion,
                 accessPointBssid = hotspotInfo.accessPointBssid,
+                mutualAuthentication = mutualAuthentication(),
+                carPlayTheme = config.identification.carPlayTheme,
             )
             wirelessRuntimeIdentification = runtimeIdentification
             wirelessAirPlayEndpoint = endpoint
@@ -2272,6 +2282,8 @@ class CarPlayController(
                 publicKey = identity.publicKeyHex,
                 sourceVersion = airPlayConfig.sourceVersion,
                 deviceIdentifier = ncmHostMac.macString(),
+                mutualAuthentication = mutualAuthentication(),
+                carPlayTheme = config.identification.carPlayTheme,
             )
             onStatus(CarPlayStatus.RunningControl)
             debugLog(

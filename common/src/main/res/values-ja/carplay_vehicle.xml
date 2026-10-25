@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_vehicle_data">車両データ</string>
+    <string name="carplay_tire_front_left">左前タイヤ</string>
+    <string name="carplay_tire_front_right">右前タイヤ</string>
+    <string name="carplay_tire_rear_left">左後タイヤ</string>
+    <string name="carplay_tire_rear_right">右後タイヤ</string>
+    <string name="carplay_vehicle_range">合計航続距離</string>
+    <string name="carplay_vehicle_odometer">総走行距離</string>
+    <string name="carplay_vehicle_fuel">燃料残量</string>
+    <string name="carplay_vehicle_unavailable">データなし</string>
+    <string name="carplay_vehicle_bar">bar</string>
+    <string name="carplay_vehicle_km">km</string>
+    <string name="carplay_vehicle_battery">バッテリー残量</string>
+    <string name="carplay_vehicle_electric_range">電動走行可能距離</string>
+    <string name="carplay_vehicle_drive_mode">走行モード</string>
+    <string name="carplay_drive_eco">エコ</string>
+    <string name="carplay_drive_comfort">コンフォート</string>
+    <string name="carplay_drive_sport">スポーツ</string>
+    <string name="carplay_drive_offroad">オフロード</string>
+    <string name="carplay_drive_individual">個別</string>
+    <string name="carplay_drive_snow">スノー</string>
+    <string name="carplay_vehicle_controls">車両操作</string>
+    <string name="carplay_driver_massage">運転席マッサージ</string>
+    <string name="carplay_passenger_massage">助手席マッサージ</string>
+    <string name="carplay_driver_massage_program">運転席マッサージプログラム</string>
+    <string name="carplay_passenger_massage_program">助手席マッサージプログラム</string>
+    <string name="carplay_vehicle_lights">車外照明</string>
+    <string name="carplay_vehicle_menu">車両メニュー</string>
+    <string name="carplay_control_off">オフ</string>
+    <string name="carplay_massage_wave">ウェーブ</string>
+    <string name="carplay_massage_rollers">ローラー</string>
+    <string name="carplay_light_position">車幅灯</string>
+    <string name="carplay_light_low_beam">ロービーム</string>
+    <string name="carplay_light_auto">自動</string>
+    <string name="carplay_vehicle_fuel_range">ガソリンでの航続距離</string>
+</resources>

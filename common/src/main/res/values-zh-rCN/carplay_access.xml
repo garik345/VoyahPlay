@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_launcher_hint">CarPlay 打开时，再次轻点车辆程序坞中的 VoyahPlay 图标即可打开设置。</string>
+</resources>

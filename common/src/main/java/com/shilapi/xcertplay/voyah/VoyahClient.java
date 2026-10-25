@@ -75,6 +75,11 @@ public final class VoyahClient {
                 check(request);
                 JSONObject windows = readCache(can, 44);
                 check(request);
+                // Optional: a failure here must not cost the climate and comfort snapshot.
+                JSONObject odometer = optionalCache(can, 1);
+                check(request);
+                JSONObject tires = optionalCache(can, 70);
+                check(request);
                 Map<String, Integer> comfort = new HashMap<>();
                 boolean comfortAvailable = false;
                 try {
@@ -95,7 +100,8 @@ public final class VoyahClient {
                     climate == null ? -1 : climate.optInt("airWindSpeed", -1), sampledAt,
                     states(doors, "fLDoor", "fRDoor", "rLDoor", "rRDoor"),
                     states(windows, "fLWindow", "fRWindow", "rLWindow", "rRWindow"),
-                    new VoyahComfortValues(comfort, comfortAvailable), numbers(climate));
+                    new VoyahComfortValues(comfort, comfortAvailable), numbers(climate),
+                    numbers(fuel), numbers(odometer), numbers(tires));
             } catch (Exception e) {
                 error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             } finally {
@@ -206,6 +212,10 @@ public final class VoyahClient {
             if (reply.dataAvail() != 4) throw new IOException("Неверный ответ типа машины");
             return reply.readInt();
         } finally { data.recycle(); reply.recycle(); }
+    }
+
+    private static JSONObject optionalCache(IBinder binder, int code) {
+        try { return readCache(binder, code); } catch (Exception e) { return null; }
     }
 
     private static JSONObject readCache(IBinder binder, int code) throws Exception {

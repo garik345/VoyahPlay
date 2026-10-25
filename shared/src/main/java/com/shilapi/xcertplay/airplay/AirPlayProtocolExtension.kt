@@ -4,7 +4,11 @@ package com.shilapi.xcertplay.airplay
 interface AirPlayProtocolExtension {
     fun forSession(): AirPlayProtocolExtension
     fun decorateInfo(info: MutableMap<String, Any?>) {}
+    /** Optional catalog display id, shared by /info, HID binding and later display commands. */
+    fun displayIdentifier(streamType: Int): String? = null
     fun onInfoRequest(body: ByteArray) {}
+    /** Called after /auth-setup is answered; diagnostics only, it cannot change the answer. */
+    fun onAuthSetup(headers: Map<String, String>, body: ByteArray, status: Int) {}
     fun enabledFeatures(proposed: List<*>?): List<String> = emptyList()
     fun onFeaturesNegotiated(features: List<String>) {}
     fun openDataStream(session: AirPlaySession, stream: Map<String, Any?>): Map<String, Any?>? = null

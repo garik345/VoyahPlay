@@ -9,16 +9,25 @@ package com.shilapi.xcertplay.airplay
 object ProtocolTraceFormatter {
     fun hex(bytes: ByteArray): String {
         if (bytes.isEmpty()) return "<empty>"
-        return buildString(bytes.size * 2) {
-            bytes.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
+        val text = CharArray(bytes.size * 2)
+        bytes.forEachIndexed { index, byte ->
+            val value = byte.toInt() and 0xff
+            text[index * 2] = HEX[value ushr 4]
+            text[index * 2 + 1] = HEX[value and 0x0f]
         }
+        return String(text)
     }
 
     fun preview(bytes: ByteArray, maximumBytes: Int = 32): String {
         require(maximumBytes >= 0)
         if (bytes.isEmpty()) return "<empty>"
-        val shown = bytes.take(maximumBytes).joinToString(" ") {
-            "%02x".format(it.toInt() and 0xff)
+        val count = minOf(bytes.size, maximumBytes)
+        val shown = buildString(count * 3) {
+            repeat(count) { index ->
+                if (index > 0) append(' ')
+                val value = bytes[index].toInt() and 0xff
+                append(HEX[value ushr 4]); append(HEX[value and 0x0f])
+            }
         }
         return if (bytes.size <= maximumBytes) {
             shown
@@ -90,4 +99,5 @@ object ProtocolTraceFormatter {
 
     private const val MAX_DEPTH = 8
     private const val MAX_ITEMS = 128
+    private const val HEX = "0123456789abcdef"
 }

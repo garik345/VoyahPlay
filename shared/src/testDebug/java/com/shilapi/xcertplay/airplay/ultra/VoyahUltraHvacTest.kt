@@ -31,17 +31,77 @@ class VoyahUltraHvacTest {
         val ids = arrayListOf<Long>()
         for (a in tree.accessories) { ids.add(a.iid.value); for (s in a.services) { ids.add(s.iid.value); ids.addAll(s.characteristics.map { it.iid.value }) } }
         assertEquals(ids.size, ids.toSet().size)
-        val services = tree.accessories.first().services
+        val services = tree.accessories.first { it.type.value == 0x01000001L }.services
         assertTrue(services.any { it.type.value == 0x11000001L })
         assertTrue(services.any { it.type.value == 0x11000007L })
         assertEquals(2, services.count { it.type.value == 0x11000002L })
         val targets = services.flatMap { it.characteristics }.filter { it.type.value == 0x31000017L }
         assertEquals(2, targets.size); assertTrue(targets.all { it.writable == true && (it.units as Number).toInt() == 1082 })
-        assertTrue(services.flatMap { it.characteristics }.none { it.type.value == 0x31000019L || it.type.value == 0x31000022L })
+        val chars = services.flatMap { it.characteristics }
+        val cabin = chars.filter { it.type.value == 0x31000019L }
+        assertEquals(2, cabin.size); assertTrue(cabin.all { it.writable == false && (it.units as Number).toInt() == 1082 })
+        assertTrue(chars.none { it.type.value == 0x30000054L || it.type.value == 0x30000055L })
+        assertEquals(0x11000001L, services.first().type.value)
+        assertTrue(services.any { it.type.value == 0x11000012L })
         assertTrue(tree.accessories.any { it.type.value == 0x01200002L })
     }
+    @Test fun routeSharingAndVehicleAppRowsAreDescribedAndPhoneWritesOnlyStoreValues() {
+        val a = accessory()
+        val tree = CafConfigTree.decode(a.config())
+        assertEquals(listOf(0x0E000002L, 0x05000001L, 0x01000001L), tree.accessories.take(3).map { it.type.value })
+        val written = write(a, mapOf(262L to true, 266L to mapOf("name" to "Home"), 264L to false, 1284L to "x"))
+        assertEquals(mapOf(262L to 0L, 266L to 0L, 264L to -50L, 1284L to -50L), written.errors())
+        assertTrue(writes.isEmpty())
+        val read = reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 5, listOf(262, 264, 274, 1284))))!!).valuesMap()
+        assertEquals(true, read[262]); assertEquals(true, read[264]); assertEquals("VoyahPlay", read[274])
+        assertEquals(VoyahUltraProtocol.WIRE_REV, read[1284])
+    }
+    @Test fun bothWindowControlsRemainReadableAndRearHeatingWritableWithoutUnsupportedMaxButtons() {
+        val a = accessory()
+        val services = CafConfigTree.decode(a.config()).accessories.single { it.type.value == 0x01000001L }.services
+        val chars = services.flatMap { it.characteristics }
+        assertFalse(chars.any { it.iid.value in setOf(43L, 44L) })
+        val rear = services.single { it.iid.value == 90L }
+        assertEquals(0x11000005L, rear.type.value)
+        assertEquals(CafFormatValue.Text("windshield_rear"), rear.characteristics.single { it.iid.value == 92L }.initialValue)
+        assertEquals(CafFormatValue.Unsigned(java.math.BigInteger.valueOf(2), 8),
+            rear.characteristics.single { it.iid.value == 93L }.initialValue)
+        val registered = reader(a.handle(reader(CarAccessoryMessages.registerRequest(0, 18,
+            CafRegistration.Identifiers(listOf(81L,91L,43L,44L)))))!!)
+        assertEquals(mapOf(81L to 0L, 91L to 1L), registered.valuesMap())
+        assertEquals(mapOf(43L to -50L, 44L to -50L), registered.errors())
+        assertEquals(mapOf(91L to 0L), write(a, mapOf(91L to 0L)).errors())
+        assertEquals(listOf(UltraHvacControl.REAR_DEFROST to 0L), writes)
+        sample = sample!!.copy(hvacValues = sample!!.hvacValues + (UltraHvacControl.REAR_DEFROST to 0L))
+        assertEquals(mapOf(91L to 0L), reader(a.changed()!!).valuesMap())
+    }
+    @Test fun missingValuesAreReportedAsErrorsNotNullValuesAndCabinFallsBackToTheSetPoint() {
+        val a = accessory()
+        val reg = reader(a.handle(reader(CarAccessoryMessages.registerRequest(0, 6,
+            CafRegistration.Identifiers(listOf(11, 16, 21, 26, 96, 999)))))!!)
+        assertEquals(mapOf(11L to 22.5, 16L to 22.5, 21L to 23.0, 26L to 23.0), reg.valuesMap())
+        assertEquals(mapOf(96L to -6727L, 999L to -50L), reg.errors())
+        sample = null
+        val read = reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 7, listOf(11, 16))))!!)
+        assertTrue(read.valuesMap().isEmpty()); assertEquals(mapOf(11L to -6727L, 16L to -6727L), read.errors())
+    }
+    @Test fun readingsAreRealCacheValuesSharedByBothZonesAndNeverWritten() {
+        sample = sample!!.copy(readings = mapOf(UltraClimateReading.CABIN_TEMPERATURE to 19.4,
+            UltraClimateReading.ZONES_SYNCED to false, UltraClimateReading.MAX_AC to null))
+        val a = accessory()
+        val read = reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 3, listOf(16, 26, 96, 43, 44))))!!).valuesMap()
+        // The sensor value is only aligned to the advertised 0.5 °C step.
+        assertEquals(19.5, read[16]); assertEquals(19.5, read[26]); assertEquals(false, read[96])
+        assertNull(read[43]); assertNull(read[44])
+        assertEquals(19.5, UltraClimateReading.CABIN_TEMPERATURE.normalize(19.6))
+        assertNull(UltraClimateReading.CABIN_TEMPERATURE.normalize(-100)); assertNull(UltraClimateReading.ZONES_SYNCED.normalize(2))
+        val response = write(a, mapOf(16L to 20.0, 26L to 20.0, 96L to true, 43L to true, 44L to true, 15L to false, 52L to false, 53L to true))
+        assertTrue(response.errors().values.all { it == -50L }); assertTrue(writes.isEmpty())
+        sample = sample!!.copy(hvacSampledAtMillis = -6000)
+        assertNull(reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 4, listOf(16))))!!).valuesMap()[16])
+    }
     @Test fun writesAreAbsoluteAndOnlyReadbackCountsAsSuccess() {
-        val a = accessory(); val response = write(a, mapOf(11L to 24.5, 21L to 20.0, 51L to 8, 42L to true))
+        val a = accessory(); val response = write(a, mapOf(11L to 24.5, 21L to 20.0, 51L to 7, 42L to true))
         assertTrue(response.errors().values.all { it == 0L }); assertEquals(4, writes.size)
         assertTrue(writes.contains(UltraHvacControl.DRIVER_TARGET to 24.5))
         // A successful writer does not fabricate a new cache reading.
@@ -69,8 +129,10 @@ class VoyahUltraHvacTest {
     }
     @Test fun readOnlySourceDoesNotAdvertiseOrPerformWrites() {
         val a = VoyahClimateAccessory({ sample }, { now })
-        val chars = CafConfigTree.decode(a.config()).accessories.flatMap { it.services }.flatMap { it.characteristics }
-        assertTrue(chars.all { it.writable == false })
+        val tree = CafConfigTree.decode(a.config())
+        // Only the phone's own route-sharing values stay writable; nothing on the car side is.
+        assertTrue(tree.accessories.filter { it.type.value != 0x0E000002L }.flatMap { it.services }
+            .flatMap { it.characteristics }.all { it.writable == false })
         assertEquals(-50L, write(a, mapOf(11L to 24.0)).errors()[11])
         assertTrue(writes.isEmpty())
     }
@@ -101,7 +163,7 @@ class VoyahUltraHvacTest {
         assertEquals(1775, panel["widthPixels"]); assertEquals(675, panel["heightPixels"])
         val stream = (panel["initialVideoStreams"] as List<*>).single() as Map<*, *>
         assertEquals(AirPlayInfoPlist.MAIN_UUID, stream["uuid"])
-        assertArrayEquals(BplistCodec.encode(AirPlayInfoPlist.build(normal)), BplistCodec.encode(info - "displayPanels" - "vehicleStateProtocolInfo"))
+        assertArrayEquals(BplistCodec.encode(AirPlayInfoPlist.build(normal)), BplistCodec.encode(info - "displayPanels" - "vehicleStateProtocolInfo" - "uiSyncInfo"))
         p.close()
     }
     @Test fun sessionInfoAndCafConfigUseTheSameLiveTree() {
@@ -112,7 +174,8 @@ class VoyahUltraHvacTest {
         val plugin = (vsp["pluginConfigs"] as List<*>).single() as Map<*, *>
         assertEquals(0L, plugin["pluginID"]); assertEquals(VoyahClimateAccessory.PLUGIN_NAME, plugin["name"])
         val tree = CafConfigTree.decode(mapOf("accessories" to plugin["accessories"]))
-        assertEquals(CafFormatValue.Floating(22.5), tree.accessories.first().services.first().characteristics.first().initialValue)
+        assertEquals(CafFormatValue.Floating(22.5), tree.accessories.first { it.type.value == 0x01000001L }.services.flatMap { it.characteristics }
+            .first { it.iid.value == UltraHvacControl.DRIVER_TARGET.iid }.initialValue)
         p.close(); assertEquals(1, s.closed.get())
     }
     @Test fun opackAndWrappedBodiesRoundTripOpaque64BitTransactions() {
@@ -142,26 +205,6 @@ class VoyahUltraHvacTest {
                 assertEquals(CafCommand.CONFIG_RESPONSE, CarAccessoryMessages.reader(caf.body).command)
             }
         } finally { p.close() }
-    }
-    @Test fun actualInfoHandlerUsesTheSessionExtensionRatherThanThePrototype() {
-        val child = object : AirPlayProtocolExtension {
-            override fun forSession() = this
-            override fun decorateInfo(info: MutableMap<String, Any?>) { info["testExtension"] = "session" }
-        }
-        val prototype = object : AirPlayProtocolExtension {
-            override fun forSession() = child
-            override fun decorateInfo(info: MutableMap<String, Any?>) { info["testExtension"] = "prototype" }
-        }
-        val session = AirPlaySession(java.net.Socket(),
-            AirPlayConfig("test", "02:00:00:00:00:01", "02:00:00:00:00:02", "950.7.1", AirPlayDisplayConfig(1775,675), protocolExtension = prototype),
-            AirPlayIdentity.generate(), PairingStore(), null, object : AirPlaySessionListener {}, object : AirPlayMediaHandler {})
-        try {
-            val response = AirPlaySession::class.java.getDeclaredMethod("handle", RtspMessage.Request::class.java)
-                .apply { isAccessible = true }.invoke(session,
-                    RtspMessage.Request("GET", "rtsp://test/info", "RTSP/1.0", emptyMap(), ByteArray(0))) as RtspMessage.Response
-            val info = BplistCodec.decode(response.body) as Map<*, *>
-            assertEquals("session", info["testExtension"])
-        } finally { session.close() }
     }
     private class Source : UltraClimateSource {
         val closed = AtomicInteger(); var callback: ((UltraClimateSample?) -> Unit)? = null

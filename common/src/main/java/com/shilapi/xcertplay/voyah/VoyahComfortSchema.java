@@ -42,9 +42,11 @@ public final class VoyahComfortSchema {
         "AUTO_LAMP_SWITCH",
         "STEER_WHEEL_HEAT_SWITCH",
         "STEER_WHEEL_HEAT_SWITCH_FB",
-        "STEER_WHEEL_HEAT_ERROR"};
-    private static final int[] ORDINALS = {76,136,137,192,193,194,195,225,228,479,480,481,482,483,484,485,486,487,488,555,556,557,558,746,747,748,850,878,879,880,881,891,892};
-    private static final int[] IDS = {160,215,216,260,261,262,263,292,295,697,698,699,700,701,702,703,704,705,706,774,775,776,777,963,964,965,1067,1095,1096,1097,1098,1108,1109};
+        "STEER_WHEEL_HEAT_ERROR",
+        // H97C ui97.DriveModeViewManager reads this state; SET_* constants of other models differ.
+        "DRIVING_MODE_SET"};
+    private static final int[] ORDINALS = {76,136,137,192,193,194,195,225,228,479,480,481,482,483,484,485,486,487,488,555,556,557,558,746,747,748,850,878,879,880,881,891,892,328};
+    private static final int[] IDS = {160,215,216,260,261,262,263,292,295,697,698,699,700,701,702,703,704,705,706,774,775,776,777,963,964,965,1067,1095,1096,1097,1098,1108,1109,545};
     public interface Continue { boolean live(); }
     public static JSONObject read(IBinder binder, Continue active) throws Exception {
         JSONObject result = new JSONObject();

@@ -33,6 +33,16 @@ public class VoyahComfortValuesTest {
         assertEquals("●●● 3/3",VoyahComfortValues.level(2,3));
         assertEquals("вкл · уровень неизвестен",VoyahComfortValues.level(2,-1));
     }
+    @Test public void selectedVentilationLevelSurvivesItsSwitchBeingOff() {
+        Map<String,Integer> fields=new HashMap<>();
+        fields.put("FRONT_SEAT_VENTILATION_SWITCH_LEFT",1);
+        fields.put("FRONT_SEAT_VENTILATION_COMMAND_LEFT",2);
+        VoyahComfortValues values=new VoyahComfortValues(fields,true);
+        assertEquals(Integer.valueOf(0), values.seatLevel(0,true));
+        assertEquals(Integer.valueOf(2), values.selectedSeatLevel(0,true));
+        assertNull(values.selectedSeatLevel(1,true));
+        assertNull(new VoyahComfortValues(fields,false).selectedSeatLevel(0,true));
+    }
     @Test public void snapshotIsCopiedAndFeedbackIsNotReplacedByRequest() {
         Map<String,Integer> fields=new HashMap<>();
         fields.put("IVI_FRAG_TASTE",2);fields.put("IVI_FRAG_TASTE_FB",3);

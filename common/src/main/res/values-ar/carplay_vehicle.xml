@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_vehicle_data">بيانات السيارة</string>
+    <string name="carplay_tire_front_left">الإطار الأمامي الأيسر</string>
+    <string name="carplay_tire_front_right">الإطار الأمامي الأيمن</string>
+    <string name="carplay_tire_rear_left">الإطار الخلفي الأيسر</string>
+    <string name="carplay_tire_rear_right">الإطار الخلفي الأيمن</string>
+    <string name="carplay_vehicle_range">مدى السير الإجمالي</string>
+    <string name="carplay_vehicle_odometer">عداد المسافة</string>
+    <string name="carplay_vehicle_fuel">مستوى الوقود</string>
+    <string name="carplay_vehicle_unavailable">لا توجد بيانات</string>
+    <string name="carplay_vehicle_bar">بار</string>
+    <string name="carplay_vehicle_km">كم</string>
+    <string name="carplay_vehicle_battery">شحن البطارية</string>
+    <string name="carplay_vehicle_electric_range">المدى الكهربائي</string>
+    <string name="carplay_vehicle_drive_mode">وضع القيادة</string>
+    <string name="carplay_drive_eco">اقتصادي</string>
+    <string name="carplay_drive_comfort">مريح</string>
+    <string name="carplay_drive_sport">رياضي</string>
+    <string name="carplay_drive_offroad">طرق وعرة</string>
+    <string name="carplay_drive_individual">فردي</string>
+    <string name="carplay_drive_snow">ثلج</string>
+    <string name="carplay_vehicle_controls">التحكم بالسيارة</string>
+    <string name="carplay_driver_massage">تدليك السائق</string>
+    <string name="carplay_passenger_massage">تدليك الراكب</string>
+    <string name="carplay_driver_massage_program">برنامج تدليك السائق</string>
+    <string name="carplay_passenger_massage_program">برنامج تدليك الراكب</string>
+    <string name="carplay_vehicle_lights">الإضاءة الخارجية</string>
+    <string name="carplay_vehicle_menu">قائمة السيارة</string>
+    <string name="carplay_control_off">إيقاف</string>
+    <string name="carplay_massage_wave">موجات</string>
+    <string name="carplay_massage_rollers">بكرات</string>
+    <string name="carplay_light_position">أضواء الموضع</string>
+    <string name="carplay_light_low_beam">ضوء منخفض</string>
+    <string name="carplay_light_auto">تلقائي</string>
+    <string name="carplay_vehicle_fuel_range">مدى السير بالبنزين</string>
+</resources>

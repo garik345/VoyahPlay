@@ -150,6 +150,9 @@ class Iap2WiredControlClient(
                 deviceIdentifier = endpoint.deviceIdentifier,
                 publicKey = endpoint.publicKey,
                 sourceVersion = endpoint.sourceVersion,
+                sdkVersion = endpoint.carPlayTheme?.sdkVersion,
+                clusterAsset = endpoint.carPlayTheme?.asset,
+                mutualAuth = endpoint.mutualAuthentication,
             )
 
         fun carPlayAvailabilitySummary(payload: ByteArray): String {
@@ -179,6 +182,9 @@ class Iap2WiredCarPlayEndpoint(
     val publicKey: String,
     val sourceVersion: String,
     val deviceIdentifier: String? = null,
+    /** CarPlayStartSession field 8: the accessory answers MFi4 mutual authentication. */
+    val mutualAuthentication: Boolean? = null,
+    val carPlayTheme: Iap2CarPlayTheme? = null,
 ) {
     /** A stable copy so a caller cannot mutate a validated endpoint before it is encoded. */
     val ipv6Addresses: List<String> = ipv6Addresses.toList()

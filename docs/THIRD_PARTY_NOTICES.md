@@ -6,6 +6,21 @@ DiPlay is a modified version of [xcertplay by shilapi](https://github.com/shilap
 
 Upstream credits [LIVI](https://github.com/f-io/LIVI) and [Showcase](https://github.com/amineross/showcase) for protocol research. Existing source comments and attribution are preserved.
 
+The debug Ultra radio CAF descriptions and control parameter schemas are adapted from LIVI
+[`vehicle_state.rs` at 3fb5210f](https://github.com/f-io/LIVI/blob/3fb5210f71ebc4b15d9aed034df8f0c28eda4f54/native/livi-helperd/crates/livi-cp/src/vehicle_state.rs),
+licensed GPL-3.0-or-later. Voyah's FM/AM backend is an independent interoperability adapter for
+the supplied OEM APK; that APK and its code are not bundled or loaded.
+
+The debug logical instrument panel experiment in `VoyahUltraDisplayPanels.kt` adapts
+[`info.rs` at f999f557](https://github.com/f-io/LIVI/blob/f999f55735278acd76f0fa207218cac00a739047/native/livi-helperd/crates/livi-cp/src/info.rs)
+from LIVI (GPL-3.0-or-later). It does not create an additional physical screen.
+
+The numeric UI Sync exchange in `CarPlayUiSyncSession.kt` and the theme announcement
+follow LIVI's [`ui_sync.rs`](https://github.com/f-io/LIVI/blob/f999f55735278acd76f0fa207218cac00a739047/native/livi-helperd/crates/livi-cp/src/ui_sync.rs)
+and `livi-runtime` identification/start-session code at the same commit (GPL-3.0-or-later).
+The hidden diagnostic theme probe names an existing Apple catalog asset; its images and
+package files are not bundled or licensed as project source, and it is not a Voyah theme.
+
 ## Home and settings UI
 
 `common/src/main/java/com/shilapi/xcertplay/DiPlayActivity.kt` adapts the palette, visual arrangement and interface copy of the [DiAuto project](https://github.com/shihabal3amri/DiAuto). DiAuto's source is licensed under AGPL version 3. The UI file is marked AGPL-3.0-only; its license text is included in `docs/licenses/DiAuto-AGPL-3.0.txt`.

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_vehicle_data">Datos del vehículo</string>
+    <string name="carplay_tire_front_left">Neumático delantero izquierdo</string>
+    <string name="carplay_tire_front_right">Neumático delantero derecho</string>
+    <string name="carplay_tire_rear_left">Neumático trasero izquierdo</string>
+    <string name="carplay_tire_rear_right">Neumático trasero derecho</string>
+    <string name="carplay_vehicle_range">Autonomía total</string>
+    <string name="carplay_vehicle_odometer">Kilometraje</string>
+    <string name="carplay_vehicle_fuel">Nivel de combustible</string>
+    <string name="carplay_vehicle_unavailable">Sin datos</string>
+    <string name="carplay_vehicle_bar">bar</string>
+    <string name="carplay_vehicle_km">km</string>
+    <string name="carplay_vehicle_battery">Batería</string>
+    <string name="carplay_vehicle_electric_range">Autonomía eléctrica</string>
+    <string name="carplay_vehicle_drive_mode">Modo de conducción</string>
+    <string name="carplay_drive_eco">Eco</string>
+    <string name="carplay_drive_comfort">Confort</string>
+    <string name="carplay_drive_sport">Deportivo</string>
+    <string name="carplay_drive_offroad">Todoterreno</string>
+    <string name="carplay_drive_individual">Individual</string>
+    <string name="carplay_drive_snow">Nieve</string>
+    <string name="carplay_vehicle_controls">Controles del vehículo</string>
+    <string name="carplay_driver_massage">Masaje del conductor</string>
+    <string name="carplay_passenger_massage">Masaje del pasajero</string>
+    <string name="carplay_driver_massage_program">Programa de masaje del conductor</string>
+    <string name="carplay_passenger_massage_program">Programa de masaje del pasajero</string>
+    <string name="carplay_vehicle_lights">Luces exteriores</string>
+    <string name="carplay_vehicle_menu">Menú del vehículo</string>
+    <string name="carplay_control_off">Apagado</string>
+    <string name="carplay_massage_wave">Olas</string>
+    <string name="carplay_massage_rollers">Rodillos</string>
+    <string name="carplay_light_position">Luces de posición</string>
+    <string name="carplay_light_low_beam">Luces de cruce</string>
+    <string name="carplay_light_auto">Automático</string>
+    <string name="carplay_vehicle_fuel_range">Autonomía con gasolina</string>
+</resources>

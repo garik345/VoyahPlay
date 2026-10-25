@@ -124,7 +124,7 @@ internal class MicrophoneUplink(
             return false
         }
 
-        val nextSocket = try {
+        val nextSocket = if (config.transport != null) null else try {
             DatagramSocket(null).apply {
                 reuseAddress = true
                 bind(InetSocketAddress(InetAddress.getByName("::"), 0))
@@ -151,6 +151,9 @@ internal class MicrophoneUplink(
             }
             nextRecorder.startRecording()
             stats.started(routeType(nextRecorder))
+            if (config.transport != null) runCatching {
+                onDiagnostic("Microphone: transport type=${config.audioType} sourcePort=negotiated-audio")
+            }
             thread = Thread({ capture(nextRecorder, nextSocket) }, "carplay-mic").apply {
                 isDaemon = true
                 start()
@@ -273,7 +276,7 @@ internal class MicrophoneUplink(
         }
     }
 
-    private fun capture(recorder: AudioRecord, socket: DatagramSocket) {
+    private fun capture(recorder: AudioRecord, socket: DatagramSocket?) {
         runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }
         val frame = ByteArray(config.frameBytes)
         val readBuffer = ByteArray(maxOf(frame.size, MIN_READ_BYTES))
@@ -383,7 +386,7 @@ internal class MicrophoneUplink(
         false
     }
 
-    private fun sendFrame(socket: DatagramSocket, counters: MicrophoneCounters, frame: ByteArray) {
+    private fun sendFrame(socket: DatagramSocket?, counters: MicrophoneCounters, frame: ByteArray) {
         val bodies = if (config.codec == AudioCodecKind.OPUS) {
             opusEncoder?.encode(frame).orEmpty()
         } else {
@@ -401,7 +404,7 @@ internal class MicrophoneUplink(
     }
 
     private fun sendPacket(
-        socket: DatagramSocket,
+        socket: DatagramSocket?,
         counters: MicrophoneCounters,
         body: ByteArray,
         samples: Int,
@@ -414,7 +417,9 @@ internal class MicrophoneUplink(
             samples = samples,
         )
         try {
-            socket.send(DatagramPacket(packet, packet.size, config.host, config.port))
+            val transport = config.transport
+            if (transport != null) transport.send(packet)
+            else requireNotNull(socket).send(DatagramPacket(packet, packet.size, config.host, config.port))
             stats.sent()
         } catch (error: Exception) {
             stats.sendFailed()

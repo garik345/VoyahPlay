@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_vehicle_data">車輛資料</string>
+    <string name="carplay_tire_front_left">左前輪胎</string>
+    <string name="carplay_tire_front_right">右前輪胎</string>
+    <string name="carplay_tire_rear_left">左後輪胎</string>
+    <string name="carplay_tire_rear_right">右後輪胎</string>
+    <string name="carplay_vehicle_range">總續航里程</string>
+    <string name="carplay_vehicle_odometer">總里程</string>
+    <string name="carplay_vehicle_fuel">燃油餘量</string>
+    <string name="carplay_vehicle_unavailable">暫無資料</string>
+    <string name="carplay_vehicle_bar">巴</string>
+    <string name="carplay_vehicle_km">公里</string>
+    <string name="carplay_vehicle_battery">電池電量</string>
+    <string name="carplay_vehicle_electric_range">純電續航里程</string>
+    <string name="carplay_vehicle_drive_mode">駕駛模式</string>
+    <string name="carplay_drive_eco">經濟</string>
+    <string name="carplay_drive_comfort">舒適</string>
+    <string name="carplay_drive_sport">運動</string>
+    <string name="carplay_drive_offroad">越野</string>
+    <string name="carplay_drive_individual">個人化</string>
+    <string name="carplay_drive_snow">雪地</string>
+    <string name="carplay_vehicle_controls">車輛控制</string>
+    <string name="carplay_driver_massage">駕駛座按摩</string>
+    <string name="carplay_passenger_massage">副駕駛座按摩</string>
+    <string name="carplay_driver_massage_program">駕駛座按摩程式</string>
+    <string name="carplay_passenger_massage_program">副駕駛座按摩程式</string>
+    <string name="carplay_vehicle_lights">車外照明</string>
+    <string name="carplay_vehicle_menu">車輛選單</string>
+    <string name="carplay_control_off">關閉</string>
+    <string name="carplay_massage_wave">波浪</string>
+    <string name="carplay_massage_rollers">滾輪</string>
+    <string name="carplay_light_position">位置燈</string>
+    <string name="carplay_light_low_beam">近光燈</string>
+    <string name="carplay_light_auto">自動</string>
+    <string name="carplay_vehicle_fuel_range">燃油續航里程</string>
+</resources>

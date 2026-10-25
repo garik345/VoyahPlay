@@ -78,6 +78,35 @@ class TelephonyMicrophoneTest {
         ShadowAudioRecord.clearSource()
     }
 
+    @Test fun voyahCallUsesRecognitionWithoutCommunicationModeEvenWhenAudioFocusIsOff() {
+        sink.close()
+        sink = AndroidMediaSink(context = context, voyahMicrophone = true, audioFocusEnabled = false)
+        manager.mode = AudioManager.MODE_NORMAL
+        sink.onMicrophoneStarted(telephony, config("telephony"))
+        val record = awaitCapture()
+        assertEquals(MediaRecorder.AudioSource.VOICE_RECOGNITION, record.audioSource)
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+        sink.onMicrophoneStopped(telephony)
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+        assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
+    }
+
+    @Test fun voyahCallSendsCaptureThroughTheSessionTransport() {
+        sink.close()
+        sink = AndroidMediaSink(context = context, voyahMicrophone = true)
+        provideCallFrame()
+        val sent = CountDownLatch(1)
+        val config = config("telephony").copy(transport = com.shilapi.xcertplay.airplay.MicrophoneTransport { packet ->
+            assertTrue(packet.size > 36)
+            sent.countDown()
+        })
+        sink.onMicrophoneStarted(telephony, config)
+        assertTrue("Captured call frame did not use the session transport", sent.await(5, TimeUnit.SECONDS))
+        sink.onMicrophoneStopped(telephony)
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+    }
+
     @Test fun telephonyEnablesEffectsOnItsRecorderAndRestoresThePreviousMode() {
         manager.mode = AudioManager.MODE_RINGTONE
         sink.onMicrophoneStarted(telephony, config("telephony"))

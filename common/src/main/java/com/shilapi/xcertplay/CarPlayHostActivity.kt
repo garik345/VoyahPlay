@@ -167,6 +167,8 @@ class CarPlayHostActivity : ComponentActivity() {
             vehicleStatusEnabled = com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this),
             chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
             vehicleSpeedEnabled = locationReportingEnabled && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this),
+            vehicleInformation = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.vehicleInformation(this),
+            carPlayTheme = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.carPlayTheme(this),
         ),
         label = "VoyahPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
@@ -845,6 +847,11 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (DiPlayActivity.isLauncherIntent(intent) && CarPlayBackgroundSession.projectionVisible &&
+            CarPlayBackgroundSession.hasSession()) {
+            openSettingsMenu()
+            return
+        }
         if (isIphoneUsbAttachment(intent)) {
             if (wirelessEnabled) {
                 if (menuOpen) cancelSettingsEdits()
@@ -880,6 +887,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        CarPlayBackgroundSession.projectionVisible = true
         comfortHostActive = true
         updateComfortBar()
         voyahPanel?.setHostActive(true)
@@ -1262,6 +1270,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        CarPlayBackgroundSession.projectionVisible = false
         voyahDock.stop()
         closePicturePanel()
         // The controller, USB/iAP2 link, and VPN attachment intentionally outlive the UI.
@@ -1557,7 +1566,8 @@ class CarPlayHostActivity : ComponentActivity() {
             instructions.setPadding(0, spacing(8f, 14f), 0, spacing(12f, 24f))
             for (button in listOf(back, recovery, retry)) {
                 button.textSize = size(17f, 18f)
-                button.layoutParams = button.layoutParams.apply { this.height = spacing(50f, 64f) }
+                button.minHeight = spacing(50f, 64f)
+                button.layoutParams = button.layoutParams.apply { this.height = ViewGroup.LayoutParams.WRAP_CONTENT }
             }
             gestureHint.textSize = size(12.5f, 13f)
             gestureHint.setPadding(0, spacing(10f, 20f), 0, 0)
@@ -1565,8 +1575,7 @@ class CarPlayHostActivity : ComponentActivity() {
         fun fitPreparationContent() {
             val availableHeight = viewport.height - viewport.paddingTop - viewport.paddingBottom
             if (panel.height <= 0 || availableHeight <= 0) return
-            val landscape = viewport.width - viewport.paddingLeft - viewport.paddingRight > availableHeight
-            val scale = if (landscape) minOf(1f, availableHeight.toFloat() / panel.height) else 1f
+            val scale = minOf(1f, availableHeight.toFloat() / panel.height)
             panel.scaleX = scale
             panel.scaleY = scale
         }
@@ -2956,7 +2965,8 @@ class CarPlayHostActivity : ComponentActivity() {
         appendLog("CarPlay size=${CarPlayUiScale.label(uiScalePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
         val nativeMasks = blackCornerRadiusDp == CarPlayBlackCornerOverlay.IPHONE_MASK
         val disableSafeArea = mainDisplayDisableSafeArea || nativeMasks
-        val display = scaledDisplay.copy(
+        val themeCanvas = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.themeDisplay(this, fps)
+        val display = themeCanvas ?: scaledDisplay.copy(
             safeArea = AirPlaySafeArea.toInsets(
                 mapping = AirPlayPersistence.loadSafeAreaRect(this, size.width, size.height),
                 activityWidthPixels = size.width,
@@ -2976,7 +2986,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         val longPixels = maxOf(display.widthPixels, display.heightPixels)
         val shortPixels = minOf(display.widthPixels, display.heightPixels)
-        val square = if (CarPlayRotation.enabled(this) && !inSplitScreen) {
+        val square = if (themeCanvas == null && CarPlayRotation.enabled(this) && !inSplitScreen) {
             CarPlayRotation.squareSide(longPixels, CarPlayRotation.picture(this), sessionHevc, hevcSoftwareDecoderEnabled)
         } else null
         val canvas = if (square == null) display else {
@@ -2987,7 +2997,7 @@ class CarPlayHostActivity : ComponentActivity() {
             display.copy(widthPixels = square, heightPixels = square, widthPhysicalMm = squareMm,
                 heightPhysicalMm = squareMm, viewArea = null, safeArea = null)
         }
-        val viewAreas = if (square == null) {
+        val viewAreas = if (themeCanvas != null) null else if (square == null) {
             CarPlayViewAreas.build(display.widthPixels, display.heightPixels, listOf(
                 CarPlayViewAreas.Screen(display.widthPixels, display.heightPixels, portrait = display.heightPixels > display.widthPixels),
             ), dock, splitWindow, startPortrait = display.heightPixels > display.widthPixels,
@@ -3037,6 +3047,7 @@ class CarPlayHostActivity : ComponentActivity() {
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
             mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),
             protocolExtension = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.createExtension(this),
+            mutualAuthentication = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isMutualAuthEnabled(this),
             speechWithout8And16Khz = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
                 com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.USB_SPEECH),
             disableAudioOutput = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
@@ -3208,6 +3219,9 @@ class CarPlayHostActivity : ComponentActivity() {
     ): AndroidMediaSink {
         // Capture this session's log: late decoder shutdown must not write into a new session.
         val diagnosticLog = sessionLog
+        val voyahFocus = com.shilapi.xcertplay.voyah.VoyahAudioFocus(applicationContext) { message ->
+            diagnosticLog?.append(formattedLogLine(message, System.currentTimeMillis()))
+        }
         return AndroidMediaSink(
             surface = null,
             videoWidth = videoWidth,
@@ -3242,6 +3256,12 @@ class CarPlayHostActivity : ComponentActivity() {
             mtkDecoderTuningEnabled = AirPlayPersistence.loadMtkDecoderTuning(this),
             vendorLowLatencyDecoder = com.shilapi.xcertplay.voyah.VoyahMediaSettings.enabled(this,
                 com.shilapi.xcertplay.voyah.VoyahMediaSettings.Option.LOW_LATENCY),
+            // This fork runs on Voyah: its call microphone is silent on Android's VoIP path.
+            // Capture selection must also work when the optional audio-focus setting is off.
+            voyahMicrophone = true,
+            voyahAudioRouting = true,
+            onAudioFocusStreamChanged = voyahFocus::setFocus,
+            onAudioFocusClosed = voyahFocus::close,
         )
     }
 
@@ -3556,6 +3576,7 @@ class CarPlayHostActivity : ComponentActivity() {
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
             displayRotation(), hideTopBar, hideBottomBar, effectiveSize.width, effectiveSize.height,
             viewAreas = pendingViewAreas,
+            fillViewport = com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.carPlayTheme(this) != null,
         )
         sessionDisplay = display
         sessionMediaKey = com.shilapi.xcertplay.voyah.VoyahMediaSettings.sessionKey(this)
@@ -3780,6 +3801,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun contentRect(viewWidth: Int, viewHeight: Int): CarPlayVideoLayout {
         val display = sessionDisplay ?: return CarPlayVideoLayout(0f, 0f, viewWidth.toFloat(), viewHeight.toFloat())
+        // The Ultra package fixes its logical canvas. Map all of it to the video/touch window.
+        if (display.fillViewport) return CarPlayVideoLayout(0f, 0f, viewWidth.toFloat(), viewHeight.toFloat())
         // In the head unit's split screen, or on a turning screen's square canvas, CarPlay draws in part of
         // the canvas; that area fills the window and the rest falls outside it. Video and touches both
         // follow this. An area of the whole canvas keeps the usual fit.
@@ -3950,8 +3973,7 @@ class CarPlayHostActivity : ComponentActivity() {
             .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT), ::appendLog)
     }
 
-    private fun settingsAccessHint(): String =
-        "Настройки VoyahPlay: удерживайте кнопку «${com.shilapi.xcertplay.voyah.VoyahComfortLayout.titles[com.shilapi.xcertplay.voyah.VoyahComfortLayout.settingsKey(this)]}»."
+    private fun settingsAccessHint(): String = getString(R.string.settings_carplay_launcher_hint)
 
     private fun openSettingsMenu() {
         comfortBar?.dismissExtra()
@@ -4414,11 +4436,15 @@ internal data class CarPlaySessionDisplay(
     val windowHeight: Int,
     /** The view areas this session declared, or null for the whole screen as one area. */
     val viewAreas: CarPlayViewAreas? = null,
+    /** Preserve the fixed Ultra theme canvas while filling the actual video and touch viewport. */
+    val fillViewport: Boolean = false,
 )
 
 /** Process-local hand-off for keeping the CarPlay session alive while no Activity is visible. */
 internal object CarPlayBackgroundSession {
     @Volatile var active = false
+    // Android pauses the host before delivering a launcher intent. Clear only when covered.
+    @Volatile var projectionVisible = false
     private var stopAction: (((() -> Unit)) -> Unit)? = null
     private var stopping = false
     private var owner: Any? = null

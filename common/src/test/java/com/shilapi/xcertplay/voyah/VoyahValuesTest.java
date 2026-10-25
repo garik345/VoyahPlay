@@ -38,8 +38,22 @@ public class VoyahValuesTest {
         assertTrue(values.display(1001).contains("Передняя левая: частично открыто"));
         assertEquals("Данные не обновляются",values.display(7001));
     }
+    @Test public void odometerAndTireGettersUseThePublishedLayouts() {
+        CanSchema.Spec odometer = CanSchema.byCode(1);
+        assertEquals(10, odometer.fields.length);
+        assertEquals(odometer.fields.length, odometer.types.length());
+        assertEquals("mBeenTravelingMileage", odometer.fields[1]);
+        assertEquals('f', odometer.types.charAt(2));
+        assertTrue(odometer.nullable);
+        CanSchema.Spec tires = CanSchema.byCode(70);
+        assertEquals(11, tires.fields.length);
+        assertEquals(tires.fields.length, tires.types.length());
+        assertEquals("leftFrontPressure", tires.fields[7]);
+        assertEquals("ffff", tires.types.substring(7));
+        assertTrue(tires.nullable);
+    }
     @Test public void unrelatedCommandsAreRejected() {
-        for (int code : new int[]{1, 6, 26, 31, 32, 45, 70, 999}) {
+        for (int code : new int[]{6, 26, 31, 32, 45, 999}) {
             try { CanSchema.byCode(code); fail("Allowed unsupported command " + code); }
             catch (IllegalArgumentException expected) { }
         }

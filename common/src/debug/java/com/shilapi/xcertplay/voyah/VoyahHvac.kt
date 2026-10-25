@@ -28,10 +28,27 @@ internal object VoyahHvacSchema {
     }
     fun decode(raw: Map<String, Number>): Map<UltraHvacControl, Any?> = UltraHvacControl.entries.associateWith { control ->
         val number = raw[field(control).cacheName]?.toDouble()
-        if (control.format == com.shilapi.xcertplay.airplay.rcs.caf.CafCharacteristicFormat.BOOL)
+        if (control == UltraHvacControl.RECIRCULATION) VoyahRecirculation.decode(raw["airCirculationMode"])?.on
+        else if (control.format == com.shilapi.xcertplay.airplay.rcs.caf.CafCharacteristicFormat.BOOL)
             when (number) { 0.0 -> false; 1.0 -> true; else -> null }
         else control.normalize(number)
     }
+    /** TX30 cache names for values that are only shown to the phone. Unverified semantics stay null unless 0/1. */
+    fun readingField(reading: UltraClimateReading): String = when (reading) {
+        UltraClimateReading.CABIN_TEMPERATURE -> "airTempInCar"
+        UltraClimateReading.MAX_AC -> "airACMaxSW"
+        UltraClimateReading.MAX_DEFROST -> "airMaxFrontStatus"
+        UltraClimateReading.ZONES_SYNCED -> "airSyncStatus"
+        UltraClimateReading.RECIRCULATION_AUTO -> "airCirculationMode"
+    }
+    fun decodeReadings(raw: Map<String, Number>): Map<UltraClimateReading, Any?> =
+        UltraClimateReading.entries.associateWith { reading ->
+            if (reading == UltraClimateReading.RECIRCULATION_AUTO) VoyahRecirculation.decode(raw["airCirculationMode"])?.automatic
+            else reading.normalize(raw[readingField(reading)]) ?: if (reading == UltraClimateReading.ZONES_SYNCED) {
+                // H97C leaves airSyncStatus at -1; airDUALStatus 0 means one shared zone, 1 independent zones.
+                when (raw["airDUALStatus"]?.toInt()) { 0 -> true; 1 -> false; else -> null }
+            } else null
+        }
     fun cycleAdvanced(before: Int?, after: Int?): Boolean = before in 0..2 && after in 0..2 && before != after
     fun wireValue(control: UltraHvacControl, value: Any): Int {
         val normalized = control.normalize(value) ?: throw IllegalArgumentException("Invalid $control=$value")
@@ -39,6 +56,7 @@ internal object VoyahHvacSchema {
         // H97C power/AC/AUTO/front defrost/recirculation are button pulses, not absolute bits.
         if (control in setOf(UltraHvacControl.POWER, UltraHvacControl.AC, UltraHvacControl.AUTO,
                 UltraHvacControl.RECIRCULATION, UltraHvacControl.FRONT_DEFROST)) return 1
+        if (control == UltraHvacControl.FAN) return VoyahHvacFan.wireValue(normalized as Long)
         return when (normalized) {
             is Boolean -> if (normalized) 1 else 0
             is Double -> (normalized * 10).toInt()
@@ -48,7 +66,8 @@ internal object VoyahHvacSchema {
     }
 }
 
-internal data class VoyahHvacResult(val status: UltraClimateWriteResult, val values: Map<UltraHvacControl, Any?>?, val sampledAt: Long)
+internal data class VoyahHvacResult(val status: UltraClimateWriteResult, val values: Map<UltraHvacControl, Any?>?, val sampledAt: Long,
+    val readings: Map<UltraClimateReading, Any?>? = null)
 
 /** Runs on the CAF worker. The UI thread performs binding/unbinding only. */
 internal object VoyahHvac {
@@ -67,6 +86,7 @@ internal object VoyahHvac {
         val binder = AtomicReference<IBinder?>()
         val deadline = SystemClock.elapsedRealtime() + 6_000
         var actual: Map<UltraHvacControl, Any?>? = null
+        var actualReadings: Map<UltraClimateReading, Any?>? = null
         var stamp = 0L
         fun checkLive() {
             if (cancelled.get() || !live() || Thread.currentThread().isInterrupted || SystemClock.elapsedRealtime() > deadline)
@@ -106,13 +126,28 @@ internal object VoyahHvac {
             val can = binder.get() ?: throw IOException("CAN service unavailable")
             check(can.interfaceDescriptor == API) { "Unknown CAN Binder" }
             var raw = read(can)
-            actual = VoyahHvacSchema.decode(raw); stamp = SystemClock.elapsedRealtime()
-            val before = actual[control]
+            actual = VoyahHvacSchema.decode(raw); actualReadings = VoyahHvacSchema.decodeReadings(raw); stamp = SystemClock.elapsedRealtime()
+            fun reached(): Boolean = if (control == UltraHvacControl.RECIRCULATION)
+                VoyahRecirculation.matchesManual(raw["airCirculationMode"], wanted as Boolean)
+                else actual?.get(control) == wanted
+            val before = actual?.get(control)
             val initialCycle = raw["airCirculationMode"]?.toInt()
             if (before == null && !(control == UltraHvacControl.RECIRCULATION && initialCycle in 0..2))
                 throw IOException("Current $control state is unknown")
             var steps = 0
-            while (actual?.get(control) != wanted && steps < if (control == UltraHvacControl.RECIRCULATION) 2 else 1) {
+            var lastPulseAt = 0L
+            while (!reached() && steps < if (control == UltraHvacControl.RECIRCULATION) 2 else 1) {
+                if (control == UltraHvacControl.RECIRCULATION && steps > 0) {
+                    // The H97C ignores a second button pulse sent as soon as its cache changes.
+                    // Leave a full second between pulses, then re-read before another side effect.
+                    val previousMode = raw["airCirculationMode"]?.toInt()
+                    val remaining = 1_000 - (SystemClock.elapsedRealtime() - lastPulseAt)
+                    if (remaining > 0) Thread.sleep(remaining)
+                    checkLive()
+                    raw = read(can); actual = VoyahHvacSchema.decode(raw); actualReadings = VoyahHvacSchema.decodeReadings(raw)
+                    stamp = SystemClock.elapsedRealtime()
+                    if (reached() || raw["airCirculationMode"]?.toInt() != previousMode) break
+                }
                 val previousCycle = raw["airCirculationMode"]?.toInt()
                 steps++
                 // AIDL transaction 31 is AirConditionState; VehicleState TX58 is a different ABI.
@@ -120,18 +155,19 @@ internal object VoyahHvac {
                 check(app.checkSelfPermission("com.qinggan.permission.WRITE_CANBUS") == PackageManager.PERMISSION_GRANTED)
                 val field = VoyahHvacSchema.field(control)
                 val data = Parcel.obtain(); val reply = Parcel.obtain()
-                actual = null; stamp = 0 // Never publish the pre-command snapshot as a new readback.
+                actual = null; actualReadings = null; stamp = 0 // Never publish the pre-command snapshot as a new readback.
                 try {
                     data.writeInterfaceToken(API); data.writeInt(1); data.writeInt(field.ordinal); data.writeInt(field.id)
                     data.writeInt(VoyahHvacSchema.wireValue(control, wanted))
+                    lastPulseAt = SystemClock.elapsedRealtime()
                     check(can.transact(31, data, reply, 0)) { "TX31 unsupported" }
                     reply.readException(); check(reply.dataAvail() == 0) { "Unexpected TX31 response" }
                 } finally { data.recycle(); reply.recycle() }
                 for (attempt in 0..7) {
                     checkLive(); Thread.sleep(250); checkLive()
-                    raw = read(can); actual = VoyahHvacSchema.decode(raw); stamp = SystemClock.elapsedRealtime()
-                    val readback = actual[control]
-                    if (readback == wanted) break
+                    raw = read(can); actual = VoyahHvacSchema.decode(raw); actualReadings = VoyahHvacSchema.decodeReadings(raw)
+                    stamp = SystemClock.elapsedRealtime()
+                    if (reached()) break
                     if (control == UltraHvacControl.RECIRCULATION &&
                         VoyahHvacSchema.cycleAdvanced(previousCycle, raw["airCirculationMode"]?.toInt())) break
                 }
@@ -139,11 +175,13 @@ internal object VoyahHvac {
                 if (control == UltraHvacControl.RECIRCULATION &&
                     !VoyahHvacSchema.cycleAdvanced(previousCycle, raw["airCirculationMode"]?.toInt())) break
             }
-            val confirmed = actual?.get(control) == wanted
+            val confirmed = reached()
             return VoyahHvacResult(UltraClimateWriteResult(confirmed,
-                "$control=$wanted readback=${actual?.get(control)} steps=$steps ${if (confirmed) "confirmed" else "not confirmed; stopped"}"), actual, stamp)
+                "$control=$wanted readback=${actual?.get(control)}" +
+                    (if (control == UltraHvacControl.RECIRCULATION) " rawMode=${raw["airCirculationMode"]}" else "") +
+                    " steps=$steps ${if (confirmed) "confirmed" else "not confirmed; stopped"}"), actual, stamp, actualReadings)
         } catch (error: Exception) {
-            return VoyahHvacResult(UltraClimateWriteResult(false, "${error.javaClass.simpleName}: ${error.message}"), actual, stamp)
+            return VoyahHvacResult(UltraClimateWriteResult(false, "${error.javaClass.simpleName}: ${error.message}"), actual, stamp, actualReadings)
         } finally {
             cancelled.set(true)
             main.post { if (bound.getAndSet(false)) runCatching { app.unbindService(connection) } }

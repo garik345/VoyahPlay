@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_vehicle_data">Дані автомобіля</string>
+    <string name="carplay_tire_front_left">Переднє ліве колесо</string>
+    <string name="carplay_tire_front_right">Переднє праве колесо</string>
+    <string name="carplay_tire_rear_left">Заднє ліве колесо</string>
+    <string name="carplay_tire_rear_right">Заднє праве колесо</string>
+    <string name="carplay_vehicle_range">Сумарний запас ходу</string>
+    <string name="carplay_vehicle_odometer">Пробіг</string>
+    <string name="carplay_vehicle_fuel">Рівень пального</string>
+    <string name="carplay_vehicle_unavailable">Немає даних</string>
+    <string name="carplay_vehicle_bar">бар</string>
+    <string name="carplay_vehicle_km">км</string>
+    <string name="carplay_vehicle_battery">Заряд батареї</string>
+    <string name="carplay_vehicle_electric_range">Запас ходу на батареї</string>
+    <string name="carplay_vehicle_drive_mode">Режим руху</string>
+    <string name="carplay_drive_eco">Еко</string>
+    <string name="carplay_drive_comfort">Комфорт</string>
+    <string name="carplay_drive_sport">Спорт</string>
+    <string name="carplay_drive_offroad">Бездоріжжя</string>
+    <string name="carplay_drive_individual">Індивідуальний</string>
+    <string name="carplay_drive_snow">Сніг</string>
+    <string name="carplay_vehicle_controls">Керування автомобілем</string>
+    <string name="carplay_driver_massage">Масаж водія</string>
+    <string name="carplay_passenger_massage">Масаж пасажира</string>
+    <string name="carplay_driver_massage_program">Програма масажу водія</string>
+    <string name="carplay_passenger_massage_program">Програма масажу пасажира</string>
+    <string name="carplay_vehicle_lights">Зовнішнє освітлення</string>
+    <string name="carplay_vehicle_menu">Меню автомобіля</string>
+    <string name="carplay_control_off">Вимкнено</string>
+    <string name="carplay_massage_wave">Хвилі</string>
+    <string name="carplay_massage_rollers">Ролики</string>
+    <string name="carplay_light_position">Габарити</string>
+    <string name="carplay_light_low_beam">Ближнє світло</string>
+    <string name="carplay_light_auto">Авто</string>
+    <string name="carplay_vehicle_fuel_range">Запас ходу на бензині</string>
+</resources>

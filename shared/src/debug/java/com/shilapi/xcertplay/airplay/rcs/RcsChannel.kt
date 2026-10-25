@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.airplay.rcs
 
+import com.shilapi.xcertplay.airplay.ProtocolTraceFormatter
 import com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackage
 import com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackageCodec
 import com.shilapi.xcertplay.airplay.rcs.transport.RcsFrameCodec
@@ -77,7 +78,7 @@ class RcsChannel private constructor(
                 }
                 trace(
                     "RCS TX type=0x${message.messageType.toString(16)} bytes=${message.body.size} " +
-                        "bodyHex=${message.body.toHex()}",
+                        "bodyHex=${ProtocolTraceFormatter.hex(message.body)}",
                 )
             } catch (failure: Throwable) {
                 trace(
@@ -166,7 +167,7 @@ class RcsChannel private constructor(
         val packageValue = pendingPackages.pollFirst() ?: return null
         trace(
             "RCS RX type=0x${packageValue.messageType.toString(16)}" +
-                " bytes=${packageValue.body.size} bodyHex=${packageValue.body.toHex()}",
+                " bytes=${packageValue.body.size} bodyHex=${ProtocolTraceFormatter.hex(packageValue.body)}",
         )
         return RcsMessage(packageValue.messageType, packageValue.body, packageValue.kind, packageValue.token, packageValue.headerCopy())
     }
@@ -240,10 +241,6 @@ class RcsChannel private constructor(
             )
     }
 }
-
-private fun ByteArray.toHex(): String =
-    if (isEmpty()) "<empty>"
-    else joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
 /**
  * Receive-side factory returned by [RcsChannel.listen].

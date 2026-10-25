@@ -39,3 +39,9 @@ release-signing.properties
 *.key
 *.apk
 *.aab
+
+# iPhone diagnostic logs
+sysdiagnose_*.tar.gz
+
+# Other diagnostic archives
+*.ips

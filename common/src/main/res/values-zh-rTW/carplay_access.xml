@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_launcher_hint">CarPlay 開啟時，再次點一下車輛 Dock 中的 VoyahPlay 圖示即可開啟設定。</string>
+</resources>

@@ -376,7 +376,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         com.shilapi.xcertplay.voyah.VoyahSettingsProfile.apply(this)
         // Back on the home page finishes this activity while the session runs on, so the icon lands here.
         if (savedInstanceState == null && isLauncherIntent(intent) && CarPlayBackgroundSession.hasSession()) {
-            openProjection(); finish(); return
+            if (CarPlayBackgroundSession.projectionVisible) {
+                intent.putExtra("page", "settings").putExtra("from_carplay_settings", true)
+            } else {
+                openProjection(); finish(); return
+            }
         }
         scheduleBackgroundUpdateChecks()
         availableUpdate = UpdateAvailability.available(this, version())
@@ -429,10 +433,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent)
         connectionSettingsReturnCategory = null
-        // CarPlay runs in its own task, so the launcher icon resumes this one. Settings opened from
-        // CarPlay carry a "page" extra, which isLauncherIntent rejects.
+        // From another app the icon returns to CarPlay; another tap over visible CarPlay opens settings.
         if (isLauncherIntent(intent) && CarPlayBackgroundSession.hasSession()) {
-            page = "home"; render(); openProjection(); return
+            if (CarPlayBackgroundSession.projectionVisible) {
+                intent.putExtra("page", "settings").putExtra("from_carplay_settings", true)
+                settingsCategory = SettingsCategory.OVERVIEW
+            } else {
+                page = "home"; render(); openProjection(); return
+            }
         }
         page = intent.getStringExtra("page") ?: "home"; render()
         automaticVehicleValidationStarted = false
@@ -1714,6 +1722,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     markReconnectNeeded()
                 }
                 card.addView(label(getString(R.string.voyah_ultra_readonly), 14, MUTED))
+                toggle(card, getString(R.string.voyah_ultra_asset_probe_toggle),
+                    getString(R.string.voyah_ultra_asset_probe_description),
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isAssetProbeEnabled(this)) { enabled ->
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveAssetProbe(this, enabled)
+                    markReconnectNeeded()
+                }
+                toggle(card, getString(R.string.voyah_ultra_mutual_auth_toggle),
+                    getString(R.string.voyah_ultra_mutual_auth_description),
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isMutualAuthEnabled(this)) { enabled ->
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveMutualAuth(this, enabled)
+                    markReconnectNeeded()
+                }
             }
         }
         filteredSection(content, SettingsSection.VOYAH_CONTROLS,

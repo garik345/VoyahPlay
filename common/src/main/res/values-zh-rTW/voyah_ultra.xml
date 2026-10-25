@@ -8,4 +8,8 @@
     <string name="voyah_ultra_report">Ultra：檢視日誌</string>
     <string name="voyah_ultra_export">Ultra：儲存日誌</string>
     <string name="voyah_ultra_working">正在準備 Ultra 報告…</string>
+    <string name="voyah_ultra_asset_probe_toggle">Ultra：記錄資源包傳輸（實驗性）</string>
+    <string name="voyah_ultra_asset_probe_description">除錯測試。在下次 CarPlay 連線時生效。接受 iPhone 提供的 fileTransfer，僅記錄收到的內容，不處理資源套件，也不執行車輛命令。UI Sync 獨立於此開關運作。可能會中斷 CarPlay 工作階段：若無法連線，請關閉。</string>
+    <string name="voyah_ultra_mutual_auth_toggle">Ultra：MFi4 雙向認證（實驗性）</string>
+    <string name="voyah_ultra_mutual_auth_description">除錯測試。在下次 CarPlay 連線時生效。使用已為 MFiSAP 簽章的同一 3.0 身分，向 iPhone 提供 MFi 4.0 雙向認證；之後 iPhone 可能將車輛視為 CarPlay Ultra 配件。若 CarPlay 無法連線，請關閉。</string>
 </resources>

@@ -138,7 +138,7 @@ class CarPlayMediaEngine(
             if (streams[streamKey] === screen) {
                 // The cluster asks for a keyframe of its own screen; the plain command is the main screen's.
                 val command = if (type == STREAM_TYPE_ALT_SCREEN) {
-                    mapOf("type" to "forceKeyFrame", "params" to mapOf("uuid" to AirPlayInfoPlist.ALT_UUID))
+                    mapOf("type" to "forceKeyFrame", "params" to mapOf("uuid" to session.displayIdentifier(111)))
                 } else {
                     mapOf("type" to "forceKeyFrame")
                 }
@@ -193,7 +193,12 @@ class CarPlayMediaEngine(
         val connectionId = stream["streamConnectionID"]
         val latencyMs = (stream["audioLatencyMs"] as? Number)?.toInt() ?: 0
         val meta = AudioMeta(type, format, connectionId, latencyMs)
-        val microphone = microphoneConfig(session, type, stream, format)
+        val audio = AudioStream(key, type, session::logDebug)
+        val microphone = microphoneConfig(session, type, stream, format)?.let { config ->
+            if (audioType == "telephony") config.copy(transport = MicrophoneTransport { packet ->
+                audio.sendMicrophone(packet, config.host, config.port)
+            }) else config
+        }
         if (microphone != null) pendingMicrophone[streamKey] = microphone
         if (type == STREAM_TYPE_MAIN_AUDIO && audioType != "media") {
             session.logDebug(
@@ -209,7 +214,6 @@ class CarPlayMediaEngine(
         if (capture != null) audioCaptures[streamKey] = capture
         val clockProbe = RtpClockProbe()
         val microphoneStart = microphone?.let { config -> MicrophoneStart { sink.onMicrophoneStarted(streamId, config) } }
-        val audio = AudioStream(key, type, session::logDebug)
         val (dataPort, controlPort) = audio.listen(
             object : AudioStream.Listener {
                 override fun onStarted(firstSample: Int) {
