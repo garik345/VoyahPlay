@@ -429,6 +429,7 @@
     <string name="option_size_large">Великий</string>
     <string name="option_size_medium">Середній</string>
     <string name="option_size_small">Малий</string>
+    <string name="settings_carplay_size_extra_small">Дуже малий</string>
     <string name="option_theme_scenario">Сценарій · карта збоку</string>
     <string name="option_theme_map">Карта · повна карта</string>
     <string name="option_theme_simple">Проста · карта збоку</string>
@@ -869,4 +870,9 @@
     <string name="settings_report_on_phone_hint">Відскануйте код камерою телефона, щоб відкрити сторінку в його браузері, і виберіть «Завантажити звіт». Не закривайте цей екран, доки завантаження не завершиться.</string>
     <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
     <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
+    <string name="settings_ultra_radio">Радіо</string>
+    <string name="settings_ultra_radio_description">Підключати штатне радіо до CarPlay Ultra. Вимкніть в автомобілях без радіоприймача. Застосовується під час наступного підключення. Значок «Радіо» може залишитися в CarPlay з порожнім вікном.</string>
+    <string name="carplay_voyahplay_settings">Налаштування VoyahPlay</string>
+    <string name="voyah_waiting_for_car_hotspot">Очікування точки доступу автомобіля. Підключення продовжиться автоматично.</string>
+    <string name="voyah_wireless_retry_later">VoyahPlay автоматично повторить спробу після паузи.</string>
 </resources>

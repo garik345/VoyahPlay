@@ -1,6 +1,11 @@
-# Root-помощник 1.1.2
+# Root-помощник 1.2.1
 
-Первичная установка/миграция после замены файлов:
+Полный порядок для новой машины:
+[чистая установка VoyahPlay и root-helper](../../docs/INSTALL_NEW_CAR.md).
+Нужны automotive APK текущей сборки, существующий `su 0` через ADB и проверенные
+компоненты Tweaks/прошивки. Helper не устанавливает root или Tweaks.
+
+Очистка исходников требуется только при переходе со старого ZIP с legacy-модулем:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\root-module\remove-legacy-sources.ps1
@@ -10,9 +15,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\root-module\remove
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\root-module\root-helper.ps1 -Mode Install
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\root-module\root-helper.ps1 -Mode Status
 ```
 
-В приложении доступны полная ширина через Tweaks и автозапуск помощника.
+Если устройств несколько, укажите `-Serial SERIAL`; для своего пути ADB — `-Adb C:\path\adb.exe`.
+В приложении доступны полная ширина через Tweaks, расширение вверх и автозапуск помощника.
 Старый модуль больше не устанавливается и не запускается.
 
 Порядок проверки, backup/восстановление и все режимы скрипта:

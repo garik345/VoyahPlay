@@ -30,6 +30,29 @@ class VoyahUltraRadioTest {
         assertFalse(base.accessories.any { it.type.value == 0x03000001L || it.type.value == 0x0F000001L })
     }
 
+    @Test fun disabledRadioRejectsRequestsFromThePhonesRemainingIconEvenWithOldLiveData() {
+        var writes = 0
+        val disabled = VoyahClimateAccessory({ sample }, { now }, radioSupported = false,
+            radioWriter = { writes++; UltraClimateWriteResult(true, "must not run") })
+        val response = reader(disabled.handle(reader(CarAccessoryMessages.configRequest(0, 1)))!!)
+        val tree = CafConfigTree.decode(response.values() as Map<*, *>)
+        assertFalse(tree.accessories.any { it.type.value in setOf(0x03000001L, 0x0F000001L) })
+        for (request in listOf(
+            CarAccessoryMessages.readRequest(0, 2, listOf(4102L, 4103L, 4359L)),
+            CarAccessoryMessages.registerRequest(0, 3, CafRegistration.Identifiers(listOf(4102L, 4103L, 4359L))),
+        )) {
+            val result = reader(disabled.handle(reader(request))!!)
+            assertTrue(result.valuesMap().isEmpty())
+            assertEquals(setOf(4102L, 4103L, 4359L), result.errors().keys)
+        }
+        val control = reader(disabled.handle(reader(CarAccessoryMessages.controlRequest(0, 4,
+            mapOf(VoyahRadioDescription.PLAY to null))))!!)
+        assertEquals(CafCommand.GENERAL_ERROR, control.command)
+        assertEquals(4L, control.transactionId)
+        assertEquals(0, writes)
+        assertNull(disabled.changed())
+    }
+
     @Test fun realStationsAndReadbackReachRegisterAndUpdateNotifications() {
         val a = accessory()
         val initial = reader(a.handle(reader(CarAccessoryMessages.registerRequest(0, 7,

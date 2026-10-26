@@ -15,8 +15,8 @@ object VoyahUltraSettings {
     fun carPlayTheme(context: Context): com.shilapi.xcertplay.transport.Iap2CarPlayTheme? = null
     fun themeDisplay(context: Context, fps: Int): com.shilapi.xcertplay.airplay.AirPlayDisplayConfig? = null
     fun vehicleInformation(context: Context): com.shilapi.xcertplay.transport.Iap2VehicleInformation? = null
-    fun saveMutualAuth(context: Context, enabled: Boolean) {}
-    fun saveAssetProbe(context: Context, enabled: Boolean) {}
+    fun isRadioEnabled(context: Context): Boolean = false
+    fun saveRadioEnabled(context: Context, enabled: Boolean) {}
     fun showStatus(activity: Activity) {}
     fun probeClimate(activity: Activity) {}
     fun exportReport(activity: Activity) {}

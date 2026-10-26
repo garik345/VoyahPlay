@@ -7,7 +7,8 @@ package com.shilapi.xcertplay.airplay
 enum class CarPlaySize(val label: String, val widthMillimeters: Int) {
     LARGE("Large", 250),
     MEDIUM("Medium", 300),
-    SMALL("Small", 350);
+    SMALL("Small", 350),
+    EXTRA_SMALL("Extra small", 400);
 
     companion object {
         val DEFAULT = MEDIUM

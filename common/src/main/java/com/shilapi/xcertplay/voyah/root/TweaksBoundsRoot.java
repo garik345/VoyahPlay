@@ -51,7 +51,7 @@ final class TweaksBoundsRoot {
         }
         verifiedLengths = lengths; verifiedTimes = times;
     }
-    private static TweaksBoundsSnapshot snapshot() throws Exception {
+    static TweaksBoundsSnapshot snapshot() throws Exception {
         verifyFiles();
         if (LEGACY_ENABLED.exists()) throw new IOException("Обнаружен включённый старый модуль. Выполните root-helper.ps1 -Mode Install для миграции");
         TweaksBoundsSnapshot data = TweaksBoundsSnapshot.parse(setting(PROBE), SystemClock.elapsedRealtime());

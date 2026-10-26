@@ -416,6 +416,7 @@
     <string name="option_size_large">Большой</string>
     <string name="option_size_medium">Средний</string>
     <string name="option_size_small">Маленький</string>
+    <string name="settings_carplay_size_extra_small">Очень маленький</string>
     <string name="option_theme_scenario">Сценарий · карта сбоку</string>
     <string name="option_theme_map">Карта · полная карта</string>
     <string name="option_theme_simple">Простой · карта сбоку</string>
@@ -857,4 +858,13 @@
     <string name="settings_report_on_phone_hint">Отсканируйте код камерой телефона, чтобы открыть страницу в его браузере, и выберите «Скачать отчёт». Не закрывайте этот экран, пока загрузка не завершится.</string>
     <string name="voyah_cluster_navigation">Подсказки CarPlay на приборной панели Voyah</string>
     <string name="voyah_cluster_navigation_hint">Стрелка, расстояние и дорога. После включения переподключите CarPlay.</string>
+    <string name="settings_ultra_radio">Радио</string>
+    <string name="settings_ultra_radio_description">Подключать штатное радио к CarPlay Ultra. Выключите на автомобилях без радиоприёмника. Применяется при следующем подключении. Значок «Радио» может остаться в CarPlay с пустым окном.</string>
+    <string name="carplay_voyahplay_settings">Настройки VoyahPlay</string>
+    <string name="voyah_waiting_for_car_hotspot">Ожидание точки доступа автомобиля. Подключение продолжится автоматически.</string>
+    <string name="voyah_wireless_retry_later">VoyahPlay автоматически повторит попытку после паузы.</string>
+    <string name="hotspot_network_not_ready">Сеть точки доступа ещё не готова</string>
+    <string name="first_tcp_timeout">iPhone не успел подключиться к CarPlay</string>
+    <string name="wireless_startup_retries_exhausted">Автоматические попытки остановлены. Проверьте подключение и повторите попытку.</string>
+    <string name="retry_carplay_connection">Повторить подключение</string>
 </resources>

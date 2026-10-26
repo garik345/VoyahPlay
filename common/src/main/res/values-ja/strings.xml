@@ -468,6 +468,7 @@
     <string name="option_size_large">大</string>
     <string name="option_size_medium">中</string>
     <string name="option_size_small">小</string>
+    <string name="settings_carplay_size_extra_small">最小</string>
     <string name="option_theme_scenario">シナリオ · サイドマップ</string>
     <string name="option_theme_map">地図 · 全画面</string>
     <string name="option_theme_simple">シンプル · サイドマップ</string>
@@ -959,4 +960,9 @@
     <string name="settings_report_on_phone_hint">スマートフォンのカメラでQRコードを読み取って、ブラウザーでページを開き、「レポートをダウンロード」を選んでください。ダウンロードが終わるまでこの画面を開いたままにしてください。</string>
     <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
     <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
+    <string name="settings_ultra_radio">ラジオ</string>
+    <string name="settings_ultra_radio_description">車載ラジオをCarPlay Ultraに接続します。ラジオ受信機がない車ではオフにしてください。次回接続時に適用されます。CarPlayにラジオアイコンが残り、空の画面が開く場合があります。</string>
+    <string name="carplay_voyahplay_settings">VoyahPlayの設定</string>
+    <string name="voyah_waiting_for_car_hotspot">車載ホットスポットを待っています。接続は自動的に再開されます。</string>
+    <string name="voyah_wireless_retry_later">しばらく待ってからVoyahPlayが自動的に再試行します。</string>
 </resources>

@@ -110,7 +110,7 @@ internal class VoyahClimateAccessory(
     /** Per stream: how many writes of each phone value this stream has already confirmed. */
     private val confirmedWrites = linkedMapOf<Long, Long>()
     /** Echo an accepted action once; the following update returns the button to ready. */
-    private var carHomeAction = 0
+    private val appActions = mutableMapOf<UltraVehicleControl, Int>()
     private val vehicleControlIds = VoyahVehicleControls.ids(supportedVehicleControls)
     private var lastSent: Map<Long, Any?> = emptyMap()
     /** Mirrors the shared ownership used by working CarPlay climate descriptions; unmapped writes still get -50. */
@@ -310,7 +310,7 @@ internal class VoyahClimateAccessory(
             val wanted = control.normalize(requested[control.valueIid]) ?: continue
             val result = runCatching { sendVehicleControl.invoke(control, wanted) }.getOrNull()
             results[control.valueIid] = if (result?.confirmed == true) 0L else UNAVAILABLE
-            if (control == UltraVehicleControl.CAR_HOME && result?.confirmed == true) carHomeAction = wanted
+            if (control.isAppAction && result?.confirmed == true) appActions[control] = wanted
         }
         val volumeIds = requested.keys.filter { it in VoyahVehicleDescription.writableIds }
         val sendVolume = volumeWriter
@@ -375,7 +375,7 @@ internal class VoyahClimateAccessory(
         // First confirm the phone's written action. Then publish ready (0) on the
         // next update: keeping the action disables the button, skipping its echo
         // leaves the phone's write unconfirmed and prevents another invocation.
-        carHomeAction = 0
+        appActions.clear()
         if (changed.isEmpty()) return null
         lastSent = lastSent + changed
         return CarAccessoryMessages.updateNotify(PLUGIN_ID, changed)
@@ -386,7 +386,7 @@ internal class VoyahClimateAccessory(
         val s = sample()
         val current = s?.vehicleControlValues?.filter { (c, _) -> fresh(
             if (c == UltraVehicleControl.LIGHT_MODE) s.lightingSampledAtMillis else s.vehicleControlsSampledAtMillis) }.orEmpty()
-        return current + (UltraVehicleControl.CAR_HOME to carHomeAction)
+        return current + UltraVehicleControl.entries.filter { it.isAppAction }.associateWith { appActions[it] ?: 0 }
     }
     private fun radio(): UltraRadioSnapshot? = sample()?.takeIf { fresh(it.radioSampledAtMillis) }?.radio
     private fun current(control: UltraHvacControl): Any? {

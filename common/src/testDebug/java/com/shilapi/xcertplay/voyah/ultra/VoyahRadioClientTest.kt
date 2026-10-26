@@ -128,6 +128,21 @@ class VoyahRadioClientTest {
         assertTrue(client.snapshot.stations.isEmpty())
     }
 
+    @Test fun nativePlaybackAndStationChangesAreObservedWithoutACarplayCommand() {
+        playback = playback(PlaybackState.STATE_PLAYING)
+        observer!!.onPlaybackStateChanged(playback)
+        metadata = metadata(10200).let { MediaMetadata.Builder(it)
+            .putString(VoyahRadioOem.STATION_NAME, "Native station").build() }
+        observer!!.onMetadataChanged(metadata)
+        assertEquals(true, client.snapshot.state?.playing)
+        assertEquals("FM:10200", client.snapshot.currentId)
+        assertEquals("Native station", client.snapshot.state?.stationName)
+        assertEquals(0, calls.get())
+        playback = playback(PlaybackState.STATE_PAUSED)
+        observer!!.onPlaybackStateChanged(playback)
+        assertEquals(false, client.snapshot.state?.playing)
+    }
+
     @Test fun tuningRefreshesTheListBeforeUsingItsOemIndexAndConfirmsTheStation() {
         queue = listOf(10200, 10170) // The OEM list changed after the phone saw the first list.
         onTune = { index ->

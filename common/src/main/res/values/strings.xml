@@ -470,6 +470,7 @@
     <string name="option_size_large">Large</string>
     <string name="option_size_medium">Medium</string>
     <string name="option_size_small">Small</string>
+    <string name="settings_carplay_size_extra_small">Extra small</string>
     <string name="option_theme_scenario">Scenario · side map</string>
     <string name="option_theme_map">Map · full map</string>
     <string name="option_theme_simple">Simple · side map</string>
@@ -960,4 +961,9 @@
     <string name="settings_report_on_phone_hint">Scan the code with the phone camera to open this page in its browser, then choose Download report. Keep this screen open until the download has finished.</string>
     <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
     <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
+    <string name="settings_ultra_radio">Radio</string>
+    <string name="settings_ultra_radio_description">Connect the native radio to CarPlay Ultra. Turn off on vehicles without a radio tuner. Applies at the next connection. The Radio icon may remain in CarPlay with an empty window.</string>
+    <string name="carplay_voyahplay_settings">VoyahPlay settings</string>
+    <string name="voyah_waiting_for_car_hotspot">Waiting for the car hotspot. Connection will resume automatically.</string>
+    <string name="voyah_wireless_retry_later">VoyahPlay will retry automatically after a pause.</string>
 </resources>

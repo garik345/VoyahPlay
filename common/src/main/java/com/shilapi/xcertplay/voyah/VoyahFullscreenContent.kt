@@ -13,7 +13,7 @@ import com.shilapi.xcertplay.AirPlayPersistence
 class VoyahFullscreenContent private constructor(private val activity: Activity, content: View) : FrameLayout(activity) {
     private val preferences = activity.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE)
     private val preferenceChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "hide_bottom_bar") post { requestLayout() }
+        if (key == "hide_bottom_bar" || key == "hide_top_bar") post { requestLayout() }
     }
 
     init {
@@ -33,18 +33,18 @@ class VoyahFullscreenContent private constructor(private val activity: Activity,
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        updateGutter(MeasureSpec.getSize(widthMeasureSpec))
+        updateGutter(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         // Window origin can finish changing after measure when the OEM applies new bounds.
-        updateGutter(right - left)
+        updateGutter(right - left, bottom - top)
     }
 
     @Suppress("DEPRECATION")
-    private fun updateGutter(contentWidth: Int) {
+    private fun updateGutter(contentWidth: Int, contentHeight: Int) {
         val targetDisplay = display ?: activity.windowManager.defaultDisplay
         val metrics = DisplayMetrics()
         targetDisplay.getRealMetrics(metrics)
@@ -52,7 +52,10 @@ class VoyahFullscreenContent private constructor(private val activity: Activity,
         activity.window.decorView.getLocationOnScreen(origin)
         val gutter = VoyahScreenGeometry.leftGutterPx(targetDisplay.displayId, activity.isInMultiWindowMode,
             AirPlayPersistence.loadHideBottomBar(activity), metrics.widthPixels, origin[0], contentWidth, metrics.density)
-        if (paddingLeft != gutter) setPadding(gutter, 0, 0, 0)
+        val top = VoyahScreenGeometry.topGutterPx(targetDisplay.displayId, activity.isInMultiWindowMode,
+            AirPlayPersistence.loadHideTopBar(activity) && com.shilapi.xcertplay.voyah.root.VoyahTweaksFullscreen.enabled(activity),
+            origin[1], contentHeight, metrics.density)
+        if (paddingLeft != gutter || paddingTop != top) setPadding(gutter, top, 0, 0)
     }
 
     companion object {

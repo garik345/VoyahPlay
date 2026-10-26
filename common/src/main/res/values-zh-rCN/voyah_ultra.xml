@@ -2,14 +2,12 @@
 <resources>
     <string name="voyah_ultra_title">CarPlay Ultra：空调与舒适功能（实验性）</string>
     <string name="voyah_ultra_toggle">通过 CarPlay Ultra 连接空调与舒适功能</string>
-    <string name="voyah_ultra_description">debug 测试。保存后请重新连接 CarPlay。支持主副驾驶设定温度、空调电源、A/C、风量、AUTO、内循环、车窗除雾和舒适功能，并读取车辆状态确认。iPhone 空调界面尚未确认。</string>
-    <string name="voyah_ultra_readonly">写入需要 WRITE_CANBUS。不会声明车内温度传感器、MAX A/C 或收音机。仅按 iPhone 的明确请求执行命令。</string>
+    <string name="voyah_ultra_description">同时启用空调、车辆功能、MFi4认证和Ultra配置。下次连接CarPlay时生效。</string>
+    <string name="voyah_ultra_readonly">写入需要 WRITE_CANBUS。不会声明车内温度传感器或MAX A/C。仅按 iPhone 的明确请求执行命令。</string>
     <string name="voyah_ultra_probe">Ultra：检查空调数据</string>
     <string name="voyah_ultra_report">Ultra：查看日志</string>
     <string name="voyah_ultra_export">Ultra：保存日志</string>
     <string name="voyah_ultra_working">正在准备 Ultra 报告…</string>
     <string name="voyah_ultra_asset_probe_toggle">Ultra：记录资源包传输（实验性）</string>
     <string name="voyah_ultra_asset_probe_description">调试测试。在下次 CarPlay 连接时生效。接受 iPhone 提供的 fileTransfer，仅记录收到的内容，不处理资源包，也不执行车辆命令。UI Sync 独立于此开关运行。可能会中断 CarPlay 会话：如果无法连接，请关闭。</string>
-    <string name="voyah_ultra_mutual_auth_toggle">Ultra：MFi4 双向认证（实验性）</string>
-    <string name="voyah_ultra_mutual_auth_description">调试测试。在下次 CarPlay 连接时生效。使用已为 MFiSAP 签名的同一 3.0 身份，向 iPhone 提供 MFi 4.0 双向认证；之后 iPhone 可能将车辆视为 CarPlay Ultra 配件。如果 CarPlay 无法连接，请关闭。</string>
 </resources>

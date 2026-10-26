@@ -429,6 +429,7 @@
     <string name="option_size_large">大</string>
     <string name="option_size_medium">中</string>
     <string name="option_size_small">小</string>
+    <string name="settings_carplay_size_extra_small">更小</string>
     <string name="option_theme_scenario">場景 · 側邊地圖</string>
     <string name="option_theme_map">地圖 · 全螢幕地圖</string>
     <string name="option_theme_simple">簡約 · 側邊地圖</string>
@@ -917,4 +918,9 @@
     <string name="settings_report_on_phone_hint">用手機相機掃碼，在瀏覽器中開啟此頁面，然後選擇「下載報告」。下載完成前請保持此畫面開啟。</string>
     <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
     <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
+    <string name="settings_ultra_radio">收音機</string>
+    <string name="settings_ultra_radio_description">將車載收音機連接到CarPlay Ultra。沒有收音機接收器的車輛請關閉。下次連線時生效。CarPlay可能仍保留收音機圖示，開啟後顯示空白視窗。</string>
+    <string name="carplay_voyahplay_settings">VoyahPlay設定</string>
+    <string name="voyah_waiting_for_car_hotspot">正在等待車載熱點。連線將自動恢復。</string>
+    <string name="voyah_wireless_retry_later">VoyahPlay將在稍候片刻後自動重試。</string>
 </resources>

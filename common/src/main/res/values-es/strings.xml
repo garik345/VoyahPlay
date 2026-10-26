@@ -416,6 +416,7 @@
     <string name="option_size_large">Grande</string>
     <string name="option_size_medium">Mediano</string>
     <string name="option_size_small">Pequeño</string>
+    <string name="settings_carplay_size_extra_small">Muy pequeño</string>
     <string name="option_theme_scenario">Escenario · mapa lateral</string>
     <string name="option_theme_map">Mapa · mapa completo</string>
     <string name="option_theme_simple">Simple · mapa lateral</string>
@@ -857,4 +858,9 @@
     <string name="settings_report_on_phone_hint">Escanea el código con la cámara del teléfono para abrir esta página en su navegador y elige Descargar informe. Mantén esta pantalla abierta hasta que termine la descarga.</string>
     <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
     <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
+    <string name="settings_ultra_radio">Radio</string>
+    <string name="settings_ultra_radio_description">Conectar la radio del vehículo a CarPlay Ultra. Desactívelo en vehículos sin sintonizador de radio. Se aplica en la próxima conexión. El icono Radio puede permanecer en CarPlay con una ventana vacía.</string>
+    <string name="carplay_voyahplay_settings">Ajustes de VoyahPlay</string>
+    <string name="voyah_waiting_for_car_hotspot">Esperando el punto de acceso del vehículo. La conexión se reanudará automáticamente.</string>
+    <string name="voyah_wireless_retry_later">VoyahPlay volverá a intentarlo automáticamente después de una pausa.</string>
 </resources>

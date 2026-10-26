@@ -23,7 +23,7 @@ public final class VoyahRootHelper {
         allowedUid = uid;
         RootHelperOperations.verifyHome();
         RootHelperOperations.privatePath(new File(RootHelperProtocol.APK), false);
-        if (RootHelperOperations.installedUid() != uid) throw new IOException("Installed package UID differs from bootstrap UID");
+        RootHelperIdentity.verifyInstalled(uid);
         server = new LocalServerSocket(RootHelperProtocol.socketName(uid));
     }
 
@@ -35,7 +35,7 @@ public final class VoyahRootHelper {
             RootHelperProtocol.socketName(uid); // Validate primary-user UID before any operation.
             switch (arguments[0]) {
                 case "--check":
-                    if (RootHelperOperations.installedUid() != uid) throw new IOException("Package UID mismatch");
+                    RootHelperIdentity.verifyInstalled(uid);
                     System.out.println("HELPER_CODE=1\nHELPER_VERSION=" + RootHelperProtocol.VERSION + "\nSERVER_UID=0");
                     return;
                 case "--serve":
@@ -140,7 +140,8 @@ public final class VoyahRootHelper {
             }
             RootProcess.Result result;
             boolean changes = request.action == RootHelperProtocol.Action.BOOT_POLICY ||
-                    request.action == RootHelperProtocol.Action.STOP || request.action == RootHelperProtocol.Action.TWEAKS_POLICY;
+                    request.action == RootHelperProtocol.Action.STOP || request.action == RootHelperProtocol.Action.TWEAKS_POLICY ||
+                    request.action == RootHelperProtocol.Action.TOP_POLICY;
             boolean locked = !changes || mutations.tryLock();
             if (!locked) {
                 result = new RootProcess.Result(1, false, "HELPER_BUSY: another helper change is running\n");
@@ -155,7 +156,9 @@ public final class VoyahRootHelper {
                         case BOOT_POLICY: result = RootHelperBoot.policy(request.active); break;
                         case TWEAKS_STATUS: result = TweaksBoundsRoot.status(); break;
                         case TWEAKS_POLICY: result = TweaksBoundsRoot.policy(request.active, request.hidden); break;
+                        case TOP_POLICY: result = TopBoundsRoot.policy(request.active); break;
                         case STOP:
+                            TopBoundsRoot.policy(false);
                             result = TweaksBoundsRoot.policy(false, false);
                             if (result.successful()) {
                                 stopping = true; stopAfterReply = true;

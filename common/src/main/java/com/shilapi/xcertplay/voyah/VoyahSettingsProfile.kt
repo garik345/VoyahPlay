@@ -6,7 +6,14 @@ import android.content.Context
 object VoyahSettingsProfile {
     @JvmStatic fun apply(context: Context) {
         val marker=context.getSharedPreferences("voyah_settings_profile",Context.MODE_PRIVATE)
-        if(marker.getInt("version",0)>=2) return
+        val version = marker.getInt("version", 0)
+        if (version >= 5) return
+        context.getSharedPreferences("voyah_ultra_pilot", Context.MODE_PRIVATE).edit()
+            .putBoolean("assetProbe", false).remove("mutualAuth").remove("themeProbe").remove("panelProbe").apply()
+        if (version >= 2) {
+            marker.edit().putInt("version", 5).apply()
+            return
+        }
         val prefs = context.getSharedPreferences("xcertplay_airplay",Context.MODE_PRIVATE)
         val edit = prefs.edit()
             .putBoolean("auto_start_on_boot",false)
@@ -25,6 +32,6 @@ object VoyahSettingsProfile {
         edit.apply()
         context.getSharedPreferences("diplay_side_panel",Context.MODE_PRIVATE).edit().putBoolean("enabled",false).apply()
         context.getSharedPreferences("diplay_carplay_rotation",Context.MODE_PRIVATE).edit().putBoolean("enabled",false).apply()
-        marker.edit().putInt("version",2).apply()
+        marker.edit().putInt("version",5).apply()
     }
 }

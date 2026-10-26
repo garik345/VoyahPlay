@@ -17,7 +17,7 @@ class VoyahVehicleControlsTest {
         VoyahClimateAccessory({ sample }, { now }, supportedVehicleControls = supported,
             vehicleControlWriter = { c, v ->
                 writes += c to v
-                if (confirmed && c != UltraVehicleControl.CAR_HOME) sample = sample.copy(
+                if (confirmed && !c.isAppAction) sample = sample.copy(
                     vehicleControlValues = sample.vehicleControlValues + (c to v), vehicleControlsSampledAtMillis = now)
                 UltraClimateWriteResult(confirmed, "OEM readback")
             })
@@ -35,7 +35,7 @@ class VoyahVehicleControlsTest {
         for (control in UltraVehicleControl.entries) {
             val s = services.single { it.iid.value == control.serviceIid }
             val value = s.characteristics.single { it.iid.value == control.valueIid }
-            val button = control == UltraVehicleControl.CAR_HOME
+            val button = control.isAppAction
             assertEquals(if (button) 0x16000002L else 0x16000007L, s.type.value)
             assertEquals(if (button) 0x36000010L else 0x30000010L, value.type.value)
             assertEquals(if (button) CafCharacteristicFormat.UINT8 else CafCharacteristicFormat.INT32, value.format)
@@ -104,6 +104,23 @@ class VoyahVehicleControlsTest {
         confirmed = false
         assertEquals(-6727L, write(a, home.valueIid, 1).errors()[home.valueIid])
         assertNull(a.changed())
+    }
+    @Test fun settingsButtonIsIndependentRepeatableAndNeverRunsOnRead() {
+        val a = accessory()
+        val settings = UltraVehicleControl.VOYAH_SETTINGS
+        val home = UltraVehicleControl.CAR_HOME
+        val ids = listOf(settings.valueIid, home.valueIid)
+        request(a, CarAccessoryMessages.registerRequest(0, 1, CafRegistration.Identifiers(ids)))
+        request(a, CarAccessoryMessages.readRequest(0, 3, ids))
+        assertTrue(writes.isEmpty())
+        repeat(2) {
+            assertEquals(mapOf(settings.valueIid to 0L), write(a, settings.valueIid, 1).errors())
+            assertEquals(mapOf(settings.valueIid to 1L), reader(a.changed()!!).valuesMap())
+            assertEquals(mapOf(settings.valueIid to 0L), reader(a.changed()!!).valuesMap())
+            assertNull(a.changed())
+        }
+        assertEquals(listOf(settings to 1, settings to 1), writes)
+        assertEquals(listOf(home, settings), VoyahVehicleControls.displayOrder.take(2))
     }
     @Test fun programmeZeroAndThreeAreRejectedRatherThanEnablingMassage() {
         val a = accessory()

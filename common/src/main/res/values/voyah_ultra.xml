@@ -2,14 +2,12 @@
 <resources>
     <string name="voyah_ultra_title">CarPlay Ultra: climate and comfort (experimental)</string>
     <string name="voyah_ultra_toggle">Climate and comfort through CarPlay Ultra</string>
-    <string name="voyah_ultra_description">Debug test. Reconnect CarPlay after saving. Driver/passenger temperature, HVAC, A/C, fan, AUTO, recirculation, window defrost and comfort controls use verified OEM readback. Climate UI on iPhone is not yet confirmed.</string>
-    <string name="voyah_ultra_readonly">Writes require WRITE_CANBUS. Cabin sensor, MAX A/C and radio are not advertised. Commands run only in response to an explicit iPhone request.</string>
+    <string name="voyah_ultra_description">Enable climate and vehicle controls together with MFi4 authentication and the Ultra profile. Applies at the next CarPlay connection.</string>
+    <string name="voyah_ultra_readonly">Writes require WRITE_CANBUS. Cabin sensor and MAX A/C are not advertised. Commands run only in response to an explicit iPhone request.</string>
     <string name="voyah_ultra_probe">Ultra: check climate readings</string>
     <string name="voyah_ultra_report">Ultra: view capture</string>
     <string name="voyah_ultra_export">Ultra: export capture</string>
     <string name="voyah_ultra_working">Preparing Ultra report…</string>
     <string name="voyah_ultra_asset_probe_toggle">Ultra: record asset package transfer (experimental)</string>
     <string name="voyah_ultra_asset_probe_description">Debug test. Applies at the next CarPlay connection. Accepts fileTransfer offered by iPhone and only records what it sends, without processing the package or running vehicle commands. UI Sync works independently of this switch. May interrupt the CarPlay session: turn it off if CarPlay stops connecting.</string>
-    <string name="voyah_ultra_mutual_auth_toggle">Ultra: MFi4 mutual authentication (experimental)</string>
-    <string name="voyah_ultra_mutual_auth_description">Debug test. Applies at the next CarPlay connection. Offers iPhone the MFi 4.0 mutual authentication with the 3.0 identity that already signs MFiSAP; iPhone may then treat the car as a CarPlay Ultra accessory. If CarPlay stops connecting, turn it off.</string>
 </resources>

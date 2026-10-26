@@ -10,13 +10,26 @@ locked=0
 fail() { echo "ERROR $*"; exit 1; }
 number() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
 identity() { [ -r "/proc/$1/stat" ] && awk '{sub(/^.*\) /, ""); if ($1 != "Z" && $1 != "X") print $20}' "/proc/$1/stat"; }
+process_args() { timeout 2 dd "if=/proc/$1/cmdline" bs=4096 count=1 2>/dev/null | tr '\000' '\n'; }
 run_apk() { CLASSPATH="$1" /system/bin/app_process /system/bin "$CLASS" "$2" "$3"; }
+stop_owned_helper() {
+    for stop_attempt in $(seq 1 12); do
+        stop_code=0
+        stop_result=$(run_apk "$ROOT/app.apk" --stop "$old_uid" 2>&1) || stop_code=$?
+        printf '%s\n' "$stop_result"
+        [ "$stop_code" = 0 ] && return 0
+        # A foreground lease may still be finishing after the top agent detaches.
+        printf '%s\n' "$stop_result" | grep -q '^HELPER_BUSY:' || return 1
+        sleep 1
+    done
+    return 1
+}
 helper_live() { [ "$helper_boot" = "$boot_id" ] && [ "$(identity "$helper_pid" || true)" = "$helper_start" ]; }
 verify_helper_target() {
     helper_live || return 1
     [ "$helper_pid" -gt 1 ] || fail 'invalid old helper PID'
     helper_uid=$(awk '/^Uid:/ { print $2 " " $3 " " $4 " " $5 }' "/proc/$helper_pid/status")
-    helper_name=$(tr '\000' '\n' < "/proc/$helper_pid/cmdline" | head -n 1)
+    helper_name=$(process_args "$helper_pid" | head -n 1)
     [ "$helper_uid" = '0 0 0 0' ] && [ "$helper_name" = voyahplay-root-helper ] || fail 'old PID does not identify the owned root helper; no signal sent'
     helper_live
 }
@@ -42,7 +55,7 @@ if ! number "$uid" || [ "$uid" -lt 10000 ] || [ "$uid" -ge 20000 ]; then
 fi
 echo "APP_UID=$uid"
 echo "HELPER_SNAPSHOT_UID=${old_uid:-none}"
-echo EXPECTED_HELPER_VERSION=1.1.2
+echo EXPECTED_HELPER_VERSION=1.2.1
 if [ "$MODE" = status ]; then
     [ -f "$ROOT/app.apk" ] && number "$old_uid" || { echo HELPER_NOT_INSTALLED; exit 2; }
     if [ "$uid" != "$old_uid" ]; then
@@ -55,7 +68,7 @@ if [ "$MODE" = status ]; then
     exit $?
 fi
 if [ "$MODE" = start ]; then
-    [ -f "$ROOT/runtime.sh" ] || fail 'install helper 1.1.2 first'
+    [ -f "$ROOT/runtime.sh" ] || fail 'install helper 1.2.1 first'
     sh "$ROOT/runtime.sh" start
     exit $?
 fi
@@ -85,12 +98,16 @@ if [ "$MODE" = install ]; then
     case "$apk" in /data/app/*.apk|/system/app/*.apk|/system/priv-app/*.apk) ;; *) fail 'unexpected installed APK path';; esac
     [ -f "$apk" ] && [ ! -L "$ROOT/app.apk.new" ] || fail 'invalid installed/staging APK path'
     cp "$apk" "$ROOT/app.apk.new"; chmod 600 "$ROOT/app.apk.new"
-    candidate=$(run_apk "$ROOT/app.apk.new" --check "$uid") || fail 'rebuild and install automotive 1.1.2 first'
+    candidate=$(run_apk "$ROOT/app.apk.new" --check "$uid") || fail 'rebuild and install automotive 1.2.1 first'
     printf '%s\n' "$candidate"
-    printf '%s\n' "$candidate" | grep -Fxq 'HELPER_VERSION=1.1.2' || fail 'APK helper version differs; rebuild and install automotive 1.1.2 before updating the helper'
+    printf '%s\n' "$candidate" | grep -Fxq 'HELPER_VERSION=1.2.1' || fail 'APK helper version differs; rebuild and install automotive 1.2.1 before updating the helper'
     run_apk "$ROOT/app.apk.new" --retire-legacy "$uid" || fail 'old payload retirement incomplete; read the reason above'
 fi
 if [ "$MODE" = install ] || [ "$MODE" = stop ]; then
+    if [ -f "$ROOT/runtime.sh" ] && grep -q '^VERSION=1\.2\.' "$ROOT/runtime.sh"; then
+        [ ! -L "$ROOT/runtime.sh" ] && [ "$(stat -c '%u:%a' "$ROOT/runtime.sh")" = '0:600' ] || fail 'untrusted runtime'
+        sh "$ROOT/runtime.sh" quiesce || fail 'supervisor/top-edge agent did not pause'
+    fi
     helper_record_loaded=0
     helper_owned_seen=0
     probe_ambiguous=0
@@ -108,7 +125,7 @@ if [ "$MODE" = install ] || [ "$MODE" = stop ]; then
         code=0
         probe_output=$(run_apk "$ROOT/app.apk" --probe "$old_uid" 2>&1) || code=$?
         printf '%s\n' "$probe_output"
-        if [ "$code" = 0 ]; then run_apk "$ROOT/app.apk" --stop "$old_uid" || fail 'helper refused shutdown'
+        if [ "$code" = 0 ]; then stop_owned_helper || fail 'helper refused shutdown'
         elif [ "$code" = 1 ] && printf '%s\n' "$probe_output" | grep -q '^IOException: Helper is stopping$'; then
             echo HELPER_STOP_ALREADY_ACCEPTED=1
         elif [ "$code" = 1 ] && [ "$helper_owned_seen" = 1 ]; then

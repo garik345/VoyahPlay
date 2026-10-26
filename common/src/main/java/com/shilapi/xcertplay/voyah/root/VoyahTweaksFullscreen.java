@@ -116,6 +116,17 @@ public final class VoyahTweaksFullscreen {
         compatible = false;
         return "Нет подтверждения от root-помощника.\n" + error.getMessage();
     }
+    private static RootProcess.Result policy(boolean full) throws Exception {
+        if (!full) {
+            RootProcess.Result top = call(new RootHelperProtocol.Request(RootHelperProtocol.Action.TOP_POLICY, false, false));
+            if (!top.successful()) return top;
+        }
+        RootProcess.Result width = call(new RootHelperProtocol.Request(RootHelperProtocol.Action.TWEAKS_POLICY, full, full));
+        if (!width.successful() || !full) return width;
+        boolean topWanted = com.shilapi.xcertplay.AirPlayPersistence.INSTANCE.loadHideTopBar(app);
+        RootProcess.Result top = call(new RootHelperProtocol.Request(RootHelperProtocol.Action.TOP_POLICY, topWanted, false));
+        return new RootProcess.Result(top.exitCode, top.timedOut, width.output + "\n" + top.output);
+    }
     public static void status(Context context, VoyahRootModule.Callback callback) {
         app = context.getApplicationContext();
         work.execute(() -> {
@@ -148,7 +159,7 @@ public final class VoyahTweaksFullscreen {
         work.execute(() -> {
             boolean success = false, observed = false; String text;
             try {
-                RootProcess.Result result = call(new RootHelperProtocol.Request(RootHelperProtocol.Action.TWEAKS_POLICY, value, value));
+                RootProcess.Result result = policy(value);
                 success = result.successful(); observed = result.output.contains("BRIDGE_ACK=1"); text = result.output;
             } catch (Exception error) { text = failure(error); }
             boolean ok = success, ack = observed; String answer = text;
@@ -184,7 +195,7 @@ public final class VoyahTweaksFullscreen {
                     MAIN.post(() -> { policyQueued = false; MAIN.post(HEARTBEAT); });
                     return;
                 }
-                RootProcess.Result result = call(new RootHelperProtocol.Request(RootHelperProtocol.Action.TWEAKS_POLICY, full, full));
+                RootProcess.Result result = policy(full);
                 success = result.successful(); observed = result.output.contains("BRIDGE_ACK=1"); text = result.output;
             } catch (Exception error) { text = failure(error); }
             boolean ok = success, ack = observed; String answer = text;
@@ -217,12 +228,13 @@ public final class VoyahTweaksFullscreen {
                 remember("Получены другие границы окна; автоматическое пересоздание пропущено." + windowDescription()); return;
             }
             int desiredLeft = full ? 0 : 145;
-            if (origin[0] == desiredLeft && width == 1920 - desiredLeft) {
+            int desiredTop = full && com.shilapi.xcertplay.AirPlayPersistence.INSTANCE.loadHideTopBar(current) ? 0 : 45;
+            if (origin[0] == desiredLeft && width == 1920 - desiredLeft && origin[1] == desiredTop) {
                 if (!full) preferences(app).edit().putBoolean("restore_pending", false).apply();
                 remember((full ? "Полная ширина применена." : "Исходная ширина восстановлена.") + windowDescription());
                 return;
             }
-            String component = current.getComponentName().getClassName() + "|" + full;
+            String component = current.getComponentName().getClassName() + "|" + full + "|" + desiredTop;
             long now = SystemClock.elapsedRealtime();
             Long previous = windowRequests.get(component);
             if (previous != null) {
@@ -251,7 +263,7 @@ public final class VoyahTweaksFullscreen {
         }
     }
     static boolean knownGeometry(int x, int y, int width, int height) {
-        return y == 45 && (height == 675 || height == 485) &&
+        return (y == 0 || y == 45) && (y + height == 720 || y + height == 530) &&
                 ((x == 0 && width == 1920) || (x == 145 && width == 1775));
     }
     private static String windowDescription() {

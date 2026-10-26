@@ -5,9 +5,9 @@ import org.junit.Test
 
 class VoyahScreenGeometryTest {
     @Test fun expandedDriverWindowReservesThePhysicalLeftEdgeAtDisplayDensity() {
-        assertEquals(16, VoyahScreenGeometry.leftGutterPx(0, false, true, 1920, 0, 1920, 1f))
-        assertEquals(32, VoyahScreenGeometry.leftGutterPx(0, false, true, 1920, 0, 1920, 2f))
-        assertEquals(16, VoyahScreenGeometry.leftGutterPx(0, false, true, 1920, 0, 1920, Float.NaN))
+        assertEquals(19, VoyahScreenGeometry.leftGutterPx(0, false, true, 1920, 0, 1920, 1f))
+        assertEquals(38, VoyahScreenGeometry.leftGutterPx(0, false, true, 1920, 0, 1920, 2f))
+        assertEquals(19, VoyahScreenGeometry.leftGutterPx(0, false, true, 1920, 0, 1920, Float.NaN))
     }
 
     @Test fun windowedAndOtherScreensKeepTheirExistingContentArea() {

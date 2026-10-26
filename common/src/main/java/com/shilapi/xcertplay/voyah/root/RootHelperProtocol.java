@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 final class RootHelperProtocol {
     static final int MAGIC = 0x56525031; // VRP1
     static final int MAX_OUTPUT = 65536;
-    static final String VERSION = "1.1.2";
+    static final String VERSION = "1.2.1";
     static final String PACKAGE = "com.shilapi.xcertplay";
     static final String DIRECTORY = "/data/local/voyahplay-root-helper";
     static final String APK = DIRECTORY + "/app.apk";
@@ -15,13 +15,13 @@ final class RootHelperProtocol {
     static final String MODULE = "/data/local/voyahplay-fullscreen/payload/module.sh";
 
     // Append only: preserve installed helper action ordinals.
-    enum Action { ROOT, STATUS, INSTALL, ENABLE, DISABLE, REMOVE, POLICY, INFO, STOP, TWEAKS_STATUS, TWEAKS_POLICY, BOOT_STATUS, BOOT_POLICY }
+    enum Action { ROOT, STATUS, INSTALL, ENABLE, DISABLE, REMOVE, POLICY, INFO, STOP, TWEAKS_STATUS, TWEAKS_POLICY, BOOT_STATUS, BOOT_POLICY, TOP_POLICY }
 
     static boolean authorized(int peer, int owner, int currentPackageUid, Action action) {
         if (peer == 0) return action == Action.INFO || action == Action.STOP;
         return peer == owner && currentPackageUid == owner && (action == Action.ROOT || action == Action.INFO
                 || action == Action.TWEAKS_STATUS || action == Action.TWEAKS_POLICY
-                || action == Action.BOOT_STATUS || action == Action.BOOT_POLICY);
+                || action == Action.BOOT_STATUS || action == Action.BOOT_POLICY || action == Action.TOP_POLICY);
     }
 
     static String socketName(int uid) {
@@ -33,8 +33,8 @@ final class RootHelperProtocol {
         final Action action;
         final boolean active, hidden;
         Request(Action action, boolean active, boolean hidden) {
-            if (action == null || ((action != Action.POLICY && action != Action.TWEAKS_POLICY && action != Action.BOOT_POLICY) && (active || hidden))
-                    || (action == Action.BOOT_POLICY && hidden)) {
+            if (action == null || ((action != Action.POLICY && action != Action.TWEAKS_POLICY && action != Action.BOOT_POLICY && action != Action.TOP_POLICY) && (active || hidden))
+                    || ((action == Action.BOOT_POLICY || action == Action.TOP_POLICY) && hidden)) {
                 throw new IllegalArgumentException("Invalid command fields");
             }
             this.action = action; this.active = active; this.hidden = hidden;

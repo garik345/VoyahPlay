@@ -2,14 +2,12 @@
 <resources>
     <string name="voyah_ultra_title">CarPlay Ultra: clima y confort (experimental)</string>
     <string name="voyah_ultra_toggle">Clima y confort mediante CarPlay Ultra</string>
-    <string name="voyah_ultra_description">Prueba debug. Vuelve a conectar CarPlay tras guardar. Temperaturas del conductor y pasajero, climatización, A/C, ventilador, AUTO, recirculación, desempañado y confort se verifican con el estado OEM. La interfaz en iPhone aún no está confirmada.</string>
-    <string name="voyah_ultra_readonly">La escritura requiere WRITE_CANBUS. No se anuncian sensor de cabina, MAX A/C ni radio. Solo se ejecutan órdenes solicitadas explícitamente por el iPhone.</string>
+    <string name="voyah_ultra_description">Activa el clima y las funciones del vehículo junto con la autenticación MFi4 y el perfil Ultra. Se aplica en la próxima conexión de CarPlay.</string>
+    <string name="voyah_ultra_readonly">La escritura requiere WRITE_CANBUS. No se anuncian sensor de cabina ni MAX A/C. Solo se ejecutan órdenes solicitadas explícitamente por el iPhone.</string>
     <string name="voyah_ultra_probe">Ultra: comprobar datos del clima</string>
     <string name="voyah_ultra_report">Ultra: ver registro</string>
     <string name="voyah_ultra_export">Ultra: guardar registro</string>
     <string name="voyah_ultra_working">Preparando informe Ultra…</string>
     <string name="voyah_ultra_asset_probe_toggle">Ultra: registrar la transferencia del paquete de recursos (experimental)</string>
     <string name="voyah_ultra_asset_probe_description">Prueba de depuración. Se aplica en la próxima conexión de CarPlay. Acepta fileTransfer del iPhone y solo registra lo recibido, sin procesar el paquete ni ejecutar órdenes en el vehículo. UI Sync funciona independientemente de este interruptor. Puede interrumpir la sesión de CarPlay: desactívela si CarPlay deja de conectarse.</string>
-    <string name="voyah_ultra_mutual_auth_toggle">Ultra: autenticación mutua MFi4 (experimental)</string>
-    <string name="voyah_ultra_mutual_auth_description">Prueba de depuración. Se aplica en la próxima conexión de CarPlay. Ofrece al iPhone la autenticación mutua MFi 4.0 con la misma identidad 3.0 que ya firma MFiSAP; el iPhone puede tratar entonces el coche como un accesorio CarPlay Ultra. Si CarPlay deja de conectarse, desactívela.</string>
 </resources>

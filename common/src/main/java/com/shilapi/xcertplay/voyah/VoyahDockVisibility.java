@@ -19,7 +19,7 @@ public final class VoyahDockVisibility {
     private static final Coordinator SHARED = new Coordinator();
 
     private final Activity activity;
-    private boolean active, paused, hidden;
+    private boolean active, paused, hidden, statusHidden;
     private ViewTreeObserver focusObserver;
     private final ViewTreeObserver.OnWindowFocusChangeListener focusListener = hasFocus -> {
         if (active) SHARED.refresh(this, hasFocus ? "window-focus" : "window-focus-lost");
@@ -35,6 +35,10 @@ public final class VoyahDockVisibility {
     }
     public void setHidden(boolean value) {
         hidden = value;
+        SHARED.settingChanged(this);
+    }
+    public void setStatusBarHidden(boolean value) {
+        statusHidden = value;
         SHARED.settingChanged(this);
     }
     public void pause() {
@@ -54,7 +58,7 @@ public final class VoyahDockVisibility {
         return activity.getWindowManager().getDefaultDisplay().getDisplayId() == 0;
     }
     private boolean shouldHide() {
-        return active && hidden && isMainDisplay() && !activity.isFinishing()
+        return active && (hidden || statusHidden) && isMainDisplay() && !activity.isFinishing()
                 && !activity.isDestroyed() && !activity.isInMultiWindowMode()
                 && (!paused || windowVisible());
     }
@@ -159,7 +163,7 @@ public final class VoyahDockVisibility {
             Connection current = connection;
             if (current != null) {
                 if (current.service != null) {
-                    try { current.send(false, reason); }
+                    try { current.apply(reason); }
                     catch (Exception | LinkageError e) { current.failed(e.toString()); }
                 }
                 return;
@@ -182,7 +186,7 @@ public final class VoyahDockVisibility {
 
         private final class Connection implements ServiceConnection {
             final Context context;
-            boolean bound, hideSent;
+            boolean bound, hideSent, statusHideSent;
             Messenger service;
             final Runnable timeout = () -> failed("QGBus connection timeout");
             Connection(Context context) { this.context = context; }
@@ -199,7 +203,7 @@ public final class VoyahDockVisibility {
                     register.setData(identity); register.replyTo = client;
                     service.send(register);
                     Log.i(TAG, "QGBus connected: " + activityName);
-                    send(false, "connected");
+                    apply("connected");
                 } catch (Exception | LinkageError e) { failed(e.toString()); }
             }
             void send(boolean visible, String reason) throws Exception {
@@ -228,6 +232,34 @@ public final class VoyahDockVisibility {
                 if ("renew".equals(reason) || "transition-settled".equals(reason)) Log.d(TAG, report);
                 else Log.i(TAG, report);
             }
+            void apply(String reason) throws Exception {
+                if (owner == null) return;
+                if (owner.hidden || hideSent) send(!owner.hidden, reason);
+                if (owner.statusHidden || statusHideSent) sendStatus(!owner.statusHidden, reason);
+            }
+            void sendStatus(boolean visible, String reason) throws Exception {
+                // QGToolCommon.showStatusBar and PhoneStatusBar$12 on this firmware.
+                Bundle data = new Bundle();
+                data.putBoolean("isVisible", visible);
+                data.putInt("displayId", 0);
+                Class<?> type = Class.forName("com.qinggan.bus.QGBusEvent", true, context.getClassLoader());
+                Object event = type.getConstructor().newInstance();
+                type.getMethod("setEventType", String.class).invoke(event, "SYSTEMUI_STATUS_BAR_MODE_VISIBLE");
+                type.getMethod("setDestination", String.class).invoke(event, "com.qinggan.systemui");
+                type.getMethod("setData", Bundle.class).invoke(event, data);
+                // This firmware accepts the visual toggle only on its gallery compatibility route.
+                // The real authenticated QGBus client remains VoyahPlay; no package is replaced.
+                type.getField("mSource").set(event, "com.qinggan.app.gallery");
+                if (!(event instanceof Parcelable)) throw new IllegalStateException("Invalid QGBus status event");
+                Bundle payload = new Bundle(); payload.putParcelable("event", (Parcelable) event);
+                Message message = Message.obtain(null, 3); message.obj = payload;
+                if (!visible) statusHideSent = true;
+                service.send(message);
+                if (visible) statusHideSent = false;
+                String report = "Status request visible=" + visible + " display=0 reason=" + reason;
+                if ("renew".equals(reason) || "transition-settled".equals(reason)) Log.d(TAG, report);
+                else Log.i(TAG, report);
+            }
             void failed(String reason) {
                 if (connection != this) return;
                 Log.w(TAG, reason);
@@ -239,6 +271,10 @@ public final class VoyahDockVisibility {
                 if (show && hideSent && service != null) {
                     try { send(true, "restore"); }
                     catch (Exception | LinkageError e) { Log.w(TAG, "Dock restore request failed", e); }
+                }
+                if (show && statusHideSent && service != null) {
+                    try { sendStatus(true, "restore"); }
+                    catch (Exception | LinkageError e) { Log.w(TAG, "Status restore request failed", e); }
                 }
                 service = null;
                 if (bound) {

@@ -6,6 +6,8 @@ import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
 import com.shilapi.xcertplay.host.R
+import com.shilapi.xcertplay.network.WirelessStartupFailure
+import com.shilapi.xcertplay.orchestration.CarPlayStatus
 import java.io.File
 import java.util.Locale
 import org.junit.Assert.*
@@ -25,7 +27,13 @@ class VoyahProjectionScreenshotsTest {
     @Test fun hiddenComfortPanelKeepsSettingsAccessibleInCompactFullAndRtlLayouts() {
         val host = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         host.setTheme(R.style.Theme_Xcertplay)
+        CarPlayBackgroundSession.clear()
+        ReflectionHelpers.setField(CarPlayBackgroundSession, "owner", host)
+        ReflectionHelpers.setField(host, "wirelessEnabled", true)
         host.getSharedPreferences("voyah_vehicle", 0).edit().putBoolean("comfort_bar_enabled", false).commit()
+        AirPlayPersistence.saveHideTopBar(host, true)
+        AirPlayPersistence.saveHideBottomBar(host, true)
+        host.getSharedPreferences("voyah_tweaks_fullscreen", 0).edit().putBoolean("enabled", true).commit()
         for ((name, widthDp, heightDp, language) in listOf(
             listOf("full-ru", "1000", "500", "ru-RU"),
             listOf("compact-ru", "320", "640", "ru-RU"),
@@ -43,6 +51,15 @@ class VoyahProjectionScreenshotsTest {
             @Suppress("DEPRECATION")
             host.resources.updateConfiguration(configuration, host.resources.displayMetrics)
             val root = ReflectionHelpers.callInstanceMethod<View>(host, "buildContentView")
+            ReflectionHelpers.setField(host, "startupRetryStopped", false)
+            ReflectionHelpers.setField(host, "startupFailureGeneration", -1)
+            ReflectionHelpers.callInstanceMethod<(CarPlayStatus) -> Unit>(host, "createStatusReporter",
+                ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, 0))(
+                CarPlayStatus.Failed("The car hotspot is off", startupFailure = WirelessStartupFailure.HOTSPOT_OFF))
+            val stage = ReflectionHelpers.getField<android.widget.TextView>(host, "stageStatusView")
+            assertEquals(host.getString(R.string.voyah_waiting_for_car_hotspot), stage.text.toString())
+            val retry = ReflectionHelpers.getField<android.widget.Button>(host, "startupRetryButton")
+            assertEquals(View.VISIBLE, retry.visibility)
             val density = host.resources.displayMetrics.density
             val width = (widthDp.toInt() * density).toInt()
             val height = (heightDp.toInt() * density).toInt()
@@ -64,6 +81,7 @@ class VoyahProjectionScreenshotsTest {
             } finally { bitmap.recycle() }
         }
         host.finish()
+        CarPlayBackgroundSession.clear()
     }
 
     private fun forceMeasure(view: View) {

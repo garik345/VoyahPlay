@@ -16,6 +16,7 @@ class VoyahVehicleControlSchemaTest {
         assertEquals("light-mode", VoyahVehicleControlSchema.command(LIGHT_MODE, 3)!!.name)
         assertNull(VoyahVehicleControlSchema.command(DRIVER_MASSAGE_PROGRAM, 0))
         assertNull(VoyahVehicleControlSchema.command(CAR_HOME, 1))
+        assertNull(VoyahVehicleControlSchema.command(VOYAH_SETTINGS, 1))
     }
     private val raw = mapOf("FRONT_SEAT_MASS_SWITCH_LEFT" to 2, "FRONT_SEAT_MASS_INTEN_LEFT" to 2,
         "FRONT_SEAT_MASS_COMMAND_LEFT" to 1, "FRONT_SEAT_MASS_SWITCH_RIGHT" to 1,

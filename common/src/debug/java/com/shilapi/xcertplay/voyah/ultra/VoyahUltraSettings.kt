@@ -31,32 +31,43 @@ object VoyahUltraSettings {
 
     fun isEnabled(context: Context): Boolean = context.getSharedPreferences(PREFS, 0).getBoolean("enabled", false)
     fun saveEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, 0).edit().putBoolean("enabled", enabled).apply()
-        record(context, "SETTING enabled=$enabled; applies on next receiver start")
+        context.getSharedPreferences(PREFS, 0).edit().putBoolean("enabled", enabled)
+            .remove("mutualAuth").remove("themeProbe").remove("panelProbe").apply()
+        record(context, "SETTING enabled=$enabled mutualAuth=$enabled ultraProfile=$enabled; applies on next connection")
     }
 
-    fun isAssetProbeEnabled(context: Context): Boolean = context.getSharedPreferences(PREFS, 0).getBoolean("assetProbe", false)
-    fun saveAssetProbe(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, 0).edit().putBoolean("assetProbe", enabled).apply()
-        record(context, "SETTING assetProbe=$enabled; applies on next receiver start")
+    // Retired UI option: old or restored preferences must not silently enable packet capture.
+    fun isAssetProbeEnabled(context: Context): Boolean = false
+    fun isRadioEnabled(context: Context): Boolean = context.getSharedPreferences(PREFS, 0).getBoolean("radioEnabled", true)
+    fun saveRadioEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, 0).edit().putBoolean("radioEnabled", enabled).apply()
+        record(context, "SETTING radioEnabled=$enabled; applies on next connection")
     }
 
-    fun isMutualAuthEnabled(context: Context): Boolean = context.getSharedPreferences(PREFS, 0).getBoolean("mutualAuth", false)
-    /** Local diagnostic only. This is LIVI's catalog example, not a Voyah production theme. */
+    internal fun appActionIntent(context: Context, control: UltraVehicleControl): android.content.Intent? = when (control) {
+        UltraVehicleControl.CAR_HOME -> android.content.Intent(android.content.Intent.ACTION_MAIN)
+            .addCategory(android.content.Intent.CATEGORY_HOME)
+        UltraVehicleControl.VOYAH_SETTINGS -> android.content.Intent(context, com.shilapi.xcertplay.DiPlayActivity::class.java)
+            .putExtra("page", "settings").putExtra("from_carplay_settings", true)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        else -> null
+    }?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Ultra requires MFi4; both paths use the same saved switch, including old/restored profiles. */
+    fun isMutualAuthEnabled(context: Context): Boolean = isEnabled(context)
+    /** The integrated debug Ultra profile uses LIVI's catalog example, not a Voyah production theme. */
     fun carPlayTheme(context: Context): com.shilapi.xcertplay.transport.Iap2CarPlayTheme? =
-        if (isEnabled(context) && context.getSharedPreferences(PREFS, 0).getBoolean("themeProbe", false))
+        if (isEnabled(context))
             com.shilapi.xcertplay.transport.Iap2CarPlayTheme(
                 com.shilapi.xcertplay.iap2.message.Iap2ClusterAsset("44C9FA31EC", 985), "19.0")
         else null
-    /** The catalog package has a fixed 1920x720 center canvas at 157 dpi. */
+    /** Keep the catalog's pixel canvas, but let the driver's size choice set its logical density. */
     fun themeDisplay(context: Context, fps: Int): com.shilapi.xcertplay.airplay.AirPlayDisplayConfig? =
-        if (carPlayTheme(context) == null) null else com.shilapi.xcertplay.airplay.AirPlayDisplayConfig(
-            1920, 720, widthPhysicalMm = 311, heightPhysicalMm = 116, fps = fps)
-    fun saveMutualAuth(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, 0).edit().putBoolean("mutualAuth", enabled).apply()
-        record(context, "SETTING mutualAuth=$enabled; applies on next connection")
-    }
-
+        if (carPlayTheme(context) == null) null else {
+            val width = com.shilapi.xcertplay.AirPlayPersistence.loadWidthPhysicalMm(context)
+            com.shilapi.xcertplay.airplay.AirPlayDisplayConfig(1920, 720, widthPhysicalMm = width,
+                heightPhysicalMm = Math.round(width * 720.0 / 1920).toInt(), fps = fps)
+        }
     /** Voyah Free RU is an EREV: a petrol range extender and electric drive. Declared with the Ultra pilot. */
     fun vehicleInformation(context: Context): com.shilapi.xcertplay.transport.Iap2VehicleInformation? =
         if (!isEnabled(context)) null else com.shilapi.xcertplay.transport.Iap2VehicleInformation("Voyah Free",
@@ -67,12 +78,11 @@ object VoyahUltraSettings {
         if (!isEnabled(context)) return null
         val app = context.applicationContext
         val probe = isAssetProbeEnabled(app)
-        val panelProbe = app.getSharedPreferences(PREFS, 0).getBoolean("panelProbe", false)
         val themeProbe = carPlayTheme(app) != null
-        record(app, "THEME_PROBE=$themeProbe asset=${carPlayTheme(app)}")
+        record(app, "ULTRA_PROFILE=integrated THEME_PROBE=$themeProbe asset=${carPlayTheme(app)}")
         record(app, "RECEIVER CONFIG pilot=1 version=ultra-climate-0.1.25 WIRE_REV=${com.shilapi.xcertplay.airplay.ultra.VoyahUltraProtocol.WIRE_REV} UI_SYNC=available ASSET_PROBE=$probe MUTUAL_AUTH=${isMutualAuthEnabled(app)} VEHICLE_INFO=Voyah Free/gas+electric")
         return VoyahUltraProtocol({ ClimateSource(app) }, SystemClock::elapsedRealtime, { record(app, it) },
-            assetProbe = probe, dump = { name, bytes -> saveWireBody(app, name, bytes) }, panelProbe = panelProbe,
+            assetProbe = probe, panelProbe = themeProbe,
             themeProbe = themeProbe, vehicleDataText = UltraVehicleDataText(
                 section = app.getString(R.string.carplay_vehicle_data),
                 frontLeft = app.getString(R.string.carplay_tire_front_left), frontRight = app.getString(R.string.carplay_tire_front_right),
@@ -95,23 +105,8 @@ object VoyahUltraSettings {
                 rollers = app.getString(R.string.carplay_massage_rollers),
                 lightModes = listOf(R.string.carplay_control_off, R.string.carplay_light_position,
                     R.string.carplay_light_low_beam, R.string.carplay_light_auto).map(app::getString),
-                unavailable = app.getString(R.string.carplay_vehicle_unavailable)))
-    }
-
-    /** First receiver /info and incoming fileTransfer bodies; together capped at 4 MB per session. */
-    private fun saveWireBody(context: Context, name: String, bytes: ByteArray) {
-        val copy = bytes.copyOf()
-        try {
-            io.execute {
-                synchronized(reportLock) {
-                    runCatching {
-                        val directory = File(File(context.filesDir, "ultra-pilot"), "probe").apply { mkdirs() }
-                        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(Date())
-                        File(directory, "$stamp-${name.replace(Regex("[^A-Za-z0-9_-]"), "_")}.bin").writeBytes(copy)
-                    }.onFailure { Log.w("VoyahUltra", "Wire body write failed", it) }
-                }
-            }
-        } catch (_: java.util.concurrent.RejectedExecutionException) { dropped.incrementAndGet() }
+                unavailable = app.getString(R.string.carplay_vehicle_unavailable),
+                settings = app.getString(R.string.carplay_voyahplay_settings)))
     }
 
     private fun wireBodies(context: Context): String {
@@ -214,11 +209,11 @@ object VoyahUltraSettings {
             .setPositiveButton(android.R.string.ok, null).show()
     }
 
-    private class ClimateSource(context: Context) : UltraClimateSource {
+    internal class ClimateSource(context: Context) : UltraClimateSource {
         private val handler = Handler(Looper.getMainLooper())
         private val client = VoyahClient(context)
         private val app = context.applicationContext
-        private val radio = VoyahRadioClient(app, { record(app, it) }, { emit() })
+        private val radio = if (isRadioEnabled(app)) VoyahRadioClient(app, { record(app, it) }, { emit() }) else null
         @Volatile private var lightMode: Int? = null
         private val lights = com.shilapi.xcertplay.voyah.VoyahLightStatus(app) { mode ->
             if (!stopped) {
@@ -246,7 +241,7 @@ object VoyahUltraSettings {
         private fun permitted() = app.checkSelfPermission("com.qinggan.permission.WRITE_CANBUS") == android.content.pm.PackageManager.PERMISSION_GRANTED
         override val supportedControls = if (permitted()) UltraClimateControl.entries.toSet() else emptySet()
         override val supportedHvac = if (permitted()) UltraHvacControl.entries.toSet() else emptySet()
-        override val supportedVehicleControls = if (permitted()) UltraVehicleControl.entries.toSet() else setOf(UltraVehicleControl.CAR_HOME)
+        override val supportedVehicleControls = UltraVehicleControl.entries.filter { permitted() || it.isAppAction }.toSet()
         private fun withLights(values: Map<UltraVehicleControl, Int>) =
             (values - UltraVehicleControl.LIGHT_MODE) + (lightMode?.let { mapOf(UltraVehicleControl.LIGHT_MODE to it) } ?: emptyMap())
         private val poll = object : Runnable {
@@ -310,20 +305,21 @@ object VoyahUltraSettings {
             emit()
         }
         override fun start(onSample: (UltraClimateSample?) -> Unit) {
-            handler.post { if (!stopped && callback == null) { callback = onSample; radio.start(); lights.start(); handler.post(poll) } }
+            handler.post { if (!stopped && callback == null) { callback = onSample; radio?.start(); lights.start(); handler.post(poll) } }
         }
         private fun emit() {
             if (stopped) return
             val value = synchronized(lock) {
-                val old = latest ?: if (radio.snapshot.connected) UltraClimateSample(Double.NaN, 0) else null
-                old?.copy(radio = radio.snapshot, radioSampledAtMillis = SystemClock.elapsedRealtime()).also { latest = it }
+                val snapshot = radio?.snapshot
+                val old = latest ?: if (snapshot?.connected == true) UltraClimateSample(Double.NaN, 0) else null
+                old?.copy(radio = snapshot, radioSampledAtMillis = SystemClock.elapsedRealtime()).also { latest = it }
             }
             callback?.invoke(value)
         }
-        override val supportsRadio get() = radio.supported
+        override val supportsRadio get() = radio?.supported == true
         override fun writeRadio(request: com.shilapi.xcertplay.airplay.ultra.UltraRadioRequest): UltraClimateWriteResult {
             if (stopped) return UltraClimateWriteResult(false, "Radio source closed")
-            return radio.write(request)
+            return radio?.write(request) ?: UltraClimateWriteResult(false, "Radio disabled for this session")
         }
         /** Native stream index and mute; no lossy percent conversion between CarPlay and the car. */
         private fun volume(): Pair<Long?, Boolean?> = mediaVolume.read()
@@ -365,7 +361,7 @@ object VoyahUltraSettings {
         override fun writeVehicleControl(control: UltraVehicleControl, value: Int): UltraClimateWriteResult {
             check(Looper.myLooper() != Looper.getMainLooper())
             if (stopped || control !in supportedVehicleControls || control.normalize(value) == null ||
-                (control != UltraVehicleControl.CAR_HOME && !permitted()) || !writeBusy.compareAndSet(false, true))
+                (!control.isAppAction && !permitted()) || !writeBusy.compareAndSet(false, true))
                 return UltraClimateWriteResult(false, "Vehicle control closed, busy, invalid or permission denied")
             val request = ComfortRequest(); pending = request
             try {
@@ -375,11 +371,12 @@ object VoyahUltraSettings {
                 }
                 handler.post {
                     if (stopped || pending !== request) { request.ready.countDown(); return@post }
-                    if (control == UltraVehicleControl.CAR_HOME) {
+                    if (control.isAppAction) {
                         request.result = runCatching {
-                            app.startActivity(android.content.Intent(android.content.Intent.ACTION_MAIN)
-                                .addCategory(android.content.Intent.CATEGORY_HOME).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                            UltraClimateWriteResult(true, "Native vehicle menu opened")
+                            val intent = requireNotNull(appActionIntent(app, control))
+                            val options = android.app.ActivityOptions.makeBasic().apply { launchDisplayId = 0 }
+                            app.startActivity(intent, options.toBundle())
+                            UltraClimateWriteResult(true, "App action opened: $control")
                         }.getOrElse { UltraClimateWriteResult(false, "Vehicle menu: ${it.message}") }
                         request.ready.countDown()
                         return@post
@@ -465,7 +462,7 @@ object VoyahUltraSettings {
         }
         override fun close() {
             stopped = true
-            radio.close()
+            radio?.close()
             val request = pending; pending = null; request?.ready?.countDown()
             handler.post { handler.removeCallbacksAndMessages(null); request?.ticket?.cancel(); lights.stop(); client.cancel(); callback = null; latest = null }
         }

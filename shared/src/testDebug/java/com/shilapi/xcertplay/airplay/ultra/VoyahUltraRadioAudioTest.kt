@@ -28,13 +28,32 @@ class VoyahUltraRadioAudioTest {
     private class Source : UltraClimateSource {
         @Volatile var calls = 0
         var confirm = true
+        var echoPlayback = false
+        private var listener: ((UltraClimateSample?) -> Unit)? = null
+        private var radio = radio(false)
         override val supportsRadio = true
-        override fun start(onSample: (UltraClimateSample?) -> Unit) { onSample(UltraClimateSample(23.0, 1000)) }
+        override fun start(onSample: (UltraClimateSample?) -> Unit) {
+            listener = onSample
+            emit(radio)
+        }
+        fun emit(value: UltraRadioSnapshot) {
+            radio = value
+            listener?.invoke(UltraClimateSample(23.0, 1000, radio = value, radioSampledAtMillis = 1000))
+        }
         override fun writeRadio(request: UltraRadioRequest): UltraClimateWriteResult {
             calls++
+            if (echoPlayback && confirm) emit(radio.copy(state = radio.state?.copy(
+                playing = request.command != VoyahRadioOem.Command.PAUSE)))
             return UltraClimateWriteResult(confirm, "OEM readback")
         }
         override fun close() {}
+
+        companion object {
+            fun radio(playing: Boolean) = UltraRadioSnapshot(true, VoyahRadioOem.decode(mapOf(
+                VoyahRadioOem.BAND to "FM", VoyahRadioOem.FREQUENCY to 10170L,
+                VoyahRadioOem.TITLE to "FM 101.7 MHz", VoyahRadioOem.STATION_NAME to "Station"),
+                if (playing) 3 else 2))
+        }
     }
 
     private inner class Peer : Closeable {
@@ -174,6 +193,88 @@ class VoyahUltraRadioAudioTest {
                 val resources = (undo["params"] as Map<*, *>)["resources"] as List<*>
                 assertEquals(2L, (resources.single() as Map<*, *>)["transferType"])
             }
+        } } finally { p.close() }
+    }
+
+    @Test fun nativeRadioStartTakesAudioAndPublishesTheStationWithoutSendingOemPlay() {
+        val source = Source()
+        val p = VoyahUltraProtocol({ source }, { 1000L }, {})
+        try { Peer().use { peer ->
+            p.onFeaturesNegotiated(listOf("vehicleStateProtocol")); p.onSetupResponseSent(peer.session)
+            connect(p).use { phone ->
+                phone.send(CarAccessoryMessages.registerRequest(0, 1,
+                    CafRegistration.Identifiers(listOf(4102L, 4103L, 4354L, 4356L, 4359L))).asRcsMessage())
+                assertEquals(0L, receive(phone).valuesMap()[4359L])
+                val active = Source.radio(true).let { it.copy(state = it.state!!.copy(radioText = "Artist - Song")) }
+                source.emit(active) // Native/passenger-screen action, no CAF command.
+                val take = peer.receive()
+                val body = BplistCodec.decode(take.body) as Map<*, *>
+                assertEquals("changeModes", body["type"])
+                assertEquals(0, source.calls)
+                peer.answer(take, true)
+                val update = receive(phone)
+                assertEquals(CafCommand.UPDATE_NOTIFY, update.command)
+                assertEquals(1L, update.valuesMap()[4359L])
+                assertEquals("Artist - Song", update.valuesMap()[4356L])
+                phone.send(CarAccessoryMessages.readRequest(0, 2, listOf(4102L, 4103L, 4354L)).asRcsMessage())
+                val values = receive(phone).valuesMap()
+                assertEquals("FM:10170", values[4102L])
+                assertEquals("VOYAH_RADIO", values[4354L])
+                assertEquals("Station · FM 101.7 MHz", ((values[4103L] as List<*>).single() as Map<*, *>)["mediaItemName"])
+                source.emit(active.copy(state = active.state!!.copy(radioText = "Next song")))
+                peer.phone.soTimeout = 150
+                assertThrows(java.net.SocketTimeoutException::class.java) { peer.receive() }
+                assertEquals(0, source.calls)
+            }
+        } } finally { p.close() }
+    }
+
+    @Test fun aNativeStartBeforeTheSessionIsAttachedIsNotLost() {
+        val source = Source().apply { emit(Source.radio(true)) }
+        val p = VoyahUltraProtocol({ source }, { 1000L }, {})
+        try { Peer().use { peer ->
+            p.onFeaturesNegotiated(listOf("vehicleStateProtocol"))
+            peer.phone.soTimeout = 100
+            assertThrows(java.net.SocketTimeoutException::class.java) { peer.receive() }
+            p.onSetupResponseSent(peer.session)
+            peer.phone.soTimeout = 2500
+            peer.answer(peer.receive(), true)
+            assertEquals(0, source.calls)
+        } } finally { p.close() }
+    }
+
+    @Test fun cafPlayEchoDoesNotSendASecondTakeAndNativeRestartAfterIphonePlaybackDoes() {
+        val source = Source().apply { echoPlayback = true }
+        val p = VoyahUltraProtocol({ source }, { 1000L }, {})
+        try { Peer().use { peer ->
+            p.onFeaturesNegotiated(listOf("vehicleStateProtocol")); p.onSetupResponseSent(peer.session)
+            connect(p).use { phone ->
+                play(phone); peer.answer(peer.receive(), true)
+                assertTrue(receive(phone).errors().isEmpty())
+                peer.phone.soTimeout = 150
+                assertThrows(java.net.SocketTimeoutException::class.java) { peer.receive() }
+                source.emit(Source.radio(false)) // OEM yields after new iPhone media playback.
+                source.emit(Source.radio(true))
+                peer.phone.soTimeout = 2500
+                peer.answer(peer.receive(), true)
+                assertEquals(1, source.calls)
+            }
+        } } finally { p.close() }
+    }
+
+    @Test fun nativeStopDuringTheOwnershipWaitCancelsALateGrant() {
+        val source = Source()
+        val p = VoyahUltraProtocol({ source }, { 1000L }, {})
+        try { Peer().use { peer ->
+            p.onFeaturesNegotiated(listOf("vehicleStateProtocol")); p.onSetupResponseSent(peer.session)
+            source.emit(Source.radio(true))
+            val take = peer.receive()
+            source.emit(Source.radio(false))
+            peer.answer(take, true)
+            val cancel = BplistCodec.decode(peer.receive().body) as Map<*, *>
+            val resources = (cancel["params"] as Map<*, *>)["resources"] as List<*>
+            assertEquals(2L, (resources.single() as Map<*, *>)["transferType"])
+            assertEquals(0, source.calls)
         } } finally { p.close() }
     }
 }

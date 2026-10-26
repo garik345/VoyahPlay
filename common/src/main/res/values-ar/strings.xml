@@ -416,6 +416,7 @@
     <string name="option_size_large">كبير</string>
     <string name="option_size_medium">متوسط</string>
     <string name="option_size_small">صغير</string>
+    <string name="settings_carplay_size_extra_small">صغير جدًا</string>
     <string name="option_theme_scenario">المشهد · خريطة جانبية</string>
     <string name="option_theme_map">الخريطة · خريطة كاملة</string>
     <string name="option_theme_simple">بسيط · خريطة جانبية</string>
@@ -906,4 +907,9 @@
     <string name="settings_report_on_phone_hint">امسح الرمز بكاميرا الهاتف لفتح هذه الصفحة في متصفحه، ثم اختر «تنزيل التقرير». أبقِ هذه الشاشة مفتوحة حتى يكتمل التنزيل.</string>
     <string name="voyah_cluster_navigation">CarPlay guidance on the Voyah instrument cluster</string>
     <string name="voyah_cluster_navigation_hint">Turn arrow, distance and road. Reconnect CarPlay after enabling.</string>
+    <string name="settings_ultra_radio">الراديو</string>
+    <string name="settings_ultra_radio_description">ربط راديو السيارة بـ CarPlay Ultra. أوقفه في السيارات التي لا تحتوي على مستقبل راديو. يسري عند الاتصال التالي. قد يبقى رمز الراديو في CarPlay مع نافذة فارغة.</string>
+    <string name="carplay_voyahplay_settings">إعدادات VoyahPlay</string>
+    <string name="voyah_waiting_for_car_hotspot">بانتظار نقطة اتصال السيارة. سيُستأنف الاتصال تلقائيًا.</string>
+    <string name="voyah_wireless_retry_later">سيعيد VoyahPlay المحاولة تلقائيًا بعد فترة انتظار.</string>
 </resources>

@@ -115,6 +115,8 @@ final class RootHelperBoot {
             }
         }
         writePrivate("runtime.sh", runtime);
+        installAgent("top-bounds.js", "top.sha256");
+        installAgent("status-bar.js", "status.sha256");
         RootProcess.Result statTool = RootProcess.run(3, "/system/bin/stat", "-c", "%u:%a", RootHelperProtocol.DIRECTORY);
         if (!statTool.successful() || !statTool.output.trim().equals("0:700"))
             throw new IOException("BOOT_STAT_UNAVAILABLE: не подтверждена проверка владельца для boot entry\n" + statTool.output);
@@ -133,6 +135,23 @@ final class RootHelperBoot {
         byte[] patched = RootBootHook.patched(source);
         String warning = Arrays.equals(current, patched) ? "" : replaceHook(patched);
         return new RootProcess.Result(0, false, warning + status());
+    }
+    private static void installAgent(String name, String hashName) throws Exception {
+        try (ZipFile apk = new ZipFile(own("app.apk"))) {
+            ZipEntry entry = apk.getEntry("assets/voyah-helper/" + name);
+            if (entry == null || entry.isDirectory() || entry.getSize() > 16384) throw new IOException("Missing or oversized " + name);
+            byte[] script;
+            try (InputStream input = apk.getInputStream(entry); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096]; int count;
+                while ((count = input.read(buffer)) != -1) {
+                    if (output.size() + count > 16384) throw new IOException("Oversized " + name);
+                    output.write(buffer, 0, count);
+                }
+                script = output.toByteArray();
+            }
+            writePrivate(name, script);
+            writePrivate(hashName, (RootBootHook.hash(script) + "  " + own(name).getPath() + "\n").getBytes(StandardCharsets.UTF_8));
+        }
     }
     static RootProcess.Result remove() throws Exception {
         policy(false);

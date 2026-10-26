@@ -128,6 +128,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private var wifiRecoveryButton: View? = null
     private var reconnectAttempts = 0
     private val startupRetryBudget = WirelessStartupRetryBudget()
+    private val startupRecovery = com.shilapi.xcertplay.voyah.VoyahWirelessStartupRecovery()
+    private val startupRecoveryCheck = Runnable { resumeWirelessStartupIfReady() }
     private var startupRetryStopped = false
     private var startupRetryButton: View? = null
     private var startupFailureGeneration = -1
@@ -950,6 +952,7 @@ class CarPlayHostActivity : ComponentActivity() {
             hideBottomBar = savedHideBottomBar
         }
         maybeStartCarPlay()
+        scheduleStartupRecoveryCheck()
         applyFullscreenMode()
         voyahDock.resume()
         if (systemBarsChanged) refreshDisplaySizeAfterLayout()
@@ -1275,6 +1278,7 @@ class CarPlayHostActivity : ComponentActivity() {
         closePicturePanel()
         // The controller, USB/iAP2 link, and VPN attachment intentionally outlive the UI.
         isActivityStarted = false
+        mainHandler.removeCallbacks(startupRecoveryCheck)
         logThemeState(ThemeModeDiagnostics.Source.STOP, resources.configuration)
         mainHandler.removeCallbacks(pollConfiguration)
         super.onStop()
@@ -1390,6 +1394,7 @@ class CarPlayHostActivity : ComponentActivity() {
         dismissClusterPresentation()
         mainHandler.removeCallbacks(applyDisplaySize)
         mainHandler.removeCallbacks(expireOldLogLines)
+        mainHandler.removeCallbacks(startupRecoveryCheck)
         mainHandler.removeCallbacks(pollConfiguration)
         videoSurfaceOwner.clear()
         currentSurfaceTexture = null
@@ -1501,6 +1506,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 if (!CarPlayBackgroundSession.isOwner(this@CarPlayHostActivity) ||
                     shuttingDown.get() || menuOpen || handshakeResetInProgress) return@setOnClickListener
                 startupRetryBudget.manualRetry()
+                startupRecovery.reset()
                 startupRetryStopped = false
                 reconnectAttempts = 0
                 visibility = View.GONE
@@ -3020,7 +3026,7 @@ class CarPlayHostActivity : ComponentActivity() {
             "codec=${if (sessionHevc) "HEVC" else "H.264"} softwareHevc=$hevcSoftwareDecoderEnabled"
         val effectiveSummary = "Display effective percent=$uiScalePercent resolution=${displayScalePercent}% " +
             "canvas=${display.widthPixels}x${display.heightPixels} decision=${support.reason} " +
-            "physical=${physical.widthMm}x${physical.heightMm}mm safeArea=${display.safeArea} " +
+            "physical=${display.widthPhysicalMm}x${display.heightPhysicalMm}mm safeArea=${display.safeArea} " +
             "drawOutside=${display.safeAreaDrawOutside}"
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.begin(this, requestSummary, support.details, effectiveSummary)
         appendLog(requestSummary)
@@ -3293,6 +3299,10 @@ class CarPlayHostActivity : ComponentActivity() {
                         return@runOnUiThread
                     }
                     activeAirPlaySession = session
+                    startupRecovery.attemptStarted()
+                    mainHandler.removeCallbacks(startupRecoveryCheck)
+                    startupRetryStopped = false
+                    startupRetryButton?.visibility = View.GONE
                     val pending = pendingIphoneCornerMask
                     if (pending?.first === session) {
                         installIphoneCornerMask(session, pending.second.first, pending.second.second)
@@ -3314,6 +3324,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         if (controllerGeneration == restartGeneration && activeAirPlaySession === session &&
                             !shuttingDown.get() && CarPlayBackgroundSession.isOwner(this@CarPlayHostActivity) &&
                             startupRetryBudget.resetIfStable(session, android.os.SystemClock.elapsedRealtime())) {
+                            startupRecovery.reset()
                             appendLog("wireless startup retry budget reset after stable video session")
                         }
                     }, WirelessStartupPolicy.STABLE_SESSION_MILLIS)
@@ -3387,13 +3398,15 @@ class CarPlayHostActivity : ComponentActivity() {
         controllerGeneration: Int,
     ): (CarPlayStatus) -> Unit = report@{ status ->
         if (controllerGeneration != restartGeneration) return@report
+        // Cleanup can report more stages after a stopped attempt. Keep its actionable cause.
+        if (startupRetryStopped) return@report
         if (menuOpen) {
             if (status is CarPlayStatus.Failed) failurePendingAfterMenu = status
             return@report
         }
         updateHotspotStatus(status)
         val description = status.describe()
-        setConnectionStage(description)
+        setConnectionStage(description, exact = status is CarPlayStatus.Failed && status.startupFailure != null)
         when (status) {
             is CarPlayStatus.Failed -> if (status.wifiResetRequired) {
                 wifiRecoveryButton?.visibility = View.VISIBLE
@@ -3883,14 +3896,20 @@ class CarPlayHostActivity : ComponentActivity() {
         if (menuOpen) recoveryPendingAfterMenu = true
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || startupRetryStopped) return
         if (reconnectScheduled) return
-        val startupDelay = if (startupFailure != null && startupFailure != WirelessStartupFailure.HOTSPOT_CONFIGURATION)
+        val startupDelay = if (startupFailure?.retryable == true)
             startupRetryBudget.nextDelayMillis() else null
         if (startupFailure != null && startupDelay == null) {
             startupRetryStopped = true
             startupRetryButton?.visibility = View.VISIBLE
-            setConnectionStage(if (startupFailure == WirelessStartupFailure.HOTSPOT_CONFIGURATION) reason
-                else "$reason\n${getString(R.string.wireless_startup_retries_exhausted)}")
-            appendLog("wireless startup recovery stopped generation=$restartGeneration reason=$startupFailure retries=${startupRetryBudget.retries}")
+            val automatic = wirelessEnabled && startupRecovery.failed(startupFailure, android.os.SystemClock.elapsedRealtime())
+            setConnectionStage(when {
+                automatic && startupRecovery.waitsForHotspot -> getString(R.string.voyah_waiting_for_car_hotspot)
+                automatic -> "$reason\n${getString(R.string.voyah_wireless_retry_later)}"
+                else -> "$reason\n${getString(R.string.wireless_startup_retries_exhausted)}"
+            }, exact = true)
+            appendLog("wireless startup recovery stopped generation=$restartGeneration reason=$startupFailure " +
+                "retries=${startupRetryBudget.retries} automatic=$automatic waitingForHotspot=${startupRecovery.waitsForHotspot}")
+            if (automatic) scheduleStartupRecoveryCheck()
             return
         }
         reconnectScheduled = true
@@ -3922,11 +3941,41 @@ class CarPlayHostActivity : ComponentActivity() {
         )
     }
 
+    private fun scheduleStartupRecoveryCheck() {
+        mainHandler.removeCallbacks(startupRecoveryCheck)
+        if (isActivityStarted && startupRecovery.pending && !shuttingDown.get()) {
+            mainHandler.postDelayed(startupRecoveryCheck,
+                com.shilapi.xcertplay.voyah.VoyahWirelessStartupRecovery.CHECK_INTERVAL_MILLIS)
+        }
+    }
+
+    /** Recheck after wake with elapsedRealtime: Handler delays themselves pause during deep sleep. */
+    private fun resumeWirelessStartupIfReady() {
+        if (!startupRecovery.pending || !isActivityStarted || shuttingDown.get()) return
+        if (wirelessEnabled && wirelessPermissionsReady && startupRetryStopped &&
+            CarPlayBackgroundSession.isOwner(this) && !menuOpen && !handshakeResetInProgress &&
+            !reconnectScheduled && activeDisplaySize != null && activeAirPlaySession == null &&
+            activeScreenStreamTypes.isEmpty() && !CarPlayBackgroundSession.active) {
+            val hotspotReady = if (startupRecovery.waitsForHotspot)
+                com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(this) else null
+            if (startupRecovery.takeRetry(android.os.SystemClock.elapsedRealtime(), hotspotReady)) {
+                startupRetryStopped = false
+                appendLog("wireless startup recovery resumed after wake/readiness; rebuilding stopped attempt")
+                restartCarPlay(getString(R.string.connecting_to_your_iphone))
+            }
+        }
+        scheduleStartupRecoveryCheck()
+    }
+
     /** Full-stack fallback when an AirPlay-only reconnect is unavailable. */
     private fun restartCarPlay(reason: String) {
         if (!CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress) return
         val size = activeDisplaySize ?: return
+        startupRecovery.attemptStarted()
+        mainHandler.removeCallbacks(startupRecoveryCheck)
+        activeAirPlaySession = null
+        clearIphoneCornerMask()
         startupRetryBudget.disconnected()
         startupRetryButton?.visibility = View.GONE
         appendLog(reason)
@@ -4048,6 +4097,7 @@ class CarPlayHostActivity : ComponentActivity() {
         recoveryPendingAfterMenu = false
         if (reconnect) {
             startupRetryBudget.manualRetry()
+            startupRecovery.reset()
             startupRetryStopped = false
         }
         if (failure?.startupFailure != null && !reconnect) {
@@ -4077,6 +4127,8 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
         resetSidePanel()
         startupRetryBudget.disconnected()
+        startupRecovery.reset()
+        mainHandler.removeCallbacks(startupRecoveryCheck)
         restartGeneration += 1
         mainHandler.removeCallbacks(applyDisplaySize)
         val oldController = controller
@@ -4242,9 +4294,9 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     }
 
-    private fun setConnectionStage(message: String) {
+    private fun setConnectionStage(message: String, exact: Boolean = false) {
         latestStage = message
-        stageStatusView?.text = friendlyStage(message)
+        stageStatusView?.text = if (exact) message else friendlyStage(message)
         updateDebugOverlays()
     }
 
@@ -4324,6 +4376,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val multiWindow = isMultiWindowActive()
         val hideTop = hideTopBar && !multiWindow
         val hideBottom = hideBottomBar && !multiWindow
+        voyahDock.setStatusBarHidden(hideTop)
         voyahDock.setHidden(hideBottom)
         WindowCompat.setDecorFitsSystemWindows(window, !(hideTop && hideBottom))
         val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -4382,6 +4435,7 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayStatus.RunningControl -> getString(R.string.carplay_control_running)
         CarPlayStatus.ControlEnded -> getString(R.string.carplay_control_window_ended)
         is CarPlayStatus.Failed -> when (startupFailure) {
+            WirelessStartupFailure.HOTSPOT_OFF -> getString(R.string.voyah_waiting_for_car_hotspot)
             WirelessStartupFailure.HOTSPOT_NOT_READY -> getString(R.string.hotspot_network_not_ready)
             WirelessStartupFailure.FIRST_TCP_TIMEOUT -> getString(R.string.first_tcp_timeout)
             else -> getString(R.string.status_failed, message)

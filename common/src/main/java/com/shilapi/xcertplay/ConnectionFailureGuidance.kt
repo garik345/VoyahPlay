@@ -19,6 +19,7 @@ internal object ConnectionFailureGuidance {
         when (failure.startupFailure) {
             WirelessStartupFailure.BLUETOOTH_UNUSABLE -> return R.string.connection_help_bluetooth_unusable
             WirelessStartupFailure.HOTSPOT_NOT_READY,
+            WirelessStartupFailure.HOTSPOT_OFF,
             WirelessStartupFailure.HOTSPOT_CONFIGURATION -> return network(mode)
             WirelessStartupFailure.FIRST_TCP_TIMEOUT -> return iphoneWifi(mode)
             null -> Unit

@@ -6,7 +6,7 @@ import com.shilapi.xcertplay.airplay.ultra.UltraVehicleControl
 internal object VoyahVehicleControlSchema {
     data class Command(val name: String, val side: Int, val function: Int, val value: Int)
     fun command(control: UltraVehicleControl, value: Int): Command? {
-        if (control.normalize(value) == null || control == UltraVehicleControl.CAR_HOME) return null
+        if (control.normalize(value) == null || control.isAppAction) return null
         return Command(when {
             control == UltraVehicleControl.LIGHT_MODE -> "light-mode"
             control.isProgram -> "seat-program"

@@ -607,6 +607,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun applyFullscreenMode() {
+        voyahDock.setStatusBarHidden(AirPlayPersistence.loadHideTopBar(this))
         voyahDock.setHidden(AirPlayPersistence.loadHideBottomBar(this))
         val multiWindow = Build.VERSION.SDK_INT >= 24 && isInMultiWindowMode
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -1722,16 +1723,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     markReconnectNeeded()
                 }
                 card.addView(label(getString(R.string.voyah_ultra_readonly), 14, MUTED))
-                toggle(card, getString(R.string.voyah_ultra_asset_probe_toggle),
-                    getString(R.string.voyah_ultra_asset_probe_description),
-                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isAssetProbeEnabled(this)) { enabled ->
-                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveAssetProbe(this, enabled)
-                    markReconnectNeeded()
-                }
-                toggle(card, getString(R.string.voyah_ultra_mutual_auth_toggle),
-                    getString(R.string.voyah_ultra_mutual_auth_description),
-                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isMutualAuthEnabled(this)) { enabled ->
-                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveMutualAuth(this, enabled)
+                toggle(card, getString(R.string.settings_ultra_radio),
+                    getString(R.string.settings_ultra_radio_description),
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isRadioEnabled(this)) { enabled ->
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveRadioEnabled(this, enabled)
                     markReconnectNeeded()
                 }
             }

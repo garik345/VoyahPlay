@@ -57,7 +57,8 @@ class VoyahUltraProtocol(
     @Volatile private var vehicleId: String? = null
     @Volatile private var probeFeatures: Set<String> = emptySet()
     @Volatile private var airPlaySession: AirPlaySession? = null
-    private val radioCommandLock = Any()
+    private val radioAudio = VoyahRadioAudioSync(
+        { airPlaySession?.takeAudioForRadio() == true }, { airPlaySession?.releaseRadioAudio() }, ::log)
     private val dumpedBytes = AtomicLong()
     private val infoCaptured = AtomicBoolean(false)
     private val firstSample = java.util.concurrent.CountDownLatch(1)
@@ -245,7 +246,7 @@ class VoyahUltraProtocol(
     }
 
     override fun onSetupResponseSent(session: AirPlaySession) {
-        if (!closed.get()) airPlaySession = session
+        if (!closed.get()) { airPlaySession = session; radioAudio.attach() }
         attachPending()
     }
 
@@ -300,6 +301,7 @@ class VoyahUltraProtocol(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        radioAudio.close()
         airPlaySession = null
         closeChannels()
         if (sourceStarted.get()) source.close()
@@ -322,6 +324,7 @@ class VoyahUltraProtocol(
                 sample?.comfortLevels != value?.comfortLevels || sample?.readings != value?.readings || sample?.vehicle != value?.vehicle ||
                 sample?.radio != value?.radio || sample?.vehicleControlValues != value?.vehicleControlValues
             sample = value
+            radioAudio.observe(value?.radio)
             // A radio-only callback must not end /info's initial wait for actual vehicle readings.
             if (hasVehicleReading(value)) firstSample.countDown()
             if (changed) log("VEHICLE driverTargetC=${value?.driverTargetCelsius ?: "unavailable"} hvac=${value?.hvacValues} readings=${value?.readings} comfort=${value?.comfortLevels} vehicle=${value?.vehicle} controls=${value?.vehicleControlValues}")
@@ -350,7 +353,7 @@ class VoyahUltraProtocol(
             }
         }, volumeRange = source.volumeRange, phoneValues = phoneValues, radioSupported = source.supportsRadio,
         radioWriter = if (!source.supportsRadio) null else { request ->
-            synchronized(radioCommandLock) {
+            radioAudio.control(request.command != VoyahRadioOem.Command.PAUSE) {
                 if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
                     log("RADIO CONTROL request=$request")
                     val needsAudio = request.command != VoyahRadioOem.Command.PAUSE
@@ -541,7 +544,7 @@ class VoyahUltraProtocol(
     }
 
     companion object {
-        const val FEATURE = "vehicleStateProtocol"; const val WIRE_REV = "opack-39-vehicle-order-mute"
+        const val FEATURE = "vehicleStateProtocol"; const val WIRE_REV = "opack-47-ultra-profile"
         const val UI_SYNC_FEATURE = "uiSync"
         val PROBE_FEATURES = listOf("fileTransfer")
         val PROBE_CLIENTS = setOf(RcsClientTypes.CAR_PLAY_UPDATE_DATA)

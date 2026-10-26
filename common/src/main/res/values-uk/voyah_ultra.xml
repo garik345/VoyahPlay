@@ -2,14 +2,12 @@
 <resources>
     <string name="voyah_ultra_title">CarPlay Ultra: клімат і комфорт (експериментально)</string>
     <string name="voyah_ultra_toggle">Клімат і комфорт через CarPlay Ultra</string>
-    <string name="voyah_ultra_description">Тест debug. Після збереження перепідключіть CarPlay. Температури водія та пасажира, живлення клімату, A/C, вентилятор, AUTO, рециркуляція, обдування скла та комфорт — з перевіркою стану автомобіля. Меню на iPhone ще не підтверджене.</string>
-    <string name="voyah_ultra_readonly">Запис потребує WRITE_CANBUS. Датчик салону, MAX A/C та радіо не заявляються. Команди виконуються лише за явним запитом iPhone.</string>
+    <string name="voyah_ultra_description">Вмикає клімат і функції автомобіля разом з авторизацією MFi4 і профілем Ultra. Застосовується під час наступного підключення CarPlay.</string>
+    <string name="voyah_ultra_readonly">Запис потребує WRITE_CANBUS. Датчик салону та MAX A/C не заявляються. Команди виконуються лише за явним запитом iPhone.</string>
     <string name="voyah_ultra_probe">Ultra: перевірити дані клімату</string>
     <string name="voyah_ultra_report">Ultra: переглянути журнал</string>
     <string name="voyah_ultra_export">Ultra: зберегти журнал</string>
     <string name="voyah_ultra_working">Підготовка звіту Ultra…</string>
     <string name="voyah_ultra_asset_probe_toggle">Ultra: записати передачу пакета ресурсів (експериментально)</string>
     <string name="voyah_ultra_asset_probe_description">Налагоджувальна перевірка. Застосовується під час наступного підключення CarPlay. Приймає запропонований iPhone fileTransfer та лише записує отримане, без обробки пакета й без команд автомобілю. UI Sync працює незалежно від цього перемикача. Може переривати сеанс CarPlay: вимкніть, якщо CarPlay перестане підключатися.</string>
-    <string name="voyah_ultra_mutual_auth_toggle">Ultra: взаємна автентифікація MFi4 (експериментально)</string>
-    <string name="voyah_ultra_mutual_auth_description">Налагоджувальна перевірка. Застосовується під час наступного підключення CarPlay. Пропонує iPhone взаємну автентифікацію MFi 4.0 з тією ж ідентичністю 3.0, що вже підписує MFiSAP; після неї iPhone може вважати авто пристроєм CarPlay Ultra. Якщо CarPlay перестане підключатися, вимкніть.</string>
 </resources>
