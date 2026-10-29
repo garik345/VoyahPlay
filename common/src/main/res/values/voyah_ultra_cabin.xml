@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_ambient_switch">Ambient lighting</string>
+    <string name="carplay_ambient_brightness">Ambient brightness</string>
+    <string name="carplay_ambient_color">Ambient colour</string>
+    <string name="carplay_aroma_level">Fragrance intensity</string>
+    <string name="carplay_aroma_taste">Fragrance cartridge</string>
+    <string name="carplay_aroma_time">Fragrance duration</string>
+    <string name="carplay_control_on">On</string>
+    <string-array name="carplay_aroma_durations">
+        <item>Always</item>
+        <item>30 min</item>
+        <item>60 min</item>
+    </string-array>
+    <string-array name="carplay_ambient_colors">
+        <item>Blue</item>
+        <item>Cyan</item>
+        <item>Purple</item>
+        <item>Green</item>
+        <item>Pink</item>
+        <item>Yellow</item>
+        <item>Brown</item>
+        <item>Orange</item>
+        <item>Red</item>
+    </string-array>
+    <string name="carplay_aroma_off">Switch fragrance off</string>
+</resources>

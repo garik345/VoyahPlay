@@ -4,7 +4,7 @@ set -u
 umask 077
 ROOT=/data/local/voyahplay-root-helper
 CLASS=com.shilapi.xcertplay.voyah.root.VoyahRootHelper
-VERSION=1.2.1
+VERSION=1.2.10
 MODE=${1:-status}
 case "$MODE" in boot|start|status|stop|watch|quiesce) ;; *) exit 2;; esac
 [ "$(id -u)" = 0 ] || exit 1
@@ -22,6 +22,11 @@ record() {
     printf 'BOOT_ID=%s\nBOOT_RESULT=%s\nBOOT_HELPER_VERSION=%s\n' "$boot_id" "$1" "$VERSION" > "$ROOT/boot-report.txt"
 }
 enabled() { private_file "$ROOT/autostart.conf" && [ "$(cat "$ROOT/autostart.conf")" = 1 ]; }
+radio() {
+    private_file "$ROOT/radio-runtime.sh" && private_file "$ROOT/radio-runtime.sha256" || return 1
+    sha256sum -c "$ROOT/radio-runtime.sha256" >/dev/null 2>&1 || return 1
+    /system/bin/sh "$ROOT/radio-runtime.sh" "$1"
+}
 fail() { record "error:$1"; printf 'ERROR %s\n' "$1"; exit 1; }
 probe() { CLASSPATH="$ROOT/app.apk" /system/bin/app_process /system/bin "$CLASS" --probe "$uid"; }
 run_check() { CLASSPATH="$ROOT/app.apk" /system/bin/app_process /system/bin "$CLASS" --check "$1"; }
@@ -37,9 +42,23 @@ agent_paths() {
     case "${1:-top}" in
         top) agent_kind=top; agent_script=top-bounds.js; agent_hash=top.sha256; agent_probe=voyahplay_top_bounds_probe;;
         status) agent_kind=status; agent_script=status-bar.js; agent_hash=status.sha256; agent_probe=voyahplay_status_bar_probe;;
+        dock) agent_kind=dock; agent_script=dock-guard.js; agent_hash=dock.sha256; agent_probe=voyahplay_dock_probe;;
         *) return 1;;
     esac
     agent_record=$ROOT/$agent_kind-agent.pid
+}
+fullscreen_firmware() {
+    # Accept complete reviewed pairs only, never a cross-product of individual hashes.
+    fw_services=$(sha256sum /system/framework/services.jar | awk '{print $1}') || return 1
+    fw_ui=$(sha256sum /system/priv-app/SystemUI-release-signed/SystemUI-release-signed.apk | awk '{print $1}') || return 1
+    case "$fw_services:$fw_ui" in
+        0faed7ebf1094c62a4f92b4bc533bbb3c08480a2cd847567cb1cff91b2d1d045:28f5d93eaec22b755b339193a733bd0d4160c496cf301bcd2fcfb88c36ade162) ;;
+        483fedea7707833454272f84a64692078996127d64abac63f13863b76246a579:5d5f7498d92ee68e927bc0b891daedf15978d079b85a254399112bad98d2dd6b) ;;
+        262bfd515f5c181a556477cadbdee1e574ead0ef1acff158dc3fa25bd8b84c38:b676a3a426ba3b59fabb9d98355ff0e0ac7b07d7ad6545ac44d9cbf85f1700c1) ;;
+        *) return 1;;
+    esac
+    fw_bridge=$(sha256sum /data/local/tmp/ss11.bin | awk '{print $1}') || return 1
+    [ "$fw_bridge" = 575735ed6f6074f1c33483c8df5c8984e51e6dc0fba328b1e4179ca10b9f9d7d ]
 }
 agent_alive() {
     agent_paths "${1:-top}" || return 1
@@ -89,7 +108,17 @@ start_agent() {
     agent_paths "${1:-top}" || return 1
     private_file "$ROOT/$agent_script" && private_file "$ROOT/$agent_hash" || return 1
     sha256sum -c "$ROOT/$agent_hash" >/dev/null 2>&1 || return 1
-    if [ "$agent_kind" = top ]; then target_name=system_server; else target_name=com.qinggan.systemui; fi
+    case "$agent_kind" in
+        top) target_name=system_server;;
+        status) target_name=com.qinggan.systemui;;
+        dock)
+            # Optional guard for the exact reviewed PI Launcher. Skip other builds cheaply.
+            case "$(stat -c %s /system/priv-app/Launcher-release-signed/Launcher-release-signed.apk 2>/dev/null)" in
+                126586649|126653880) ;;
+                *) return 0;;
+            esac
+            target_name=com.qinggan.app.launcher;;
+    esac
     system_pid=$(pidof "$target_name")
     number "$system_pid" || return 1
     [ "$(awk '/^Uid:/ { print $2 }' "/proc/$system_pid/status")" = 1000 ] &&
@@ -98,9 +127,13 @@ start_agent() {
         [ "$agent_system" = "$system_pid" ] && return 0
         stop_agent "$agent_kind" || return 1
     fi
-    if [ "$agent_kind" = status ]; then
-        actual_ui=$(sha256sum /system/priv-app/SystemUI-release-signed/SystemUI-release-signed.apk | awk '{print $1}')
-        [ "$actual_ui" = 28f5d93eaec22b755b339193a733bd0d4160c496cf301bcd2fcfb88c36ade162 ] || return 1
+    fullscreen_firmware || return 1
+    if [ "$agent_kind" = dock ]; then
+        actual_launcher=$(sha256sum /system/priv-app/Launcher-release-signed/Launcher-release-signed.apk | awk '{print $1}')
+        case "$actual_launcher" in
+            0430e677f8eabafd59876f56bc5835a06e626c2aa484b6f306c0a7b31b04d63d|b3287150827e7fa51072bcbcba257539101cda8433c5f9d3a95f4ca905abd567) ;;
+            *) return 1;;
+        esac
     fi
     actual_inject=$(sha256sum /data/local/tmp/frida-inject | awk '{print $1}')
     [ "$actual_inject" = 0d99be0e44d4ca3449056fa0a0b868fca1cf66c8ad704508949945afc07706aa ] || return 1
@@ -125,6 +158,8 @@ start_watch() {
 complete() {
     start_agent || echo TOP_AGENT_START_FAILED=1
     start_agent status || echo STATUS_AGENT_START_FAILED=1
+    start_agent dock || echo DOCK_AGENT_START_FAILED=1
+    radio tick || echo RADIO_LABELS_START_FAILED=1
     start_watch
 }
 if [ "$MODE" = boot ]; then
@@ -149,6 +184,8 @@ if [ "$MODE" = quiesce ] || [ "$MODE" = stop ]; then
     [ ! -L "$ROOT/supervisor.paused" ] || fail supervisor-pause-link
     printf '1\n' > "$ROOT/supervisor.paused"; chmod 600 "$ROOT/supervisor.paused"
     stop_watch || fail supervisor-stop
+    radio stop || fail radio-agent-stop
+    stop_agent dock || fail dock-agent-stop
     stop_agent status || fail status-agent-stop
     stop_agent || fail top-agent-stop
     [ "$MODE" = quiesce ] && exit 0
@@ -198,6 +235,8 @@ if [ "$MODE" = watch ]; then
                 else
                     start_agent || echo TOP_AGENT_RECOVERY_FAILED=1
                     start_agent status || echo STATUS_AGENT_RECOVERY_FAILED=1
+                    start_agent dock || echo DOCK_AGENT_RECOVERY_FAILED=1
+                    radio tick || echo RADIO_LABELS_RECOVERY_FAILED=1
                 fi
             fi
         fi
@@ -233,7 +272,7 @@ fi
 code=0
 answer=$(probe 2>&1) || code=$?
 if [ "$code" = 0 ]; then
-    printf '%s\n' "$answer" | grep -q '^HELPER_VERSION=1\.2\.1$' || fail helper-version-differs
+    printf '%s\n' "$answer" | grep -Fxq "HELPER_VERSION=$VERSION" || fail helper-version-differs
     record already-running
     printf '%s\n' "$answer"
     complete

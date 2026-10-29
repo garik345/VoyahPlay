@@ -7,15 +7,15 @@ import android.content.ServiceConnection
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
-import java.io.File
 import java.lang.reflect.Method
-import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /** Own route state, independent of the dashboard overlay's disconnect-retention policy. */
 object VoyahNavigationOutput {
@@ -32,6 +32,15 @@ object VoyahNavigationOutput {
     private var enabled = true
     private var epoch = 0L
     private var requested = Request(0, null, false)
+    // Input counts do not prove that the cluster displayed guidance. Never retain route text here.
+    private var routeFrames = 0L // guarded by lock, reset on session start
+    private var maneuverFrames = 0L
+    private var changedFrames = 0L
+    private var lastFrameAt = 0L
+    @Volatile private var outputState = "not_started"
+    @Volatile private var verifiedProfile: String? = null
+    @Volatile private var lastError: String? = null
+    private val sentTotal = AtomicLong()
     // Worker-owned state. A blocked Binder cannot create a backlog of stale instructions.
     private var connection: Connection? = null
     private var applied: Guidance? = null
@@ -45,9 +54,27 @@ object VoyahNavigationOutput {
 
     @JvmStatic fun isSessionActive(): Boolean = synchronized(lock) { active }
 
+    /** Nonblocking report: no Binder, APK hashing or route/phone identifiers. */
+    fun diagnosticReport(context: Context): String = synchronized(lock) {
+        buildString {
+            appendLine("voyahNavigationEnabled=${enabled(context)}")
+            appendLine("voyahNavigationSessionActive=$active runtimeEnabled=$enabled")
+            appendLine("voyahNavigationState=$outputState profile=${verifiedProfile ?: "not_verified"}")
+            appendLine("voyahNavigationRouteFrames=$routeFrames maneuverFrames=$maneuverFrames decodedChanges=$changedFrames")
+            appendLine("voyahNavigationFrameAgeMs=${if (routeFrames + maneuverFrames == 0L) "none" else (SystemClock.elapsedRealtime() - lastFrameAt).coerceAtLeast(0)}")
+            appendLine("voyahNavigationGuidanceAvailable=${active && enabled && route.currentApple() != null} sentTotal=${sentTotal.get()}")
+            append("voyahNavigationLastError=${lastError ?: "none"}")
+        }
+    }
+
     @JvmStatic fun setEnabled(context: Context, value: Boolean) {
         context.getSharedPreferences("voyah_navigation", Context.MODE_PRIVATE).edit().putBoolean("enabled", value).apply()
-        synchronized(lock) { enabled = value; epoch++; if (!value) route.clear() }
+        synchronized(lock) {
+            enabled = value; epoch++; if (!value) route.clear()
+            lastError = null
+            outputState = if (value && active) "waiting_for_route" else "inactive"
+        }
+        Log.i(TAG, "Setting enabled=$value")
         publish()
     }
 
@@ -55,8 +82,14 @@ object VoyahNavigationOutput {
         synchronized(lock) {
             app = context.applicationContext
             enabled = enabled(context)
-            if (!active) { active = true; epoch++; route.clear() }
+            if (!active) {
+                active = true; epoch++; route.clear()
+                routeFrames = 0; maneuverFrames = 0; changedFrames = 0; lastFrameAt = 0
+                verifiedProfile = null; lastError = null
+                outputState = if (enabled) "waiting_for_route" else "inactive"
+            }
         }
+        Log.i(TAG, "Session start enabled=$enabled")
         main.post { main.removeCallbacks(tick); tick.run() }
     }
 
@@ -64,13 +97,21 @@ object VoyahNavigationOutput {
         if (frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_UPDATE &&
             frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE) return
         synchronized(lock) {
-            if (active && enabled) route.accept(frame.messageId, frame.payload)
+            if (active && enabled) {
+                val first = if (frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_UPDATE) ++routeFrames == 1L
+                    else ++maneuverFrames == 1L
+                lastFrameAt = SystemClock.elapsedRealtime()
+                val change = route.accept(frame.messageId, frame.payload)
+                if (change != BydHudRouteChange.NONE) changedFrames++
+                if (first) Log.i(TAG, "First route input id=${frame.messageId} change=$change")
+            }
         }
         // Frames are decoded immediately, but vehicle writes are coalesced by the 1 s tick.
     }
 
     fun end() {
         synchronized(lock) { active = false; epoch++; route.clear() }
+        Log.i(TAG, "Session end")
         main.post { main.removeCallbacks(tick); publish() }
     }
 
@@ -98,6 +139,9 @@ object VoyahNavigationOutput {
             val request = synchronized(lock) { requested }
             try { apply(request) }
             catch (e: Exception) {
+                val error = e.cause ?: e
+                lastError = "${error.javaClass.simpleName}: ${error.message.orEmpty()}".take(300)
+                outputState = "failed"
                 Log.e(TAG, "Output failed; paused until reconnect or setting change", e)
                 failedEpoch = request.epoch
                 // Even a failed write may have reached the server. Try to clear before releasing.
@@ -115,14 +159,18 @@ object VoyahNavigationOutput {
         if (request.guidance == null) {
             clearOutput()
             if (!request.active) disconnect()
+            outputState = if (request.active) "waiting_for_route" else "inactive"
             return
         }
         if (request.guidance == applied) return
         val context = synchronized(lock) { app } ?: return
         var link = connection
         if (link == null) {
-            verify(context)
+            outputState = "verifying"
+            verifiedProfile = verify(context)
+            Log.i(TAG, "Verified cluster profile=$verifiedProfile")
             if (synchronized(lock) { requested != request }) return
+            outputState = "binding"
             link = Connection(context)
             connection = link
             link.connect()
@@ -131,6 +179,8 @@ object VoyahNavigationOutput {
         mayHaveOutput = true
         link.send(request.guidance)
         applied = request.guidance
+        sentTotal.incrementAndGet()
+        outputState = "sent"
         Log.d(TAG, "Sent icon=${request.guidance.icon}, distance=${request.guidance.distance}")
     }
 
@@ -149,24 +199,7 @@ object VoyahNavigationOutput {
         applied = null
     }
 
-    private fun verify(context: Context) {
-        val pkg = context.packageManager.getPackageInfo(PKG, 0)
-        val info = requireNotNull(pkg.applicationInfo)
-        check(info.splitSourceDirs.isNullOrEmpty()) { "Unsupported split cluster APK" }
-        checkHash(File(info.sourceDir), "1a394bf793a467dd78b95ca1ed2004df62c280df4b58b043629257889d8e4f38")
-        checkHash(File("/system/framework/QGAPI.jar"), "e46d3e5db0cf932cd3a39654a2f95620f2668ada8fb32b904c1684f936eca510")
-    }
-
-    private fun checkHash(file: File, expected: String) {
-        check(file.isFile && file.length() in 1..(64L * 1024 * 1024)) { "Missing ${file.name}" }
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(32768)
-            while (true) { val count = input.read(buffer); if (count < 0) break; digest.update(buffer, 0, count) }
-        }
-        val actual = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
-        check(actual == expected) { "Unsupported ${file.name}" }
-    }
+    private fun verify(context: Context) = VoyahClusterCompatibility.verify(context)
 
     private class Connection(private val context: Context) : ServiceConnection {
         private val ready = CountDownLatch(1)

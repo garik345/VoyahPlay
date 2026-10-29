@@ -12,6 +12,7 @@ public final class VoyahRootModule {
     private static final Executor WORK = Executors.newSingleThreadExecutor();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     public interface Callback { void complete(boolean success, String report); }
+    public enum ClusterProbeAction { STATUS, GRID, MAP, STOP }
     private VoyahRootModule() {}
     public static String lastReport(Context context) {
         return context.getSharedPreferences("voyah_root_helper", 0).getString("report", "Root-помощник ещё не проверен.");
@@ -29,7 +30,14 @@ public final class VoyahRootModule {
                     RootProcess.Result result = RootHelperClient.call(android.os.Process.myUid(), request, 15);
                     ok = result.successful(); text = state.report() + "\n" + result.output;
                 } else {
-                    state.requireCompatible();
+                    if (request.action == RootHelperProtocol.Action.RADIO_STATUS || request.action == RootHelperProtocol.Action.RADIO_POLICY)
+                        state.requireRadioLabels();
+                    else if (request.action == RootHelperProtocol.Action.CLUSTER_AUTO_TICK || request.action == RootHelperProtocol.Action.CLUSTER_AUTO_STOP)
+                        state.requireClusterAuto();
+                    else if (request.action == RootHelperProtocol.Action.CLUSTER_STATUS || request.action == RootHelperProtocol.Action.CLUSTER_GRID
+                            || request.action == RootHelperProtocol.Action.CLUSTER_MAP || request.action == RootHelperProtocol.Action.CLUSTER_STOP)
+                        state.requireClusterProbe();
+                    else state.requireCompatible();
                     RootProcess.Result result = RootHelperClient.call(android.os.Process.myUid(), request, 15);
                     ok = result.successful(); text = result.output;
                 }
@@ -54,5 +62,24 @@ public final class VoyahRootModule {
     }
     public static void setAutoStart(Context context, boolean value, Callback callback) {
         execute(context, new RootHelperProtocol.Request(RootHelperProtocol.Action.BOOT_POLICY, value, false), callback);
+    }
+    public static void radioLabelsStatus(Context context, Callback callback) {
+        execute(context, new RootHelperProtocol.Request(RootHelperProtocol.Action.RADIO_STATUS), callback);
+    }
+    public static void setRadioLabels(Context context, boolean value, Callback callback) {
+        execute(context, new RootHelperProtocol.Request(RootHelperProtocol.Action.RADIO_POLICY, value, false), callback);
+    }
+    public static void clusterProbe(Context context, ClusterProbeAction action, Callback callback) {
+        RootHelperProtocol.Action request;
+        switch (action) {
+            case GRID: request = RootHelperProtocol.Action.CLUSTER_GRID; break;
+            case MAP: request = RootHelperProtocol.Action.CLUSTER_MAP; break;
+            case STOP: request = RootHelperProtocol.Action.CLUSTER_STOP; break;
+            default: request = RootHelperProtocol.Action.CLUSTER_STATUS;
+        }
+        execute(context, new RootHelperProtocol.Request(request), callback);
+    }
+    public static void clusterAuto(Context context, boolean keepAlive, Callback callback) {
+        execute(context, new RootHelperProtocol.Request(keepAlive ? RootHelperProtocol.Action.CLUSTER_AUTO_TICK : RootHelperProtocol.Action.CLUSTER_AUTO_STOP), callback);
     }
 }

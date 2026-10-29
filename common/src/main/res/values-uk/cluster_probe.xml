@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_cluster_probe_title">Карта на панелі приладів (експериментально)</string>
+    <string name="settings_cluster_probe_description">Карта з’являється автоматично під час активного маршруту. Потрібен root-помічник 1.2.7. Кнопки ручної перевірки нижче запускають тест на 60 секунд. Ручний тест призупиняє автопоказ до завершення маршруту.</string>
+    <string name="settings_cluster_probe_status">Перевірити екран приладів</string>
+    <string name="settings_cluster_probe_grid">Показати тестову сітку</string>
+    <string name="settings_cluster_probe_map">Показати карту CarPlay</string>
+    <string name="settings_cluster_probe_stop">Зупинити тест</string>
+    <string name="settings_cluster_probe_copy">Скопіювати звіт тесту</string>
+    <string name="settings_cluster_probe_working">Очікування відповіді помічника…</string>
+    <string name="settings_cluster_probe_stream_description">Показує карту під час навігації та повертає медіакартку після завершення маршруту або відключення iPhone. Зміна потребує перепідключення CarPlay.</string>
+    <string name="settings_cluster_probe_map_help">Увімкніть «%1$s» у цій картці тесту й перепідключіть CarPlay. Запустіть навігацію та знову натисніть «Показати карту CarPlay». Якщо перемикач уже ввімкнений, перевірте звіт: iPhone ще не запустив потік карти.</string>
+    <string name="settings_cluster_probe_waiting">Очікування карти CarPlay</string>
+    <string name="settings_cluster_probe_copied">Звіт тесту скопійовано</string>
+    <string name="settings_cluster_map_element_size">Написи та значки карти</string>
+    <string name="settings_cluster_map_element_size_description">Розмір написів і значків не залежить від наближення доріг. Більший відсоток збільшує елементи. Застосовується після перепідключення CarPlay.</string>
+    <string name="settings_cluster_map_size_value">%1$d%%</string>
+    <string name="settings_cluster_map_zoom_description">Наближає або віддаляє активну карту без перепідключення. Під час навігації iPhone може змінювати наближення автоматично.</string>
+    <string name="settings_cluster_map_zoom_in">Наблизити карту</string>
+    <string name="settings_cluster_map_zoom_out">Віддалити карту</string>
+    <string name="settings_cluster_map_zoom_unavailable">Спочатку відкрийте карту на панелі приладів і залиште iPhone підключеним.</string>
+</resources>

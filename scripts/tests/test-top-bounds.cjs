@@ -30,9 +30,16 @@ function fixture() {
         const bounds = rect(options.left ?? 0, options.top ?? 45, options.right ?? 1920, options.bottom ?? 720);
         const win = {getBounds:() => bounds, getWindowingMode:() => options.mode ?? 1,
             setBounds:r => { config.result = r; }, setAppBounds:r => { config.app = r; }};
-        const config = {windowConfiguration:{value:win}, densityDpi:{value:options.density ?? 160}, screenHeightDp:{value:675}};
+        const config = {windowConfiguration:{value:win}, densityDpi:{value:options.density ?? 160},
+            screenHeightDp:{value:675}, screenWidthDp:{value:1920}};
         const record = {packageName:{value:options.package ?? 'com.shilapi.xcertplay'}, getDisplayId:() => options.display ?? 0,
-            intent:{value:{getComponent:() => ({getClassName:() => options.component ?? 'com.shilapi.xcertplay.CarPlayHostActivity'})}}};
+            launchedFromUid:{value:options.caller ?? 0}, getDisplayContent:() => ({getDisplayInfo:() => ({
+                name:{value:options.displayName ?? 'Cluster-Media-Display'}, ownerUid:{value:options.owner ?? 1000},
+                ownerPackageName:{value:options.ownerPackage ?? 'com.qinggan.cluster'}, flags:{value:options.flags ?? 4},
+                logicalWidth:{value:options.width ?? 1920}, logicalHeight:{value:options.height ?? 720}})}),
+            intent:{value:{getComponent:() => ({getClassName:() => options.component ?? 'com.shilapi.xcertplay.CarPlayHostActivity'}),
+                getStringExtra:key => key === 'voyah_probe_token' ? (options.token === undefined ? 'c7d35226-abce-43fc-af7f-ddfe27a2c434' : options.token) : (options.probeMode ?? 'grid'),
+                getLongExtra:() => options.deadline ?? 65000}}};
         const task = {getTopMostActivity:() => { if (options.error) throw Error('record unavailable'); return options.noRecord ? null : record; }};
         const before = originalCalls;
         assert.equal(method.implementation.call(task, config), config);
@@ -84,5 +91,51 @@ test('missing or malformed bridge reports fail closed', () => {
 });
 test('our inspection error does not suppress original OEM behavior', () => {
     const f = fixture(); assert.equal(f.invoke({error:true}).result, undefined); assert.equal(f.invoke().result.top.value, 0);
+});
+const probe = {component:'com.shilapi.xcertplay.VoyahClusterProbeActivity', display:5,
+    left:0, top:0, right:0, bottom:0};
+test('a root-launched live grid/map probe gets a full canvas only on the reviewed media display', () => {
+    for (const probeMode of ['grid', 'map']) {
+        const c = fixture().invoke({...probe, probeMode});
+        assert.equal(c.result.right.value, 1920); assert.equal(c.result.bottom.value, 720);
+        assert.equal(c.app, c.result); assert.equal(c.screenWidthDp.value, 1920); assert.equal(c.screenHeightDp.value, 720);
+    }
+});
+test('probe correction does not change other screens, owners, callers, geometry, activities or nonempty bounds', () => {
+    for (const options of [{display:0}, {display:1}, {displayName:'Cluster-Navi-Display'}, {owner:10001},
+        {ownerPackage:'other.app'}, {flags:0}, {width:1280}, {height:600}, {caller:2000}, {mode:5},
+        {package:'other.app'}, {component:'com.shilapi.xcertplay.CarPlayHostActivity'}, {right:1920}])
+        assert.equal(fixture().invoke({...probe, ...options}).result, undefined, JSON.stringify(options));
+});
+test('invalid, expired or excessive probe intents never grant a bounds correction', () => {
+    for (const options of [{token:null}, {token:'bad'}, {probeMode:'other'}, {deadline:10000}, {deadline:70001}])
+        assert.equal(fixture().invoke({...probe, ...options}).result, undefined, JSON.stringify(options));
+});
+test('probe correction preserves the bridge boot/license/freshness gate but needs no driver width lease', () => {
+    const off = fixture(); off.values.delete('voyahplay_top_bounds_lease'); off.baseChange({lease_active:false}); off.poll();
+    assert.equal(off.invoke(probe).result.right.value, 1920);
+    for (const change of [{subscription_valid:false}, {boot_ready:false}, {pid:777}, {now_ms:4999}]) {
+        const f = fixture(); f.baseChange(change); f.poll(); assert.equal(f.invoke(probe).result, undefined);
+    }
+    const expired = fixture(); expired.clock(15001); assert.equal(expired.invoke(probe).result, undefined);
+});
+test('automatic bounds follow a matching renewed root lease beyond the original intent deadline', () => {
+    const f = fixture(); f.clock(50000); f.baseChange({now_ms:50000});
+    f.values.set('voyahplay_cluster_auto_lease', '1|c7d35226-abce-43fc-af7f-ddfe27a2c434|5|95000'); f.poll();
+    assert.equal(f.invoke({...probe, probeMode:'auto', deadline:20000}).result.right.value, 1920);
+});
+test('a fresh root-launched automatic intent renders before the settings poll observes its lease', () => {
+    const c = fixture().invoke({...probe, probeMode:'auto', deadline:55000});
+    assert.equal(c.result.right.value, 1920);
+    assert.equal(fixture().invoke({...probe, probeMode:'auto', deadline:55001}).result, undefined);
+});
+test('automatic bounds reject missing, expired, excessive, wrong-token and wrong-display renewals', () => {
+    for (const raw of [null, '0', '1|c7d35226-abce-43fc-af7f-ddfe27a2c434|5|10000',
+        '1|c7d35226-abce-43fc-af7f-ddfe27a2c434|5|55001',
+        '1|c7d35226-abce-43fc-af7f-ddfe27a2c434|6|50000',
+        '1|01234567-89ab-cdef-0123-456789abcdef|5|50000']) {
+        const f = fixture(); f.values.set('voyahplay_cluster_auto_lease', raw); f.poll();
+        assert.equal(f.invoke({...probe, probeMode:'auto', deadline:9999}).result, undefined, String(raw));
+    }
 });
 process.stdout.write(`${cases} top-edge contract tests passed\n`);

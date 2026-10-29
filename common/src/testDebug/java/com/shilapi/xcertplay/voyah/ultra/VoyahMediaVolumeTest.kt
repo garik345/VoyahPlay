@@ -71,4 +71,57 @@ class VoyahMediaVolumeTest {
         verify(audio, never()).setStreamVolume(anyInt(), anyInt(), anyInt())
         verify(audio, never()).adjustStreamVolume(anyInt(), anyInt(), anyInt())
     }
+
+    private class OemMute(var muted: Boolean = false, var clearing: Boolean? = true) : VoyahNativeMute {
+        var clears = 0
+        override fun read() = muted
+        override fun clear(): Boolean? { clears++; if (clearing == true) muted = false; return clearing }
+    }
+
+    @Test fun externalMasterMuteIsReportedWhileAndroidKeepsAPositiveIndex() {
+        val oem = OemMute()
+        volume = VoyahMediaVolume(audio, saved, oem)
+        assertEquals(5L to false, volume.read())
+        oem.muted = true
+        assertEquals(5L to true, volume.read())
+        oem.muted = false
+        assertEquals(5L to false, volume.read())
+        assertEquals(0, oem.clears) // Merely reading the native mute never changes sound.
+    }
+
+    @Test fun carPlayCanReleaseTheExternalMasterMuteWithoutChangingItsLevel() {
+        val oem = OemMute(true)
+        volume = VoyahMediaVolume(audio, saved, oem)
+        assertTrue(volume.write(null, false).confirmed)
+        assertEquals(5L to false, volume.read())
+        assertFalse(oem.muted)
+    }
+
+    @Test fun positiveVolumeReleasesNativeMuteButZeroDoesNot() {
+        val oem = OemMute(true)
+        volume = VoyahMediaVolume(audio, saved, oem)
+        assertTrue(volume.write(0, null).confirmed)
+        assertTrue(oem.muted)
+        assertEquals(0, oem.clears)
+        assertTrue(volume.write(7, null).confirmed)
+        assertEquals(7L to false, volume.read())
+    }
+
+    @Test fun aRejectedNativeUnmuteIsNotConfirmedOrAppliedToTheAndroidStream() {
+        val oem = OemMute(true, false)
+        volume = VoyahMediaVolume(audio, saved, oem)
+        assertFalse(volume.write(7, null).confirmed)
+        assertEquals(5L to true, volume.read())
+        verify(audio, never()).setStreamVolume(anyInt(), anyInt(), anyInt())
+    }
+
+    @Test fun aHeadUnitWithoutTheOemServiceKeepsTheExistingAndroidVolumePath() {
+        volume = VoyahMediaVolume(audio, saved, object : VoyahNativeMute {
+            override fun read(): Boolean? = null
+            override fun clear(): Boolean? = null
+        })
+        assertTrue(volume.write(null, true).confirmed)
+        assertTrue(volume.write(null, false).confirmed)
+        assertEquals(5L to false, volume.read())
+    }
 }

@@ -7,9 +7,14 @@ import java.util.Map;
 public final class VoyahComfortValues {
     private final Map<String, Integer> values;
     private final boolean available;
+    private final boolean heatedWheel;
     public VoyahComfortValues(Map<String, Integer> values, boolean available) {
+        this(values, available, true);
+    }
+    public VoyahComfortValues(Map<String, Integer> values, boolean available, boolean heatedWheel) {
         this.values = values == null ? new HashMap<>() : new HashMap<>(values);
         this.available = available;
+        this.heatedWheel = heatedWheel;
     }
     private int get(String name) {
         Integer value = values.get(name);
@@ -22,7 +27,7 @@ public final class VoyahComfortValues {
         return effectiveLevel(get(prefix + "_SWITCH" + suffix), get(prefix + "_COMMAND" + suffix));
     }
     public Integer wheelHeatingLevel() {
-        if (!available) return null;
+        if (!available || !heatedWheel) return null;
         int state = get("STEER_WHEEL_HEAT_SWITCH");
         if (state == 1) return Integer.valueOf(0);
         if (state == 2) return Integer.valueOf(1);
@@ -37,6 +42,21 @@ public final class VoyahComfortValues {
         if (!available || side < 0 || side > 1) return null;
         int value = get("FRONT_SEAT_MASS_COMMAND" + (side == 0 ? "_LEFT" : "_RIGHT"));
         return value == 1 || value == 2 ? Integer.valueOf(value) : null;
+    }
+    public Integer ambientOn() { return available ? switchLevel(get("VEHICLE_AMBIENT_LIGHT_SWITCH")) : null; }
+    private static Integer switchLevel(int value) { return value==1 ? Integer.valueOf(0) : value==2 ? Integer.valueOf(1) : null; }
+    private Integer ranged(String key,int minimum,int maximum) {
+        int value=get(key);return available && value>=minimum && value<=maximum ? Integer.valueOf(value) : null;
+    }
+    public Integer ambientBrightness() { return ranged("VEHICLE_AMBIENT_LIGHT_BRIGHTNESS_LEVEL",1,10); }
+    public Integer ambientColor() { return ranged("VEHICLE_AMBIENT_LIGHT_COLOR",1,64); }
+    public Integer aromaLevel() { return available ? effectiveLevel(get("FCM_SW_REQ"),get("IVI_FRAG_CONCERNTION")) : null; }
+    public Integer aromaTaste() { return ranged("IVI_FRAG_TASTE",1,3); }
+    public Integer aromaTime() { return ranged("FCM_DURATION_CONTROL",0,2); }
+    public Integer hybridMode() {
+        if (!available) return null;
+        int value=get("IVI_SOC_MODESET");
+        return value>=1 && value<=4 ? Integer.valueOf(value) : null;
     }
     public Integer driveMode() {
         if (!available) return null;
@@ -77,11 +97,11 @@ public final class VoyahComfortValues {
             "\nПрограмма массажа: " + raw(get("FRONT_SEAT_MASS_COMMAND"+suffix));
     }
     public String display() {
-        if (!available) return "Сиденья / руль / аромат / свет:\nданные недоступны";
+        if (!available) return "Сиденья / " + (heatedWheel ? "руль / " : "") + "аромат / свет:\nданные недоступны";
         return seat("LEFT", "Водитель") + "\n\n" + seat("RIGHT", "Пассажир") +
-            "\n\nПодогрев руля: " + onOff(get("STEER_WHEEL_HEAT_SWITCH")) +
+            (heatedWheel ? "\n\nПодогрев руля: " + onOff(get("STEER_WHEEL_HEAT_SWITCH")) +
             "\nОбратная связь руля: " + raw(get("STEER_WHEEL_HEAT_SWITCH_FB")) +
-            "\nОшибка руля (код): " + raw(get("STEER_WHEEL_HEAT_ERROR")) +
+            "\nОшибка руля (код): " + raw(get("STEER_WHEEL_HEAT_ERROR")) : "") +
             "\n\nАроматизатор: " + onOff(get("FCM_SW_REQ")) +
             "\nВыбранный аромат: " + raw(get("IVI_FRAG_TASTE")) +
             "\nИнтенсивность (код): " + raw(get("IVI_FRAG_CONCERNTION")) +

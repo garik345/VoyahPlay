@@ -10,9 +10,7 @@ import android.os.SystemClock
 import android.os.Looper
 import android.util.Log
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
-import java.io.File
 import java.lang.reflect.Method
-import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -194,24 +192,7 @@ object VoyahTrackOutput {
     }
     private fun disconnect() { connection?.close(); connection = null; applied = null }
 
-    private fun verify(context: Context) {
-        val pkg = context.packageManager.getPackageInfo(PKG, 0)
-        val info = requireNotNull(pkg.applicationInfo)
-        check(info.splitSourceDirs.isNullOrEmpty()) { "Unsupported split cluster APK" }
-        checkHash(File(info.sourceDir), "1a394bf793a467dd78b95ca1ed2004df62c280df4b58b043629257889d8e4f38")
-        checkHash(File("/system/framework/QGAPI.jar"), "e46d3e5db0cf932cd3a39654a2f95620f2668ada8fb32b904c1684f936eca510")
-    }
-
-    private fun checkHash(file: File, expected: String) {
-        check(file.isFile && file.length() in 1..(64L * 1024 * 1024)) { "Missing ${file.name}" }
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(32768)
-            while (true) { val count = input.read(buffer); if (count < 0) break; digest.update(buffer, 0, count) }
-        }
-        val actual = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
-        check(actual == expected) { "Unsupported ${file.name}" }
-    }
+    private fun verify(context: Context) = VoyahClusterCompatibility.verify(context)
 
     private class Connection(private val context: Context) : ServiceConnection {
         private val ready = CountDownLatch(1)

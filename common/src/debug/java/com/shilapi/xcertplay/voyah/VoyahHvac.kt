@@ -73,7 +73,6 @@ internal data class VoyahHvacResult(val status: UltraClimateWriteResult, val val
 internal object VoyahHvac {
     private const val PKG = "com.qinggan.canbus.service"
     private const val API = "com.qinggan.canbus.ICanBusService"
-    private const val HASH = "96ac5182e795ad70c43c78f26b9cf29e76b59db67c2d5c09216ba1d8425c427c"
     private val busy = AtomicBoolean()
     private val main = Handler(Looper.getMainLooper())
     fun write(context: Context, control: UltraHvacControl, value: Any, live: () -> Boolean): VoyahHvacResult {
@@ -113,7 +112,7 @@ internal object VoyahHvac {
                 val buffer = ByteArray(65_536)
                 while (true) { checkLive(); val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n) }
             }
-            check(digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) } == HASH) { "Unreviewed CAN APK" }
+            check(VoyahOemBuilds.supportsCanApk(digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) })) { "Unreviewed CAN APK" }
             main.post {
                 if (cancelled.get() || !live()) { ready.countDown(); return@post }
                 try {

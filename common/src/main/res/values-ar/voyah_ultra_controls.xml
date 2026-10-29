@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_powertrain_mode">وضع منظومة الدفع</string>
+    <string name="carplay_power_smart">ذكي</string>
+    <string name="carplay_power_electric">كهربائي</string>
+    <string name="carplay_power_hybrid">هجين</string>
+    <string name="carplay_power_sustain">الحفاظ على الشحن (وقود)</string>
+    <string name="carplay_audio_ringtone">نغمة الرنين</string>
+</resources>

@@ -98,11 +98,18 @@ internal class AudioFocusCoordinator(
     @Synchronized
     fun acquire(track: AudioTrack, channel: AudioChannel, attributes: AudioAttributes) {
         if (closed || !enabled || manager == null || (channel == AudioChannel.NAVIGATION && !navigationFocusEnabled)) return
-        val focusAttributes = if (channel == AudioChannel.NAVIGATION) AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build() else attributes
-        val expected = VoyahAudioRouting.stream(channel)
-        val stream = if (navigationFocusEnabled && runCatching { track.streamType == expected }.getOrDefault(false)) expected else -1
+        val focusAttributes = when {
+            channel == AudioChannel.NAVIGATION -> AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+            navigationFocusEnabled && channel == AudioChannel.ASSISTANT && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+            else -> attributes
+        }
+        val stream = if (navigationFocusEnabled) runCatching {
+            VoyahAudioRouting.focusStream(channel, track.streamType)
+        }.getOrDefault(-1) else -1
         active[track] = Entry(channel, focusAttributes, oemStream = stream)
         refreshRequest()
         applyMediaVolume(track, active.getValue(track))
@@ -251,7 +258,14 @@ class AndroidMediaSink(
     private val voyahAudioRouting: Boolean = false,
     private val onAudioFocusStreamChanged: (Int) -> Unit = {},
     private val onAudioFocusClosed: () -> Unit = {},
+    /** Initial codec dimensions for stream 111, including each mirror of that stream. */
+    private val clusterVideoSize: Pair<Int, Int>? = null,
 ) : MediaSink {
+    init {
+        require(clusterVideoSize == null || (clusterVideoSize.first > 0 && clusterVideoSize.second > 0)) {
+            "Cluster video dimensions must be positive"
+        }
+    }
     // Each downlink publishes its own reference; a mic must match that stream and sample rate.
     private val callEchoReferences = ConcurrentHashMap<AudioStreamId, EchoReference>()
     private val appContext = context?.applicationContext
@@ -489,6 +503,8 @@ class AndroidMediaSink(
         }
     }
 
+    fun isScreenStreamActive(type: Int): Boolean = synchronized(screenStateLock) { type in activeScreenTypes }
+
     override fun onVideoCodec(type: Int, codec: VideoCodec) {
         synchronized(videoOwnershipLock) {
             if (!videoClosed) pendingVideoCodec[type] = codec
@@ -709,26 +725,30 @@ class AndroidMediaSink(
         }
     }
 
-    private fun newVideoDecoder(type: Int, surface: Surface?, statsLabel: String? = null, startImmediately: Boolean = true) = VideoDecoder(
-        type,
-        surface,
-        videoWidth,
-        videoHeight,
-        preferSoftwareHevcDecoder,
-        requestKeyFrame = { requestVideoRecovery(type) },
-        report = { videoDiagnosticHandlers[type]?.invoke(it) },
-        statsLabel = statsLabel,
-        onExit = ::onVideoDecoderExit,
-        // Only the main screen goes to the host's SurfaceView; mirrors and the cluster keep their path.
-        pacingDelayNanos = if (type == MAIN_SCREEN_TYPE && statsLabel == null) videoPacingDelayMillis * 1_000_000L else 0L,
-        operatingRate = videoOperatingRate(type, statsLabel, mainVideoFrameRate),
-        vendorLowLatency = vendorLowLatencyDecoder,
-        dedicatedOutputThread = vendorLowLatencyDecoder,
-        framesAtOnce = type == MAIN_SCREEN_TYPE && statsLabel == null && videoPacingDelayMillis > 0,
-        // Keep the experimental MTK mode on the main CarPlay picture only. Mirrors and the
-        // cluster have separate timing and must retain their established decoder configuration.
-        mtkDecoderTuningEnabled = mtkDecoderTuningEnabled && type == MAIN_SCREEN_TYPE && statsLabel == null,
-    ).also { if (startImmediately) it.start() }
+    private fun newVideoDecoder(type: Int, surface: Surface?, statsLabel: String? = null, startImmediately: Boolean = true): VideoDecoder {
+        val (decoderWidth, decoderHeight) = if (type == ALT_SCREEN_TYPE && clusterVideoSize != null)
+            clusterVideoSize else videoWidth to videoHeight
+        return VideoDecoder(
+            type,
+            surface,
+            decoderWidth,
+            decoderHeight,
+            preferSoftwareHevcDecoder,
+            requestKeyFrame = { requestVideoRecovery(type) },
+            report = { videoDiagnosticHandlers[type]?.invoke(it) },
+            statsLabel = statsLabel,
+            onExit = ::onVideoDecoderExit,
+            // Only the main screen goes to the host's SurfaceView; mirrors and the cluster keep their path.
+            pacingDelayNanos = if (type == MAIN_SCREEN_TYPE && statsLabel == null) videoPacingDelayMillis * 1_000_000L else 0L,
+            operatingRate = videoOperatingRate(type, statsLabel, mainVideoFrameRate),
+            vendorLowLatency = vendorLowLatencyDecoder,
+            dedicatedOutputThread = vendorLowLatencyDecoder,
+            framesAtOnce = type == MAIN_SCREEN_TYPE && statsLabel == null && videoPacingDelayMillis > 0,
+            // Keep the experimental MTK mode on the main CarPlay picture only. Mirrors and the
+            // cluster have separate timing and must retain their established decoder configuration.
+            mtkDecoderTuningEnabled = mtkDecoderTuningEnabled && type == MAIN_SCREEN_TYPE && statsLabel == null,
+        ).also { if (startImmediately) it.start() }
+    }
 
     @Synchronized
     private fun audioRenderer(id: AudioStreamId, format: AudioFormat): AudioRenderer {
@@ -770,6 +790,7 @@ class AndroidMediaSink(
 
 /** CarPlay's main screen stream type. */
 private const val MAIN_SCREEN_TYPE = 110
+private const val ALT_SCREEN_TYPE = 111
 
 /**
  * An offscreen consumer a parked decoder renders to while its SurfaceView is gone. It drops each image
@@ -1786,6 +1807,7 @@ private class AudioRenderer(
     private var mappedChannel: AudioChannel? = null
     private var navigationAudioFocus: NavigationAudioFocus? = null
     private val navigationPlaybackToken = NavigationPlayback.open()
+    private val voyahRouteToken = VoyahPlaybackRoutes.open()
     private var actualLegacyStreamType: Int? = null
     private val queue = LinkedBlockingQueue<AudioPacket>(MAX_QUEUED_PACKETS)
     /** Music with sustained decoder backpressure must not keep playing minutes-old packets. */
@@ -1894,6 +1916,7 @@ private class AudioRenderer(
         AmbientMusicController.closeRenderer(ambientRendererToken)
         running = false
         NavigationPlayback.close(navigationPlaybackToken)
+        VoyahPlaybackRoutes.remove(voyahRouteToken)
         thread.interrupt()
     }
 
@@ -2013,15 +2036,22 @@ private class AudioRenderer(
         val built: AudioTrack
         var routeLabel: String
         diagnosticStage = "track-build"
-        if (streamOverride == 0) {
-            attributes = audioAttributesFor(selection)
-            routeLabel = "usage"
+        val assistantUsageRoute = voyahAudioRouting && selection.channel == AudioChannel.ASSISTANT && streamOverride == 10
+        if (streamOverride == 0 || assistantUsageRoute) {
+            attributes = if (assistantUsageRoute) VoyahAudioRouting.assistantPlaybackAttributes() else audioAttributesFor(selection)
+            routeLabel = if (assistantUsageRoute) "streamType=10(usage=accessibility)" else "usage"
             built = AudioTrack.Builder()
                 .setAudioAttributes(attributes)
                 .setAudioFormat(pcmFormat(encoding, channelMask))
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .setBufferSizeInBytes(plan.trackBufferBytes)
                 .build()
+            if (assistantUsageRoute) {
+                val actual = runCatching { built.streamType }.getOrDefault(-1)
+                val accepted = VoyahAudioRouting.accepted(10, actual, built.state == AudioTrack.STATE_INITIALIZED)
+                if (!accepted) actualLegacyStreamType = null
+                report("Audio: Voyah route requested=10 actual=$actual accepted=$accepted via=accessibility")
+            }
         } else {
             val streamType = streamOverride
             routeLabel = "streamType=$streamType"
@@ -2056,6 +2086,13 @@ private class AudioRenderer(
             )
         }
         track = built
+        if (voyahAudioRouting) VoyahPlaybackRoutes.register(voyahRouteToken) {
+            val device = built.routedDevice
+            "role=${selection.channel} audioType=${format.audioType} stream=${built.streamType}" +
+                " session=${built.audioSessionId} usage=${audioTrackAttributesForFocus(built, attributes).usage}" +
+                " playing=${built.playState == AudioTrack.PLAYSTATE_PLAYING}" +
+                " device=${device?.type}:${device?.id}"
+        }
         if (mappedChannel == AudioChannel.PHONE) {
             val listener = AudioRouting.OnRoutingChangedListener { routing -> checkCallRoute(routing.routedDevice) }
             if (runCatching { built.addOnRoutingChangedListener(listener, Handler(Looper.getMainLooper())) }.isSuccess) {
@@ -2167,6 +2204,8 @@ private class AudioRenderer(
         selection: AudioChannelSelection,
         streamOverride: Int,
     ): AudioAttributes {
+        if (voyahAudioRouting && selection.channel == AudioChannel.ASSISTANT && streamOverride == 10)
+            return VoyahAudioRouting.assistantPlaybackAttributes()
         if (streamOverride in AudioManager.STREAM_SYSTEM..AudioManager.STREAM_ACCESSIBILITY) {
             // Android accepts only its defined legacy stream IDs here. BYD audio policy can
             // map these standard streams to vehicle outputs; arbitrary channel numbers are
@@ -2697,6 +2736,7 @@ private class AudioRenderer(
         }
         val track = track
         this.track = null
+        VoyahPlaybackRoutes.remove(voyahRouteToken)
         if (track != null) {
             routingListener?.let { listener -> runCatching { track.removeOnRoutingChangedListener(listener) } }
             routingListener = null

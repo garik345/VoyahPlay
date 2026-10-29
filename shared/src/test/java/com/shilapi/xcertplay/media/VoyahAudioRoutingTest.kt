@@ -9,7 +9,7 @@ class VoyahAudioRoutingTest {
         val routes = inputs.map {
             VoyahAudioRouting.stream(AudioChannelMapper.map(it, 100, AudioChannelMappingMode.MOBILE_COMPATIBLE).channel)
         }
-        assertEquals(listOf(3, 1, 6, 22), routes)
+        assertEquals(listOf(3, 1, 6, 10), routes)
         assertEquals(4, routes.toSet().size)
     }
 
@@ -17,7 +17,7 @@ class VoyahAudioRoutingTest {
         val events = mutableListOf<String>()
         val result = LegacyAudioFallback.build(
             createLegacy = { 3 },
-            isInitialized = { VoyahAudioRouting.accepted(22, it, true) },
+            isInitialized = { VoyahAudioRouting.accepted(10, it, true) },
             release = { events += "release:$it" },
             createFallback = { events += "fallback"; 16 },
         )
@@ -26,8 +26,18 @@ class VoyahAudioRoutingTest {
     }
 
     @Test fun acceptedRouteRequiresBothCorrectStreamAndInitializedTrack() {
-        assertTrue(VoyahAudioRouting.accepted(22, 22, true))
-        assertFalse(VoyahAudioRouting.accepted(22, 22, false))
+        assertTrue(VoyahAudioRouting.accepted(10, 10, true))
+        assertFalse(VoyahAudioRouting.accepted(10, 10, false))
         assertFalse(VoyahAudioRouting.accepted(6, 3, true))
+    }
+
+    @Test fun assistantPlaybackIdNeverBecomesAQingganFocusId() {
+        assertEquals(10, VoyahAudioRouting.stream(AudioChannel.ASSISTANT))
+        assertEquals(22, VoyahAudioRouting.focusStream(AudioChannel.ASSISTANT, 10))
+        assertEquals(-1, VoyahAudioRouting.focusStream(AudioChannel.ASSISTANT, 3))
+        assertEquals(-1, VoyahAudioRouting.focusStream(AudioChannel.ASSISTANT, 22))
+        assertEquals(1, VoyahAudioRouting.focusStream(AudioChannel.NAVIGATION, 1))
+        assertEquals(-1, VoyahAudioRouting.focusStream(AudioChannel.NAVIGATION, 3))
+        assertEquals(6, VoyahAudioRouting.focusStream(AudioChannel.PHONE, 6))
     }
 }

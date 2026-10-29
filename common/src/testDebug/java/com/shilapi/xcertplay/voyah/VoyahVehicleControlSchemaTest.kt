@@ -5,6 +5,25 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VoyahVehicleControlSchemaTest {
+    @Test fun aMatchingModeAloneCannotConfirmAFailedCompoundRequest() {
+        val partial = mapOf("DRIVE" to 3, "MODE_CONFIRMED" to 0)
+        assertEquals(3, VoyahVehicleControlSchema.readback(partial)[DRIVE_MODE])
+        assertFalse(VoyahVehicleControlSchema.confirms(DRIVE_MODE, 3, partial))
+        assertTrue(VoyahVehicleControlSchema.confirms(DRIVE_MODE, 3, partial + ("MODE_CONFIRMED" to 1)))
+        assertFalse(VoyahVehicleControlSchema.confirms(DRIVE_MODE, 2, partial + ("MODE_CONFIRMED" to 1)))
+        assertFalse(VoyahVehicleControlSchema.confirms(HYBRID_MODE, 3, mapOf("HYBRID" to 3)))
+    }
+    @Test fun drivingAndHybridModesNeverBecomeSeatOrClimateCommands() {
+        assertEquals("drive-mode", VoyahVehicleControlSchema.command(DRIVE_MODE, 6)!!.name)
+        assertEquals("hybrid-mode", VoyahVehicleControlSchema.command(HYBRID_MODE, 4)!!.name)
+        assertNull(VoyahVehicleControlSchema.command(DRIVE_MODE, 0))
+        assertNull(VoyahVehicleControlSchema.command(HYBRID_MODE, 5))
+        val values = VoyahVehicleControlSchema.readings(VoyahComfortValues(mapOf("IVI_SOC_MODESET" to 3), true))
+        assertEquals(3, values[HYBRID_MODE])
+        assertFalse(values.containsKey(DRIVE_MODE))
+        // Forced EV remains a distinct OEM mode; it must not be mislabeled as ordinary EV.
+        assertNull(VoyahComfortValues(mapOf("IVI_SOC_MODESET" to 5), true).hybridMode())
+    }
     @Test fun carplayMassageNeverRoutesToHeatingOrVentilationAndProgramDoesNotTurnItOn() {
         val driver = VoyahVehicleControlSchema.command(DRIVER_MASSAGE, 0)!!
         assertEquals("seat-level", driver.name); assertEquals(0, driver.side)
@@ -25,10 +44,10 @@ class VoyahVehicleControlSchemaTest {
     @Test fun massageUsesItsOwnSwitchIntensityAndProgramForEachSide() {
         val actual = VoyahVehicleControlSchema.readings(VoyahComfortValues(raw, true))
         assertEquals(mapOf(DRIVER_MASSAGE to 2, DRIVER_MASSAGE_PROGRAM to 1,
-            PASSENGER_MASSAGE to 0, PASSENGER_MASSAGE_PROGRAM to 2), actual)
+            PASSENGER_MASSAGE to 0, PASSENGER_MASSAGE_PROGRAM to 2, DRIVE_MODE to 2), actual)
         // An off seat retains intensity 3; this must not make the CarPlay control active.
         val feedback = mapOf("MASS_L" to 2, "MASS_LEVEL_L" to 2, "MASS_PROGRAM_L" to 1,
-            "MASS_R" to 1, "MASS_LEVEL_R" to 3, "MASS_PROGRAM_R" to 2)
+            "MASS_R" to 1, "MASS_LEVEL_R" to 3, "MASS_PROGRAM_R" to 2, "DRIVE" to 2, "MODE_CONFIRMED" to 1)
         assertEquals(actual, VoyahVehicleControlSchema.readback(feedback))
     }
     @Test fun missingSwitchInvalidIntensityAndMissingPermissionNeverBecomeOff() {

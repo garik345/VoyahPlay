@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_ambient_switch">Амбієнтне підсвічування</string>
+    <string name="carplay_ambient_brightness">Яскравість підсвічування</string>
+    <string name="carplay_ambient_color">Колір підсвічування</string>
+    <string name="carplay_aroma_level">Інтенсивність ароматизатора</string>
+    <string name="carplay_aroma_taste">Картридж ароматизатора</string>
+    <string name="carplay_aroma_time">Час ароматизації</string>
+    <string name="carplay_control_on">Увімкнено</string>
+    <string-array name="carplay_aroma_durations">
+        <item>Постійно</item>
+        <item>30 хв</item>
+        <item>60 хв</item>
+    </string-array>
+    <string-array name="carplay_ambient_colors">
+        <item>Синій</item>
+        <item>Блакитний</item>
+        <item>Фіолетовий</item>
+        <item>Зелений</item>
+        <item>Рожевий</item>
+        <item>Жовтий</item>
+        <item>Коричневий</item>
+        <item>Помаранчевий</item>
+        <item>Червоний</item>
+    </string-array>
+    <string name="carplay_aroma_off">Вимкнути ароматизатор</string>
+</resources>

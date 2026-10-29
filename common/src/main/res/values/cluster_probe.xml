@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_cluster_probe_title">Cluster map (experimental)</string>
+    <string name="settings_cluster_probe_description">Shows the map automatically while a route is active. Requires root helper 1.2.7. The manual test buttons below run for 60 seconds. A manual test pauses automatic display until the route ends.</string>
+    <string name="settings_cluster_probe_status">Check cluster display</string>
+    <string name="settings_cluster_probe_grid">Show test grid</string>
+    <string name="settings_cluster_probe_map">Show CarPlay map</string>
+    <string name="settings_cluster_probe_stop">Stop test</string>
+    <string name="settings_cluster_probe_copy">Copy test report</string>
+    <string name="settings_cluster_probe_working">Waiting for the helper…</string>
+    <string name="settings_cluster_probe_stream_description">Shows the map on the cluster during navigation and restores the media card when the route ends or iPhone disconnects. Changing this setting requires reconnecting CarPlay.</string>
+    <string name="settings_cluster_probe_map_help">Enable “%1$s” in this test card and reconnect CarPlay. Start navigation and try “Show CarPlay map” again. If it is already enabled, check the test report: iPhone has not started the map stream.</string>
+    <string name="settings_cluster_probe_waiting">Waiting for CarPlay map</string>
+    <string name="settings_cluster_probe_copied">Test report copied</string>
+    <string name="settings_cluster_map_element_size">Map labels and icons</string>
+    <string name="settings_cluster_map_element_size_description">Changes map labels and icons independently of geographic zoom. Larger percentages make them bigger. Applies after reconnecting CarPlay.</string>
+    <string name="settings_cluster_map_size_value">%1$d%%</string>
+    <string name="settings_cluster_map_zoom_description">Zoom in and out on the active cluster map without reconnecting. iPhone may adjust geographic zoom during navigation.</string>
+    <string name="settings_cluster_map_zoom_in">Zoom map in</string>
+    <string name="settings_cluster_map_zoom_out">Zoom map out</string>
+    <string name="settings_cluster_map_zoom_unavailable">First open a map on the cluster and keep iPhone connected.</string>
+</resources>

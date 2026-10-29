@@ -2,7 +2,7 @@ package com.shilapi.xcertplay.voyah.root;
 
 import java.io.IOException;
 
-/** Availability and compatibility are separate facts; mutations still require an exact match. */
+/** Compatibility of existing actions is separate from capabilities of optional new actions. */
 final class RootHelperStatus {
     private final RootProcess.Result result;
     final String version;
@@ -16,7 +16,8 @@ final class RootHelperStatus {
         String owner = field(result.output, "CLIENT_UID");
         ready = result.successful() && "1".equals(field(result.output, "HELPER_READY")) &&
                 "0".equals(field(result.output, "SERVER_UID")) && Integer.toString(appUid).equals(owner);
-        compatible = ready && RootHelperProtocol.VERSION.equals(version) &&
+        // Existing bounds/boot ordinals are unchanged; keep fullscreen working before helper upgrade.
+        compatible = ready && (RootHelperProtocol.VERSION.equals(version) || "1.2.6".equals(version) || "1.2.5".equals(version) || "1.2.4".equals(version) || "1.2.3".equals(version) || "1.2.2".equals(version) || "1.2.1".equals(version)) &&
                 TweaksBoundsRoot.CAPABILITY.equals(field(result.output, "CAPABILITIES"));
     }
     static String field(String output, String key) throws IOException {
@@ -31,6 +32,24 @@ final class RootHelperStatus {
     void requireCompatible() throws IOException {
         if (!compatible) throw new IOException("Root-помощник отвечает, но его версия или UID не соответствует APK. " +
                 "Установите помощник из этого проекта: root-helper.ps1 -Mode Install.\n" + report());
+    }
+    void requireRadioLabels() throws IOException {
+        requireCompatible();
+        if (!(RootHelperProtocol.VERSION.equals(version) || "1.2.6".equals(version) || "1.2.5".equals(version) || "1.2.4".equals(version) || "1.2.3".equals(version) || "1.2.2".equals(version)) ||
+                !RadioLabelsRoot.CAPABILITY.equals(field(result.output, "RADIO_LABELS_CAPABILITY")))
+            throw new IOException("Radio labels require root helper " + RootHelperProtocol.VERSION + ". Run root-helper.ps1 -Mode Install after installing this APK.");
+    }
+    void requireClusterProbe() throws IOException {
+        requireCompatible();
+        if (!(RootHelperProtocol.VERSION.equals(version) || "1.2.6".equals(version) || "1.2.5".equals(version) || "1.2.4".equals(version) || "1.2.3".equals(version)) ||
+                !ClusterProbeRoot.CAPABILITY.equals(field(result.output, "CLUSTER_PROBE_CAPABILITY")))
+            throw new IOException("Cluster probe requires root helper 1.2.3. Run root-helper.ps1 -Mode Install after installing this APK.");
+    }
+    void requireClusterAuto() throws IOException {
+        requireCompatible();
+        if (!RootHelperProtocol.VERSION.equals(version) ||
+                !ClusterProbeRoot.AUTO_CAPABILITY.equals(field(result.output, "CLUSTER_AUTO_CAPABILITY")))
+            throw new IOException("Automatic cluster map requires root helper " + RootHelperProtocol.VERSION + ". Run root-helper.ps1 -Mode Install.");
     }
     String report() {
         return "HELPER_CONNECTED=" + (connected ? 1 : 0) + "\nEXPECTED_HELPER_VERSION=" + RootHelperProtocol.VERSION +

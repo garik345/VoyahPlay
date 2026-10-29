@@ -55,7 +55,12 @@ public class RootHelperProtocolTest {
         for (RootHelperProtocol.Action action : RootHelperProtocol.Action.values()) {
             boolean allowed = action == RootHelperProtocol.Action.ROOT || action == RootHelperProtocol.Action.INFO
                     || action == RootHelperProtocol.Action.TWEAKS_STATUS || action == RootHelperProtocol.Action.TWEAKS_POLICY
-                    || action == RootHelperProtocol.Action.BOOT_STATUS || action == RootHelperProtocol.Action.BOOT_POLICY;
+                    || action == RootHelperProtocol.Action.BOOT_STATUS || action == RootHelperProtocol.Action.BOOT_POLICY
+                    || action == RootHelperProtocol.Action.TOP_POLICY || action == RootHelperProtocol.Action.RADIO_STATUS
+                    || action == RootHelperProtocol.Action.RADIO_POLICY || action == RootHelperProtocol.Action.CLUSTER_STATUS
+                    || action == RootHelperProtocol.Action.CLUSTER_GRID || action == RootHelperProtocol.Action.CLUSTER_MAP
+                    || action == RootHelperProtocol.Action.CLUSTER_STOP || action == RootHelperProtocol.Action.CLUSTER_AUTO_TICK
+                    || action == RootHelperProtocol.Action.CLUSTER_AUTO_STOP;
             assertEquals(allowed, RootHelperProtocol.authorized(10042,10042,10042,action));
             assertFalse(RootHelperProtocol.authorized(10043,10042,10042,action));
             assertFalse(RootHelperProtocol.authorized(10042,10042,10043,action));

@@ -131,6 +131,7 @@ internal class FceClusterOutput(private val writer: FcePropertyWriter) {
 internal class FceNavigationState {
     private var state: Int? = null
     private var source: String? = null
+    val known: Boolean get() = state != null || source != null
 
     val active: Boolean
         get() = when {

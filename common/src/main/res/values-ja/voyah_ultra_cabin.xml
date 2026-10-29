@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_ambient_switch">アンビエントライト</string>
+    <string name="carplay_ambient_brightness">照明の明るさ</string>
+    <string name="carplay_ambient_color">照明の色</string>
+    <string name="carplay_aroma_level">アロマの強さ</string>
+    <string name="carplay_aroma_taste">アロマカートリッジ</string>
+    <string name="carplay_aroma_time">アロマの動作時間</string>
+    <string name="carplay_control_on">オン</string>
+    <string-array name="carplay_aroma_durations">
+        <item>常時</item>
+        <item>30分</item>
+        <item>60分</item>
+    </string-array>
+    <string-array name="carplay_ambient_colors">
+        <item>青</item>
+        <item>シアン</item>
+        <item>紫</item>
+        <item>緑</item>
+        <item>ピンク</item>
+        <item>黄</item>
+        <item>茶</item>
+        <item>オレンジ</item>
+        <item>赤</item>
+    </string-array>
+    <string name="carplay_aroma_off">芳香剤をオフにする</string>
+</resources>

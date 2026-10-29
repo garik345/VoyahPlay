@@ -43,7 +43,7 @@ object VoyahComfortSettings {
             setOnClickListener { block() }
         }
         for(edge in VoyahComfortLayout.Edge.entries) parent.addView(action("${edge.title}: кнопки и порядок") { editOrder(a,edge,theme) })
-        val options=VoyahComfortLayout.settingsKeys.map { it to VoyahComfortLayout.titles.getValue(it) }
+        val options=VoyahComfortLayout.settingsKeys(a).map { it to VoyahComfortLayout.titles.getValue(it) }
         choice("Открывать настройки удержанием",options,VoyahComfortLayout.settingsKey(a)) {
             VoyahComfortLayout.setSettingsKey(a,it)
         }
@@ -58,7 +58,7 @@ object VoyahComfortSettings {
         val list=LinearLayout(a).apply { orientation=LinearLayout.VERTICAL;setPadding(16,8,16,8) }
         fun render() {
             list.removeAllViews()
-            val order=selected+VoyahComfortLayout.ids.filter { it !in selected }
+            val order=selected+VoyahComfortLayout.availableIds(a).filter { it !in selected }
             for(id in order) {
                 val row=LinearLayout(a).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL }
                 val check=CheckBox(a).apply {

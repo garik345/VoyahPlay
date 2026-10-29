@@ -18,6 +18,7 @@ object RootModuleSettings {
     @JvmStatic
     fun add(activity: Activity, parent: LinearLayout, actionsParent: LinearLayout, theme: SettingsTheme) {
         TweaksFullscreenSettings.add(activity, parent, actionsParent, theme)
+        RadioLabelsSettings.add(activity, parent, theme)
         val description = TextView(activity).apply {
             textSize = 14f
             setTextColor(theme.textSecondary)

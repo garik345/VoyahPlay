@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_radio_labels_title">Station names in the vehicle radio (experimental)</string>
+    <string name="settings_radio_labels_description">Show the RDS name above the frequency in the vehicle radio lists. Requires root helper 1.2.4 and a supported radio version. Applies without reconnecting CarPlay. Turning it off restores the original labels.</string>
+</resources>

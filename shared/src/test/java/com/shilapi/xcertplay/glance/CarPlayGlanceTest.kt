@@ -11,6 +11,20 @@ import org.junit.Before
 import org.junit.Test
 
 class CarPlayGlanceTest {
+    @Test fun navigationWithoutManeuversSurvivesSparseUpdatesAndEndsExplicitly() {
+        CarPlayGlance.setConnected(true)
+        CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1); string(0x13, "Maps") })
+        assertTrue(CarPlayGlance.snapshot().navigationActive)
+        assertNull(CarPlayGlance.snapshot().maneuverType)
+        CarPlayGlance.onFrame(frame(0x5201) { u32(0x0a, 100) })
+        assertTrue(CarPlayGlance.snapshot().navigationActive)
+        CarPlayGlance.onFrame(frame(0x5201) { u8(1, 2) })
+        org.junit.Assert.assertFalse(CarPlayGlance.snapshot().navigationActive)
+        CarPlayGlance.onFrame(frame(0x5201) { u8(1, 1) })
+        assertTrue(CarPlayGlance.snapshot().navigationActive)
+        CarPlayGlance.setConnected(false)
+        org.junit.Assert.assertFalse(CarPlayGlance.snapshot().navigationActive)
+    }
     private fun frame(id: Int, block: Iap2BodyBuilder.() -> Unit) = Iap2Messages.buildRaw(id, block)
 
     @Before

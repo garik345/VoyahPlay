@@ -28,6 +28,8 @@ interface UltraClimateSource : Closeable {
     val volumeRange: IntRange get() = 0..100
     /** Sets a level in [volumeRange] and/or mute; confirmed only by a matching read-back. */
     fun writeVolume(level: Int?, mute: Boolean?): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
+    val audioChannelRanges: Map<UltraAudioChannel, IntRange> get() = emptyMap()
+    fun writeAudioChannel(channel: UltraAudioChannel, value: Int): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
     val supportsRadio: Boolean get() = false
     fun writeRadio(request: UltraRadioRequest): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
     val supportedVehicleControls: Set<UltraVehicleControl> get() = emptySet()
@@ -50,6 +52,7 @@ class VoyahUltraProtocol(
     private val themeProbe: Boolean = false,
     private val vehicleDataText: UltraVehicleDataText = UltraVehicleDataText(),
     private val vehicleControlsText: UltraVehicleControlsText = UltraVehicleControlsText(),
+    private val ringtoneLabel: String = "Ringtone",
 ) : AirPlayProtocolExtension, Closeable {
     @Volatile private var sample: UltraClimateSample? = null
     @Volatile private var negotiated = false
@@ -70,11 +73,13 @@ class VoyahUltraProtocol(
     private val nextId = AtomicLong(10_000)
     private val source by lazy(sourceFactory)
 
-    override fun forSession(): AirPlayProtocolExtension = VoyahUltraProtocol(sourceFactory, clock, trace, assetProbe, dump, infoWaitMillis, panelProbe, themeProbe, vehicleDataText, vehicleControlsText)
+    override fun forSession(): AirPlayProtocolExtension = VoyahUltraProtocol(sourceFactory, clock, trace, assetProbe, dump, infoWaitMillis, panelProbe, themeProbe, vehicleDataText, vehicleControlsText, ringtoneLabel)
 
     override fun displayIdentifier(streamType: Int): String? = if (!themeProbe) null else when (streamType) {
         110 -> "Center_Display"
-        111 -> "Cluster_Display"
+        // The catalog owns Cluster_Display as its instruments plugin. Keep navigation's
+        // stream 111 on the normal session UUID instead of assigning it to that plugin.
+        111 -> null
         else -> null
     }
 
@@ -351,6 +356,12 @@ class VoyahUltraProtocol(
                 log("VOLUME WRITE request level=$level mute=$mute")
                 source.writeVolume(level, mute).also { log("VOLUME WRITE result confirmed=${it.confirmed} ${it.message}") }
             }
+        }, audioRanges = source.audioChannelRanges, ringtoneLabel = ringtoneLabel,
+        audioWriter = { channel, value ->
+            if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
+                log("AUDIO_CHANNEL WRITE channel=$channel value=$value")
+                source.writeAudioChannel(channel, value).also { log("AUDIO_CHANNEL result confirmed=${it.confirmed} ${it.message}") }
+            }
         }, volumeRange = source.volumeRange, phoneValues = phoneValues, radioSupported = source.supportsRadio,
         radioWriter = if (!source.supportsRadio) null else { request ->
             radioAudio.control(request.command != VoyahRadioOem.Command.PAUSE) {
@@ -544,7 +555,7 @@ class VoyahUltraProtocol(
     }
 
     companion object {
-        const val FEATURE = "vehicleStateProtocol"; const val WIRE_REV = "opack-47-ultra-profile"
+        const val FEATURE = "vehicleStateProtocol"; const val WIRE_REV = "opack-75-pi-ota72"
         const val UI_SYNC_FEATURE = "uiSync"
         val PROBE_FEATURES = listOf("fileTransfer")
         val PROBE_CLIENTS = setOf(RcsClientTypes.CAR_PLAY_UPDATE_DATA)

@@ -4,8 +4,16 @@ import android.content.SharedPreferences
 import android.media.AudioManager
 import com.shilapi.xcertplay.airplay.ultra.UltraClimateWriteResult
 
+/** The head unit also has a Qinggan master/media mute independent of Android's media index. */
+internal interface VoyahNativeMute {
+    fun read(): Boolean?
+    /** null: OEM service unavailable; false: a known OEM mute could not be cleared. */
+    fun clear(): Boolean?
+}
+
 /** The OEM radio follows the media index, but ignores Android's stream-mute flag. */
-internal class VoyahMediaVolume(private val audio: AudioManager, private val saved: SharedPreferences) {
+internal class VoyahMediaVolume(private val audio: AudioManager, private val saved: SharedPreferences,
+    private val nativeMute: VoyahNativeMute? = null) {
     val range: IntRange? = runCatching {
         val min = audio.getStreamMinVolume(AudioManager.STREAM_MUSIC)
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
@@ -20,7 +28,7 @@ internal class VoyahMediaVolume(private val audio: AudioManager, private val sav
     @Synchronized fun read(): Pair<Long?, Boolean?> = runCatching {
         val bounds = range ?: return null to null
         val index = audio.getStreamVolume(AudioManager.STREAM_MUSIC).takeIf { it in bounds } ?: return null to null
-        val muted = index == bounds.first || audio.isStreamMute(AudioManager.STREAM_MUSIC)
+        val muted = index == bounds.first || audio.isStreamMute(AudioManager.STREAM_MUSIC) || nativeMute?.read() == true
         if (!muted) remember(index)
         index.toLong() to muted
     }.getOrElse { null to null }
@@ -40,6 +48,10 @@ internal class VoyahMediaVolume(private val audio: AudioManager, private val sav
                 before > bounds.first -> before
                 else -> audible ?: (bounds.first + 1).coerceAtMost(bounds.last)
             }
+            // A positive Android index does not release the head unit's master mute.
+            // Only an explicit unmute/positive-volume command may clear that mute.
+            if (wanted > bounds.first && nativeMute?.clear() == false)
+                return UltraClimateWriteResult(false, "OEM mute could not be cleared")
             // A mute flag alone leaves FM audible on this head unit. Zero the same
             // index that the working volume buttons use, and restore it on unmute.
             audio.adjustStreamVolume(stream, AudioManager.ADJUST_UNMUTE, 0)

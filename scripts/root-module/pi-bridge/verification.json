@@ -1,0 +1,33 @@
+{
+  "version": "voyahplay-tweaks-bounds-test-1.1",
+  "original_ss11_sha256": "8a5e9b9c612dd3ad09ee3218383bbef6c352835f7238011271a92bb3317011e2",
+  "patched_ss11_sha256": "575735ed6f6074f1c33483c8df5c8984e51e6dc0fba328b1e4179ca10b9f9d7d",
+  "injector_sha256": "0d99be0e44d4ca3449056fa0a0b868fca1cf66c8ad704508949945afc07706aa",
+  "services_jar_sha256": "0faed7ebf1094c62a4f92b4bc533bbb3c08480a2cd847567cb1cff91b2d1d045",
+  "original_plaintext_sha256": "20ba66deff9e41912ad1931605b3f3bc344b62613a657755c848b9418df972ed",
+  "patched_plaintext_sha256": "8f203734252486bf8435d1d053c17797eade901d38f60d9740c6dfe1178aad56",
+  "original_plaintext_bytes": 106155,
+  "patched_plaintext_bytes": 112159,
+  "unchanged_source_roundtrip": true,
+  "original_container_roundtrip": true,
+  "patched_container_roundtrip": true,
+  "new_method_hooks": 0,
+  "new_injections": 0,
+  "activation_key": "voyahplay_tweaks_bounds_test",
+  "changed_target": "/data/local/tmp/ss11.bin",
+  "raised_bounds": [
+    0,
+    45,
+    1920,
+    720
+  ],
+  "lowered_bounds": [
+    0,
+    45,
+    1920,
+    530
+  ],
+  "previous_patched_sha256": "ceb042e4e5d2921a2bc15a393ed025a5e725c42db8ba0cd0363d4772b27b7aa3",
+  "activation_probe_key": "voyahplay_tweaks_bounds_probe",
+  "source_insertions": 3
+}

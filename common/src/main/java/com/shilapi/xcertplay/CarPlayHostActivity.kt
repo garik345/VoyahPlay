@@ -605,6 +605,7 @@ class CarPlayHostActivity : ComponentActivity() {
         com.shilapi.xcertplay.voyah.VoyahSettingsProfile.apply(this)
         com.shilapi.xcertplay.telecom.PhoneAudioRoute.attach(applicationContext)
         NavigationWidgetUpdater.attach(applicationContext)
+        VoyahClusterMap.attach(applicationContext)
         CarPlayCallKeys.install(applicationContext)
         CenterMapOverlay.requestShow = ::showCenterMap
         MapMirrors.sink = mirrorSink
@@ -955,6 +956,9 @@ class CarPlayHostActivity : ComponentActivity() {
         scheduleStartupRecoveryCheck()
         applyFullscreenMode()
         voyahDock.resume()
+        // A retained surface need not be recreated on return, and a static CarPlay screen may
+        // otherwise send no new picture. New surfaces request one in attachSurface instead.
+        currentSurface?.takeIf { it.isValid }?.let { sink?.refreshPicture(SCREEN_TYPE_MAIN) }
         if (systemBarsChanged) refreshDisplaySizeAfterLayout()
         videoView?.post {
             val view = videoView ?: return@post
@@ -1141,6 +1145,12 @@ class CarPlayHostActivity : ComponentActivity() {
         adbClusterConfigured = false
         clusterStreamOnDisplay = false
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return null
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled) {
+            return VoyahClusterMapLayout.stream(AirPlayPersistence.loadVoyahClusterElementSize(this)).also {
+                MapMirrors.streamAspect = it.widthPixels.toDouble() / it.heightPixels
+                appendLog("Voyah cluster map: card ${it.widthPixels}x${it.heightPixels}; elementSize=${AirPlayPersistence.loadVoyahClusterElementSize(this)}%; viewport=574x464")
+            }
+        }
         if (AdbClusterRouter.enabled(this) && ClusterActivityOutput.hasConfirmedRoute()) {
             adbClusterConfigured = true
             clusterStreamOnDisplay = true
@@ -1278,6 +1288,8 @@ class CarPlayHostActivity : ComponentActivity() {
         closePicturePanel()
         // The controller, USB/iAP2 link, and VPN attachment intentionally outlive the UI.
         isActivityStarted = false
+        mainHandler.removeCallbacks(applyDisplaySize)
+        pendingDisplaySize = null
         mainHandler.removeCallbacks(startupRecoveryCheck)
         logThemeState(ThemeModeDiagnostics.Source.STOP, resources.configuration)
         mainHandler.removeCallbacks(pollConfiguration)
@@ -3218,10 +3230,14 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun normalizedModel(): String =
         model.trim().ifBlank { AirPlayPersistence.DEFAULT_MODEL }
 
+    private fun createMediaSink(videoWidth: Int, videoHeight: Int, controllerGeneration: Int): AndroidMediaSink =
+        createMediaSink(videoWidth, videoHeight, controllerGeneration, null)
+
     private fun createMediaSink(
         videoWidth: Int,
         videoHeight: Int,
         controllerGeneration: Int,
+        clusterVideoSize: Pair<Int, Int>?,
     ): AndroidMediaSink {
         // Capture this session's log: late decoder shutdown must not write into a new session.
         val diagnosticLog = sessionLog
@@ -3232,6 +3248,7 @@ class CarPlayHostActivity : ComponentActivity() {
             surface = null,
             videoWidth = videoWidth,
             videoHeight = videoHeight,
+            clusterVideoSize = clusterVideoSize,
             preferSoftwareHevcDecoder = hevcSoftwareDecoderEnabled,
             advancedAudioChannelMapping = advancedAudioChannelMapping,
             audioFocusEnabled = AirPlayPersistence.loadAudioFocusEnabled(this),
@@ -3552,6 +3569,7 @@ class CarPlayHostActivity : ComponentActivity() {
             videoWidth = airPlayConfig.main.widthPixels,
             videoHeight = airPlayConfig.main.heightPixels,
             controllerGeneration = controllerGeneration,
+            clusterVideoSize = airPlayConfig.cluster?.let { it.widthPixels to it.heightPixels },
         )
         sink = renderer
         currentSurface?.let(::attachSurface)
@@ -3693,10 +3711,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
 
     private fun applyDisplaySize(size: DisplaySize) {
+        // OEM menu/camera transitions can resize a covered window. Resume schedules its
+        // visible size again; a hidden window must not tear down the background connection.
+        if (!isActivityStarted || shuttingDown.get()) return
         val display = sessionDisplay
         if (display != null && applyViewArea(size, display)) return
         val layoutChanged = displayLayoutChanged(size)
-        if (shuttingDown.get()) return
         if (size == activeDisplaySize && !layoutChanged) {
             // Teardown may have removed the session that made this same-size rotation pending.
             maybeStartCarPlay()
@@ -3721,9 +3741,11 @@ class CarPlayHostActivity : ComponentActivity() {
             )
             maybeStartCarPlay()
         } else if (display != null && !layoutChanged &&
-            size.width <= display.windowWidth && size.height <= display.windowHeight) {
-            // Keep camera shrink/restore cycles within the original window connected. If the
-            // session started in a camera window, growth beyond it needs a full-size canvas.
+            (display.fillViewport || size.width <= display.windowWidth && size.height <= display.windowHeight)) {
+            // Ultra declares a fixed theme canvas, independent of Android's window. Restoring
+            // full width/height (including the layout before shade gutters) only changes its viewport.
+            // Ordinary CarPlay keeps camera shrink/restore cycles within its original window;
+            // growth beyond that window still needs a full-size canvas.
             val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
                 "keeping CarPlay session canvas=${display.width}x${display.height}"
             appendLog(message)
@@ -3799,7 +3821,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (sessionComfortHeight != comfortHeight || sessionComfortSides != comfortSides) return true
         if (display.rotation != displayRotation()) return true
         if (display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar) return true
-        if (newSize != null && newSize.width > 0 && newSize.height > 0) {
+        if (!display.fillViewport && newSize != null && newSize.width > 0 && newSize.height > 0) {
             val baseAspect = display.width.toDouble() / display.height
             val currentAspect = newSize.width.toDouble() / newSize.height
             val aspectDiff = kotlin.math.abs(currentAspect / baseAspect - 1.0)
@@ -4223,12 +4245,16 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun attachSurface(surface: Surface) {
-        sink?.setSurface(SCREEN_TYPE_MAIN, surface)
+        val renderer = sink ?: return
+        renderer.setSurface(SCREEN_TYPE_MAIN, surface)
         if (AirPlayPersistence.loadClusterMapEnabled(this)) {
-            clusterSurface?.let { sink?.setSurface(SCREEN_TYPE_ALT, it) }
+            clusterSurface?.let { renderer.setSurface(SCREEN_TYPE_ALT, it) }
         } else {
-            sink?.setSurface(SCREEN_TYPE_ALT, surface)
+            renderer.setSurface(SCREEN_TYPE_ALT, surface)
         }
+        // Queue after the surface change, so even a static iPhone screen redraws immediately.
+        renderer.refreshPicture(SCREEN_TYPE_MAIN)
+        appendLog("Video surface attached; requested current CarPlay picture")
     }
 
     private fun onHostTouch(view: View, event: MotionEvent): Boolean {

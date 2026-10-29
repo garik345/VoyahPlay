@@ -3,6 +3,14 @@ package com.shilapi.xcertplay.airplay
 import java.net.Socket
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
+import org.robolectric.RuntimeEnvironment
+import com.shilapi.xcertplay.orchestration.CarPlayController
+import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
+import com.shilapi.xcertplay.orchestration.MfiTarget
+import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -13,6 +21,117 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class ClusterContentTest {
+    private fun controller(session: AirPlaySession): CarPlayController = CarPlayController(
+        RuntimeEnvironment.getApplication(), CarPlayRuntimeConfig(mfiTarget = MfiTarget.LOCAL,
+            identification = Iap2IdentificationConfig(name = "test", modelIdentifier = "test", manufacturer = "test",
+                serialNumber = "test", firmwareVersion = "1", hardwareVersion = "1", carPlayUsbInterfaceNumber = 3)),
+        AirPlayConfig("test", "test", "", "1", AirPlayDisplayConfig(800, 480)),
+        AirPlayIdentity.generate(), PairingStore(), object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, {},
+    ).also { it.javaClass.getDeclaredField("activeSession").apply { isAccessible = true }.set(it, session) }
+
+    private fun mainSetup(session: AirPlaySession) {
+        session.javaClass.getDeclaredMethod("handleStreams", List::class.java).apply { isAccessible = true }
+            .invoke(session, listOf(mapOf("type" to 110L)))
+    }
+    private fun delivered(action: ((Boolean) -> Unit) -> Unit): Boolean {
+        val done = CountDownLatch(1)
+        var result: Boolean? = null
+        action { result = it; done.countDown() }
+        assertTrue("Command callback completed", done.await(5, TimeUnit.SECONDS))
+        return result!!
+    }
+
+    @Test fun controllerAcceptsItsPublicMainScreenTokenForMirroredShowAndZoom() {
+        val session = session(CarPlayClusterDisplay.MAP_URL)
+        val controller = controller(session)
+        try {
+            mainSetup(session); setup(session)
+            val event = eventReady(session)
+            val token = controller.activeAirPlaySessionToken()!!
+            assertNotSame("The public token is not the AirPlaySession object", session, token)
+            assertTrue(delivered { controller.showDashboardContentForSession(CarPlayClusterDisplay.MAP_URL, token, it) })
+            assertTrue(delivered { controller.zoomMirroredDashboardMap(true, token, it) })
+            var zoomReason: String? = null
+            assertTrue(delivered { done -> controller.zoomMirroredDashboardMapWithStatus(false, token) { sent, reason ->
+                zoomReason = reason; done(sent)
+            } })
+            assertEquals("sent", zoomReason)
+            assertEquals(listOf("showUI", "forceKeyFrame", "changeMapZoomLevel", "changeMapZoomLevel"),
+                commands(event).map { it["type"] })
+        } finally { controller.close(); session.close() }
+    }
+
+    @Test fun oldPublicTokenIsRejectedAfterPrimaryStreamReSetupOrPhoneReplacement() {
+        val session = session(CarPlayClusterDisplay.MAP_URL)
+        val controller = controller(session)
+        val next = session(CarPlayClusterDisplay.MAP_URL)
+        try {
+            mainSetup(session); setup(session)
+            val event = eventReady(session)
+            val token = controller.activeAirPlaySessionToken()!!
+            mainSetup(session)
+            assertFalse(delivered { controller.showDashboardContentForSession(CarPlayClusterDisplay.MAP_URL, token, it) })
+            var zoomReason: String? = null
+            assertFalse(delivered { done -> controller.zoomMirroredDashboardMapWithStatus(true, token) { sent, reason ->
+                zoomReason = reason; done(sent)
+            } })
+            assertEquals("session-changed", zoomReason)
+            assertEquals(0, event.bytes.size())
+            mainSetup(next); setup(next)
+            val nextEvent = eventReady(next)
+            controller.javaClass.getDeclaredField("activeSession").apply { isAccessible = true }.set(controller, next)
+            assertFalse(delivered { controller.showDashboardContentForSession(CarPlayClusterDisplay.MAP_URL, token, it) })
+            assertFalse(delivered { controller.zoomMirroredDashboardMap(true, token, it) })
+            assertEquals(0, nextEvent.bytes.size())
+        } finally { controller.close(); session.close(); next.close() }
+    }
+
+    @Test fun queuedMirroredCommandsRecheckThePublicTokenBeforeWriting() {
+        val session = session(CarPlayClusterDisplay.MAP_URL)
+        val controller = controller(session)
+        val release = CountDownLatch(1)
+        try {
+            mainSetup(session); setup(session)
+            val event = eventReady(session)
+            val token = controller.activeAirPlaySessionToken()!!
+            val executor = controller.javaClass.getDeclaredField("touchExecutor").apply { isAccessible = true }
+                .get(controller) as ExecutorService
+            val started = CountDownLatch(1)
+            executor.execute { started.countDown(); release.await(5, TimeUnit.SECONDS) }
+            assertTrue(started.await(5, TimeUnit.SECONDS))
+            val completed = CountDownLatch(2)
+            val results = java.util.Collections.synchronizedList(mutableListOf<Boolean>())
+            val callback: (Boolean) -> Unit = { results.add(it); completed.countDown() }
+            controller.showDashboardContentForSession(CarPlayClusterDisplay.MAP_URL, token, callback)
+            controller.zoomMirroredDashboardMap(true, token, callback)
+            mainSetup(session)
+            release.countDown()
+            assertTrue(completed.await(5, TimeUnit.SECONDS))
+            assertEquals(listOf(false, false), results.toList())
+            assertEquals(0, event.bytes.size())
+        } finally { release.countDown(); controller.close(); session.close() }
+    }
+
+    @Test fun geographicZoomUsesTheCurrentClusterUuidAndStopsAfterTeardown() {
+        val session = session(CarPlayClusterDisplay.MAP_URL)
+        try {
+            setup(session)
+            val event = eventReady(session)
+            assertTrue(session.setClusterUrl(CarPlayClusterDisplay.MAP_URL, send = true))
+            assertTrue(session.changeMapZoomLevel(true))
+            assertTrue(session.changeMapZoomLevel(false))
+            val sent = commands(event)
+            val mapUuid = (sent.first()["params"] as Map<*, *>)["uuid"]
+            val zoom = sent.takeLast(2)
+            assertEquals(listOf("changeMapZoomLevel", "changeMapZoomLevel"), zoom.map { it["type"] })
+            assertEquals(listOf(0L, 1L), zoom.map { (it["params"] as Map<*, *>)["zoomDirection"] })
+            assertTrue(zoom.all { (it["params"] as Map<*, *>)["uuid"] == mapUuid })
+            val bytesBefore = event.bytes.size()
+            teardown(session)
+            assertFalse(session.changeMapZoomLevel(true))
+            assertEquals(bytesBefore, event.bytes.size())
+        } finally { session.close() }
+    }
     private fun session(initialUrl: String, onTeardown: (AirPlaySession) -> Unit = {}): AirPlaySession = AirPlaySession(
         socket = Socket(),
         config = AirPlayConfig(deviceName = "test", deviceId = "02:00:00:00:00:02", btMac = "02:00:00:00:00:01",

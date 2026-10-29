@@ -17,12 +17,13 @@ internal object VoyahUltraDisplayPanels {
         val panels = screens.map { screen ->
             val uuid = screen["uuid"] as String
             val cluster = (screen["type"] as? Number)?.toInt() == 111
+            val instruments = cluster && (!themed || uuid == "Cluster_Display")
             val uid = if (themed) uuid else "$uuid-panel"
-            panel(screen, uid, listOf(uuid), cluster).apply {
-                if (themed && cluster) put("displayPlugins", listOf(mapOf("uid" to uid, "videoStreams" to listOf(uuid))))
+            panel(screen, uid, listOf(uuid), instruments).apply {
+                if (themed && instruments) put("displayPlugins", listOf(mapOf("uid" to uid, "videoStreams" to listOf(uuid))))
             }
         }.toMutableList()
-        if (virtualCluster && screens.isNotEmpty() && !(themed && screens.any { (it["type"] as? Number)?.toInt() == 111 })) {
+        if (virtualCluster && screens.isNotEmpty() && !(themed && screens.any { it["uuid"] == "Cluster_Display" })) {
             val sized = screens.firstOrNull { (it["type"] as? Number)?.toInt() == 111 } ?: screens.first()
             panels += panel(sized, "$CLUSTER_UID-panel", emptyList(), true).apply {
                 put("displayPlugins", listOf(mapOf("uid" to "$CLUSTER_UID-plugin", "videoStreams" to emptyList<String>())))

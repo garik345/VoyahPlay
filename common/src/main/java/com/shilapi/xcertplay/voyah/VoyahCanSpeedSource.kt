@@ -14,7 +14,6 @@ class VoyahCanSpeedSource(context: Context, private val report: (String) -> Unit
     companion object {
         private const val PKG = "com.qinggan.canbus.service"
         private const val API = "com.qinggan.canbus.ICanBusService"
-        private const val HASH = "96ac5182e795ad70c43c78f26b9cf29e76b59db67c2d5c09216ba1d8425c427c"
         private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "voyah-can-speed").apply { isDaemon = true } }
         private val busy = AtomicBoolean()
         @Volatile private var verifiedStamp: String? = null
@@ -97,7 +96,7 @@ class VoyahCanSpeedSource(context: Context, private val report: (String) -> Unit
                         val bytes = ByteArray(65536)
                         while (true) { val n = input.read(bytes); if (n < 0) break; digest.update(bytes, 0, n) }
                     }
-                    check(digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) } == HASH)
+                    check(VoyahOemBuilds.supportsCanApk(digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }))
                     verifiedStamp = stamp
                 }
             }

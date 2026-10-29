@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_powertrain_mode">パワートレインモード</string>
+    <string name="carplay_power_smart">スマート</string>
+    <string name="carplay_power_electric">電動</string>
+    <string name="carplay_power_hybrid">ハイブリッド</string>
+    <string name="carplay_power_sustain">充電維持（燃料）</string>
+    <string name="carplay_audio_ringtone">着信音</string>
+</resources>

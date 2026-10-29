@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_radio_labels_title">Nombres de emisoras en la radio del vehículo (experimental)</string>
+    <string name="settings_radio_labels_description">Mostrar el nombre RDS sobre la frecuencia en las listas de la radio del vehículo. Requiere el asistente root 1.2.4 y una versión de radio compatible. Se aplica sin reconectar CarPlay. Al desactivarlo se restauran las etiquetas originales.</string>
+</resources>

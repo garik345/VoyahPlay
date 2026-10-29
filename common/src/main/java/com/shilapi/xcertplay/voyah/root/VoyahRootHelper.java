@@ -25,6 +25,7 @@ public final class VoyahRootHelper {
         RootHelperOperations.privatePath(new File(RootHelperProtocol.APK), false);
         RootHelperIdentity.verifyInstalled(uid);
         server = new LocalServerSocket(RootHelperProtocol.socketName(uid));
+        ClusterProbeRoot.initialize();
     }
 
     public static void main(String[] arguments) {
@@ -141,7 +142,10 @@ public final class VoyahRootHelper {
             RootProcess.Result result;
             boolean changes = request.action == RootHelperProtocol.Action.BOOT_POLICY ||
                     request.action == RootHelperProtocol.Action.STOP || request.action == RootHelperProtocol.Action.TWEAKS_POLICY ||
-                    request.action == RootHelperProtocol.Action.TOP_POLICY;
+                    request.action == RootHelperProtocol.Action.TOP_POLICY || request.action == RootHelperProtocol.Action.RADIO_POLICY
+                    || request.action == RootHelperProtocol.Action.CLUSTER_GRID || request.action == RootHelperProtocol.Action.CLUSTER_MAP
+                    || request.action == RootHelperProtocol.Action.CLUSTER_STOP || request.action == RootHelperProtocol.Action.CLUSTER_AUTO_TICK
+                    || request.action == RootHelperProtocol.Action.CLUSTER_AUTO_STOP;
             boolean locked = !changes || mutations.tryLock();
             if (!locked) {
                 result = new RootProcess.Result(1, false, "HELPER_BUSY: another helper change is running\n");
@@ -151,13 +155,22 @@ public final class VoyahRootHelper {
                     switch (request.action) {
                         case ROOT: result = new RootProcess.Result(0, false, "uid=0(root)\nCLIENT_UID=" + allowedUid + "\n"); break;
                         case INFO: result = new RootProcess.Result(0, false, "HELPER_READY=1\nSERVER_UID=0\nCLIENT_UID=" + allowedUid +
-                                "\nCAPABILITIES=" + TweaksBoundsRoot.CAPABILITY + "\n" + RootHelperBoot.status()); break;
+                                "\nCAPABILITIES=" + TweaksBoundsRoot.CAPABILITY + "\n" + RadioLabelsRoot.brief() + ClusterProbeRoot.brief() + RootHelperBoot.status()); break;
                         case BOOT_STATUS: result = new RootProcess.Result(0, false, RootHelperBoot.status()); break;
                         case BOOT_POLICY: result = RootHelperBoot.policy(request.active); break;
                         case TWEAKS_STATUS: result = TweaksBoundsRoot.status(); break;
                         case TWEAKS_POLICY: result = TweaksBoundsRoot.policy(request.active, request.hidden); break;
                         case TOP_POLICY: result = TopBoundsRoot.policy(request.active); break;
+                        case RADIO_STATUS: result = RadioLabelsRoot.status(); break;
+                        case RADIO_POLICY: result = RadioLabelsRoot.policy(request.active); break;
+                        case CLUSTER_STATUS: result = ClusterProbeRoot.status(); break;
+                        case CLUSTER_GRID: result = ClusterProbeRoot.start("grid"); break;
+                        case CLUSTER_MAP: result = ClusterProbeRoot.start("map"); break;
+                        case CLUSTER_STOP: result = ClusterProbeRoot.stop(); break;
+                        case CLUSTER_AUTO_TICK: result = ClusterProbeRoot.autoTick(); break;
+                        case CLUSTER_AUTO_STOP: result = ClusterProbeRoot.stopAuto(); break;
                         case STOP:
+                            ClusterProbeRoot.stop();
                             TopBoundsRoot.policy(false);
                             result = TweaksBoundsRoot.policy(false, false);
                             if (result.successful()) {

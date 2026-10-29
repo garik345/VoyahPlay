@@ -17,7 +17,16 @@ object VoyahComfortLayout {
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     fun enabled(c: Context) = prefs(c).getBoolean("comfort_bar_enabled", false)
     fun mode(c: Context) = Mode.entries.firstOrNull { it.name == prefs(c).getString("comfort_layout", null) } ?: Mode.BOTTOM
-    fun settingsKey(c: Context) = prefs(c).getString("comfort_settings_key", "wheel").takeIf { it in settingsKeys } ?: "wheel"
+    fun availableIds(c: Context) = availableIds(VoyahEquipment.hasHeatedWheel(c))
+    fun availableIds(heatedWheel: Boolean) = ids.filter { heatedWheel || it != "wheel" }
+    fun settingsKeys(c: Context): List<String> {
+        val available = availableIds(c)
+        return settingsKeys.filter { it in available }
+    }
+    fun settingsKey(c: Context): String {
+        val choices = settingsKeys(c)
+        return prefs(c).getString("comfort_settings_key", "wheel").takeIf { it in choices } ?: choices.first()
+    }
     fun sanitizeOrder(raw: String?, defaults: List<String>): List<String> =
         if (raw == null) defaults else raw.split(',').filter { it in ids }.distinct()
     fun order(c: Context, edge: Edge): List<String> {
@@ -26,7 +35,8 @@ object VoyahComfortLayout {
             Edge.LEFT -> listOf("light", "wheel", "heat_l", "vent_l", "mass_l")
             Edge.RIGHT -> listOf("aroma", "mass_r", "vent_r", "heat_r")
         }
-        return sanitizeOrder(prefs(c).getString("comfort_order_${edge.name}", null), defaults)
+        val available = availableIds(c)
+        return sanitizeOrder(prefs(c).getString("comfort_order_${edge.name}", null), defaults).filter { it in available }
     }
     fun edges(mode: Mode) = when (mode) {
         Mode.BOTTOM -> listOf(Edge.BOTTOM)
@@ -36,12 +46,15 @@ object VoyahComfortLayout {
     }
     /** Retain one accessible settings entry even after a change of mode or an empty selection. */
     fun visible(c: Context): Map<Edge, List<String>> {
-        return resolve(enabled(c), mode(c), Edge.entries.associateWith { order(c,it) }, settingsKey(c))
+        return resolve(enabled(c), mode(c), Edge.entries.associateWith { order(c,it) }, settingsKey(c), availableIds(c))
     }
-    fun resolve(enabled: Boolean, mode: Mode, orders: Map<Edge,List<String>>, settingsKey: String): Map<Edge,List<String>> {
+    fun resolve(enabled: Boolean, mode: Mode, orders: Map<Edge,List<String>>, settingsKey: String,
+        availableIds: List<String> = ids): Map<Edge,List<String>> {
         if (!enabled) return emptyMap()
-        val result = edges(mode).associateWith { edge -> orders[edge].orEmpty().filter { it in ids }.distinct() }.toMutableMap()
-        val key = settingsKey.takeIf { it in settingsKeys } ?: "wheel"
+        val available = ids.filter { it in availableIds }
+        val result = edges(mode).associateWith { edge -> orders[edge].orEmpty().filter { it in available }.distinct() }.toMutableMap()
+        val keys = settingsKeys.filter { it in available }
+        val key = settingsKey.takeIf { it in keys } ?: keys.firstOrNull() ?: return emptyMap()
         if (result.values.none { key in it }) {
             val first = result.keys.first()
             result[first] = result.getValue(first) + key
@@ -56,7 +69,7 @@ object VoyahComfortLayout {
     fun setEnabled(c: Context, enabled: Boolean) { prefs(c).edit().putBoolean("comfort_bar_enabled", enabled).apply() }
     fun setMode(c: Context, mode: Mode) { prefs(c).edit().putString("comfort_layout", mode.name).apply() }
     fun setSettingsKey(c: Context, id: String) {
-        require(id in settingsKeys)
+        require(id in settingsKeys(c))
         prefs(c).edit().putString("comfort_settings_key", id).apply()
     }
     fun setOrder(c: Context, edge: Edge, order: List<String>) {

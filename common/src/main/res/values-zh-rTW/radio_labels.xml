@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_radio_labels_title">原車收音機電台名稱（實驗性）</string>
+    <string name="settings_radio_labels_description">在原車收音機清單中，將 RDS 名稱顯示在頻率上方。需要 root 助手 1.2.4 和相容的收音機版本。無需重新連接 CarPlay 即可生效。關閉後恢復原始標籤。</string>
+</resources>

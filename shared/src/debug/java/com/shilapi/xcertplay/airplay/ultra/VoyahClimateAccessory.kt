@@ -22,6 +22,10 @@ data class UltraClimateSample(
     val vehicleControlValues: Map<UltraVehicleControl, Int> = emptyMap(),
     val vehicleControlsSampledAtMillis: Long = sampledAtMillis,
     val lightingSampledAtMillis: Long = vehicleControlsSampledAtMillis,
+    /** Audio remains fresh independently of the CAN cache and its firmware verification. */
+    val volumeSampledAtMillis: Long = vehicleSampledAtMillis,
+    val audioChannels: Map<UltraAudioChannel, Int> = emptyMap(),
+    val audioChannelsSampledAtMillis: Long = volumeSampledAtMillis,
 )
 /** Real TX30 cache readings the phone needs to draw the Climate app; there is no command path for them. */
 enum class UltraClimateReading(val iid: Long, val type: Long, val format: CafCharacteristicFormat) {
@@ -102,6 +106,9 @@ internal class VoyahClimateAccessory(
     private val vehicleControlWriter: ((UltraVehicleControl, Int) -> UltraClimateWriteResult)? = null,
     private val vehicleControlsText: UltraVehicleControlsText = UltraVehicleControlsText(),
     private val volumeRange: IntRange = 0..100,
+    private val audioRanges: Map<UltraAudioChannel, IntRange> = emptyMap(),
+    private val audioWriter: ((UltraAudioChannel, Int) -> UltraClimateWriteResult)? = null,
+    private val ringtoneLabel: String = "Ringtone",
 ) {
     init { require(volumeRange.first in 0..255 && volumeRange.last in volumeRange.first..255) }
     /** Values the phone wrote successfully on this stream: confirmed by one update even if unchanged. */
@@ -116,7 +123,7 @@ internal class VoyahClimateAccessory(
     /** Mirrors the shared ownership used by working CarPlay climate descriptions; unmapped writes still get -50. */
     private val sharedWritable get() = hvacWriter != null && supportedHvac.isNotEmpty()
     private val knownIds: Set<Long> get() = FIXED_IDS + CONSTANTS.keys + PHONE_IDS + VoyahVehicleDescription.ids + VoyahVehicleDataSettings.ids +
-        vehicleControlIds +
+        vehicleControlIds + VoyahAudioChannels.ids(audioRanges) +
         (if (radioSupported) VoyahRadioDescription.ids else emptySet()) + UltraHvacControl.entries.map { it.iid } +
         PUBLISHED_READINGS.map { it.iid } + supportedControls.flatMap {
         listOf(it.levelIid) + (if (it.isVent) emptyList() else listOf(it.onIid)) + (if (it.isWheel) emptyList() else listOf(it.layoutIid)) +
@@ -146,7 +153,8 @@ internal class VoyahClimateAccessory(
             listOf(service(101, 0x20000001, listOf(characteristic(102, 0x48000004, CafCharacteristicFormat.STRING, "5Seater", mutable = false))))))
         val seats = supportedControls.filterNot { it.isWheel }.map(::comfort)
         if (seats.isNotEmpty()) accessories.add(accessory(200, 0x01500001, seats))
-        accessories.addAll(VoyahVehicleDescription.accessories(vehicle(), volumeWriter != null, volumeRange))
+        accessories.addAll(VoyahVehicleDescription.accessories(vehicle(), volumeWriter != null, volumeRange,
+            VoyahAudioChannels.services(audioRanges, audioChannels(), ringtoneLabel)))
         if (radioSupported) accessories.addAll(VoyahRadioDescription.accessories(radio()))
         return linkedMapOf("accessories" to accessories)
     }
@@ -310,7 +318,7 @@ internal class VoyahClimateAccessory(
             val wanted = control.normalize(requested[control.valueIid]) ?: continue
             val result = runCatching { sendVehicleControl.invoke(control, wanted) }.getOrNull()
             results[control.valueIid] = if (result?.confirmed == true) 0L else UNAVAILABLE
-            if (control.isAppAction && result?.confirmed == true) appActions[control] = wanted
+            if (control.isButton && result?.confirmed == true) appActions[control] = wanted
         }
         val volumeIds = requested.keys.filter { it in VoyahVehicleDescription.writableIds }
         val sendVolume = volumeWriter
@@ -324,6 +332,12 @@ internal class VoyahClimateAccessory(
                 val result = runCatching { sendVolume.invoke(level, mute) }.getOrNull()
                 volumeIds.forEach { results[it] = if (result?.confirmed == true) 0L else UNAVAILABLE }
             }
+        }
+        for ((channel, range) in audioRanges) {
+            if (channel.valueIid !in requested || audioWriter == null) continue
+            val wanted = integerLevel(requested[channel.valueIid], range.last)?.takeIf { it in range } ?: continue
+            val result = runCatching { audioWriter?.invoke(channel, wanted) }.getOrNull()
+            results[channel.valueIid] = if (result?.confirmed == true) 0L else UNAVAILABLE
         }
         val sendHvac = hvacWriter
         val sendComfort = writer
@@ -381,13 +395,21 @@ internal class VoyahClimateAccessory(
         return CarAccessoryMessages.updateNotify(PLUGIN_ID, changed)
     }
     private fun fresh(time: Long) = now() - time in 0..MAX_AGE_MILLIS
-    private fun vehicle(): UltraVehicleReadings? = sample()?.takeIf { fresh(it.vehicleSampledAtMillis) }?.vehicle
+    private fun vehicle(): UltraVehicleReadings? {
+        val s = sample() ?: return null
+        val car = s.vehicle.takeIf { fresh(s.vehicleSampledAtMillis) }
+        val audio = s.vehicle.takeIf { fresh(s.volumeSampledAtMillis) }
+        return (car ?: if (audio != null) UltraVehicleReadings() else null)?.copy(
+            volumeLevel = audio?.volumeLevel, muted = audio?.muted)
+    }
     private fun vehicleControls(): Map<UltraVehicleControl, Int> {
         val s = sample()
         val current = s?.vehicleControlValues?.filter { (c, _) -> fresh(
             if (c == UltraVehicleControl.LIGHT_MODE) s.lightingSampledAtMillis else s.vehicleControlsSampledAtMillis) }.orEmpty()
-        return current + UltraVehicleControl.entries.filter { it.isAppAction }.associateWith { appActions[it] ?: 0 }
+        return current + UltraVehicleControl.entries.filter { it.isButton }.associateWith { appActions[it] ?: 0 }
     }
+    private fun audioChannels(): Map<UltraAudioChannel, Int> =
+        sample()?.takeIf { fresh(it.audioChannelsSampledAtMillis) }?.audioChannels.orEmpty()
     private fun radio(): UltraRadioSnapshot? = sample()?.takeIf { fresh(it.radioSampledAtMillis) }?.radio
     private fun current(control: UltraHvacControl): Any? {
         val s = sample() ?: return null
@@ -420,6 +442,7 @@ internal class VoyahClimateAccessory(
             iid in VoyahVehicleDataSettings.ids -> VoyahVehicleDataSettings.value(iid, vehicle(), vehicleDataText)
             iid in vehicleControlIds ->
                 VoyahVehicleControls.value(iid, supportedVehicleControls, vehicleControls(), vehicleControlsText)
+            iid in VoyahAudioChannels.ids(audioRanges) -> VoyahAudioChannels.value(iid, audioRanges, audioChannels(), ringtoneLabel)
             iid in VoyahVehicleDescription.ids -> VoyahVehicleDescription.value(iid, vehicle())
             radioSupported && iid in VoyahRadioDescription.ids -> VoyahRadioDescription.value(iid, radio())
             hvac != null -> current(hvac)

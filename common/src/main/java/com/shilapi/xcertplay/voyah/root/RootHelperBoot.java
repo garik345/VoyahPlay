@@ -117,6 +117,11 @@ final class RootHelperBoot {
         writePrivate("runtime.sh", runtime);
         installAgent("top-bounds.js", "top.sha256");
         installAgent("status-bar.js", "status.sha256");
+        installAgent("dock-guard.js", "dock.sha256");
+        installAgent("radio-labels.js", "radio-labels.sha256");
+        installAgent("radio-runtime.sh", "radio-runtime.sha256");
+        if (!own("radio-labels.conf").exists()) writePrivate("radio-labels.conf", "0\n".getBytes(StandardCharsets.UTF_8));
+        else RadioLabelsRoot.configured();
         RootProcess.Result statTool = RootProcess.run(3, "/system/bin/stat", "-c", "%u:%a", RootHelperProtocol.DIRECTORY);
         if (!statTool.successful() || !statTool.output.trim().equals("0:700"))
             throw new IOException("BOOT_STAT_UNAVAILABLE: не подтверждена проверка владельца для boot entry\n" + statTool.output);

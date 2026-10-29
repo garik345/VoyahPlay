@@ -18,7 +18,6 @@ public final class VoyahLightStatus {
     private static final String PKG = "com.qinggan.canbus.service";
     private static final String API = "com.qinggan.canbus.ICanBusService";
     private static final String CALLBACK = "com.qinggan.canbus.ICanBusServiceCallback";
-    private static final String HASH = "96ac5182e795ad70c43c78f26b9cf29e76b59db67c2d5c09216ba1d8425c427c";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
     private static volatile String verifiedApk;
     public interface Listener { void changed(int mode); }
@@ -178,7 +177,7 @@ public final class VoyahLightStatus {
         }
         StringBuilder hash = new StringBuilder();
         for (byte b : digest.digest()) hash.append(String.format(Locale.ROOT, "%02x", b & 255));
-        if (!HASH.contentEquals(hash)) throw new IOException("CAN APK differs from reviewed build");
+        if (!VoyahOemBuilds.supportsCanApk(hash.toString())) throw new IOException("CAN APK differs from reviewed builds: " + hash);
         verifiedApk = stamp;
     }
 }

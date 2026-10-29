@@ -47,16 +47,22 @@ class VoyahUltraPanelsTest {
         assertTrue(VoyahUltraDisplayPanels.build(listOf(mapOf("type" to 110)), true).isEmpty())
     }
 
-    @Test fun themeUsesCatalogDisplayIdsForScreensHidPanelsAndComposition() {
-        val value = info(false, cluster = true, theme = true)
+    @Test fun themeKeepsTheNavigationStreamSeparateFromItsInstrumentsPlugin() {
+        val value = info(true, cluster = true, theme = true)
         val displays = (value["displays"] as List<*>).map { it as Map<*, *> }
-        assertEquals(listOf("Center_Display", "Cluster_Display"), displays.map { it["uuid"] })
+        assertEquals("Center_Display", displays[0]["uuid"])
+        val mapUuid = displays[1]["uuid"] as String
+        assertNotEquals("Cluster_Display", mapUuid)
+        assertEquals(111, displays[1]["type"])
         for (hid in value["hidDevices"] as List<*>) assertEquals("Center_Display", (hid as Map<*, *>)["displayUUID"])
         val panels = (value["displayPanels"] as List<*>).map { it as Map<*, *> }
-        assertEquals(listOf("Center_Display", "Cluster_Display"), panels.map { it["uid"] })
-        val plugin = (panels[1]["displayPlugins"] as List<*>).single() as Map<*, *>
-        assertEquals("Cluster_Display", plugin["uid"])
-        assertEquals(listOf("Cluster_Display"), plugin["videoStreams"])
+        assertEquals(listOf("Center_Display", mapUuid, "${VoyahUltraDisplayPanels.CLUSTER_UID}-panel"), panels.map { it["uid"] })
+        assertEquals(emptyList<String>(), panels[1]["properties"])
+        assertFalse(panels[1].containsKey("displayPlugins"))
+        assertEquals(mapUuid, ((panels[1]["initialVideoStreams"] as List<*>).single() as Map<*, *>)["uuid"])
+        val plugin = (panels[2]["displayPlugins"] as List<*>).single() as Map<*, *>
+        assertEquals(emptyList<String>(), plugin["videoStreams"])
+        assertEquals(listOf("showsInstruments"), panels[2]["properties"])
         val command = AirPlayInfoPlist.viewAreaCommand(0, 1, "Center_Display")
         assertEquals("Center_Display", (command["params"] as Map<*, *>)["uuid"])
         assertEquals("test", value["name"])

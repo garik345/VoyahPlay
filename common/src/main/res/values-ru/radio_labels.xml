@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_radio_labels_title">Названия станций в штатном радио (экспериментально)</string>
+    <string name="settings_radio_labels_description">Показывать RDS-название над частотой в списках штатного радио. Нужен root-помощник 1.2.4 и совместимая версия радио. Применяется без переподключения CarPlay. Выключение возвращает исходные подписи.</string>
+</resources>

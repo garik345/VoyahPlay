@@ -106,7 +106,23 @@ object VoyahUltraSettings {
                 lightModes = listOf(R.string.carplay_control_off, R.string.carplay_light_position,
                     R.string.carplay_light_low_beam, R.string.carplay_light_auto).map(app::getString),
                 unavailable = app.getString(R.string.carplay_vehicle_unavailable),
-                settings = app.getString(R.string.carplay_voyahplay_settings)))
+                settings = app.getString(R.string.carplay_voyahplay_settings),
+                driveMode = app.getString(R.string.carplay_vehicle_drive_mode),
+                driveModes = listOf(R.string.carplay_drive_eco, R.string.carplay_drive_comfort, R.string.carplay_drive_sport,
+                    R.string.carplay_drive_offroad, R.string.carplay_drive_individual, R.string.carplay_drive_snow).map(app::getString),
+                hybridMode = app.getString(R.string.carplay_powertrain_mode),
+                hybridModes = listOf(R.string.carplay_power_smart, R.string.carplay_power_electric, R.string.carplay_power_hybrid,
+                    R.string.carplay_power_sustain).map(app::getString),
+                ambientSwitch = app.getString(R.string.carplay_ambient_switch),
+                ambientBrightness = app.getString(R.string.carplay_ambient_brightness),
+                ambientColor = app.getString(R.string.carplay_ambient_color),
+                aromaLevel = app.getString(R.string.carplay_aroma_level),
+                aromaTaste = app.getString(R.string.carplay_aroma_taste),
+                aromaTime = app.getString(R.string.carplay_aroma_time),
+                aromaOff = app.getString(R.string.carplay_aroma_off),
+                on = app.getString(R.string.carplay_control_on),
+                durations = app.resources.getStringArray(R.array.carplay_aroma_durations).toList(),
+                ambientColours = listOf(1,8,10,19,30,49,54,61,64).zip(app.resources.getStringArray(R.array.carplay_ambient_colors).toList()).toMap()), ringtoneLabel = app.getString(R.string.carplay_audio_ringtone))
     }
 
     private fun wireBodies(context: Context): String {
@@ -151,7 +167,7 @@ object VoyahUltraSettings {
                 appendLine("H97C HVAC: driver/passenger target, power, AC, fan, AUTO, recirculation, front/rear defrost; comfort controls.")
                 appendLine("UI Sync: available handler; NEGOTIATED, RCS SETUP/LISTEN and STATE ready are separate stages.")
                 appendLine("First /info is captured even with ASSET_PROBE off. Export also saves a voyahplay-ultra-wire-* file with base64 wire bodies.")
-                appendLine("CAF transport and climate metadata checked against f-io/LIVI 3fb5210f; OEM commands checked against the supplied CAN APK SHA256 96ac5182.")
+                appendLine("CAF transport and climate metadata checked against f-io/LIVI 3fb5210f; OEM CAN builds: RU 96ac5182, PI OTA7.0 74d7de6e, PI OTA7.2 6fb0829a (reviewed H97C wire layouts).")
                 appendLine("Climate UI is not confirmed. Writes are accepted only from explicit iPhone requests and require OEM readback.")
                 appendLine("OEM radio: com.pateo.rdsapp MediaBrowser; CAF Media + NowPlaying use LIVI's wire schema. Play/Pause/Next/Previous/TuneToIdentifier require OEM readback. FM/AM semantic enum and iPhone rendering remain unverified.")
                 for (name in listOf("capture.previous.txt", "capture.txt")) {
@@ -209,7 +225,11 @@ object VoyahUltraSettings {
             .setPositiveButton(android.R.string.ok, null).show()
     }
 
-    internal class ClimateSource(context: Context) : UltraClimateSource {
+    internal fun comfortControls(permitted: Boolean, heatedWheel: Boolean): Set<UltraClimateControl> =
+        if (!permitted) emptySet() else UltraClimateControl.entries.filter { heatedWheel || !it.isWheel }.toSet()
+
+    internal class ClimateSource(context: Context,
+        heatedWheel: Boolean = com.shilapi.xcertplay.voyah.VoyahEquipment.hasHeatedWheel(context)) : UltraClimateSource {
         private val handler = Handler(Looper.getMainLooper())
         private val client = VoyahClient(context)
         private val app = context.applicationContext
@@ -233,15 +253,38 @@ object VoyahUltraSettings {
         @Volatile private var pending: ComfortRequest? = null
         private var callback: ((UltraClimateSample?) -> Unit)? = null
         private val audio = app.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-        private val mediaVolume = VoyahMediaVolume(audio, app.getSharedPreferences("voyah_ultra_audio", 0))
+        private val mediaVolume = VoyahMediaVolume(audio, app.getSharedPreferences("voyah_ultra_audio", 0),
+            VoyahOemMute(app) { record(app, it) })
         private val mediaVolumeRange get() = mediaVolume.range
+        private val extraAudio = VoyahOemAudioChannels(app) { record(app, it) }
+        private val audioThread = android.os.HandlerThread("voyah-ultra-volume").apply { start() }
+        private val audioHandler = Handler(audioThread.looper)
+        private data class VolumeSample(val level: Long?, val muted: Boolean?, val sampledAt: Long)
+        @Volatile private var volumeSample = VolumeSample(null, null, 0)
+        @Synchronized private fun readVolume(): VolumeSample = mediaVolume.read().let { (level, muted) ->
+            VolumeSample(level, muted, SystemClock.elapsedRealtime()).also { volumeSample = it }
+        }
+        private val audioPoll = object : Runnable {
+            override fun run() {
+                if (stopped) return
+                val before = volumeSample
+                val after = readVolume()
+                val beforeChannels = extraAudio.values
+                val afterChannels = extraAudio.read()
+                if (beforeChannels != afterChannels || before.sampledAt == 0L || before.level != after.level || before.muted != after.muted)
+                    handler.post { emit() }
+                if (!stopped) audioHandler.postDelayed(this, 500)
+            }
+        }
         private var lastRawVehicle: String? = null
         private var lastRecirculationRaw: String? = null
         private var lastRawVehicleAt = 0L
         private fun permitted() = app.checkSelfPermission("com.qinggan.permission.WRITE_CANBUS") == android.content.pm.PackageManager.PERMISSION_GRANTED
-        override val supportedControls = if (permitted()) UltraClimateControl.entries.toSet() else emptySet()
+        override val supportedControls = comfortControls(permitted(), heatedWheel)
         override val supportedHvac = if (permitted()) UltraHvacControl.entries.toSet() else emptySet()
-        override val supportedVehicleControls = UltraVehicleControl.entries.filter { permitted() || it.isAppAction }.toSet()
+        override val supportedVehicleControls = UltraVehicleControl.entries.filter {
+            it != UltraVehicleControl.AMBIENT_COLOR && (permitted() || it.isAppAction)
+        }.toSet()
         private fun withLights(values: Map<UltraVehicleControl, Int>) =
             (values - UltraVehicleControl.LIGHT_MODE) + (lightMode?.let { mapOf(UltraVehicleControl.LIGHT_MODE to it) } ?: emptyMap())
         private val poll = object : Runnable {
@@ -270,7 +313,8 @@ object VoyahUltraSettings {
                 if (!control.isWheel) comfort?.selectedSeatLevel(if (control.isPassenger) 1 else 0, control.isVent)
                     ?.let { selectedLevels[control] = it }
             }
-            val (volumeLevel, muted) = volume()
+            val volume = volumeSample
+            val (volumeLevel, muted) = volume
             val vehicle = com.shilapi.xcertplay.voyah.VoyahVehicleSchema.readings(values, volumeLevel, muted)
             val raw = "odometer=${values.odometerValues()} tpms=${values.tireValues()} fuel=${values.fuelValues()}"
             if (raw != lastRawVehicle && SystemClock.elapsedRealtime() - lastRawVehicleAt >= 10_000) {
@@ -300,19 +344,26 @@ object VoyahUltraSettings {
                     vehicleControlsSampledAtMillis = maxOf(old?.vehicleControlsSampledAtMillis ?: 0, values.receivedAt),
                     lightingSampledAtMillis = SystemClock.elapsedRealtime(),
                     comfortSelectedLevels = if (old != null && old.comfortSampledAtMillis > values.receivedAt)
-                        old.comfortSelectedLevels else selectedLevels)
+                        old.comfortSelectedLevels else selectedLevels,
+                    volumeSampledAtMillis = volume.sampledAt)
             }
             emit()
         }
         override fun start(onSample: (UltraClimateSample?) -> Unit) {
-            handler.post { if (!stopped && callback == null) { callback = onSample; radio?.start(); lights.start(); handler.post(poll) } }
+            handler.post { if (!stopped && callback == null) {
+                callback = onSample; radio?.start(); lights.start(); audioHandler.post(audioPoll); handler.post(poll)
+            } }
         }
         private fun emit() {
             if (stopped) return
             val value = synchronized(lock) {
                 val snapshot = radio?.snapshot
-                val old = latest ?: if (snapshot?.connected == true) UltraClimateSample(Double.NaN, 0) else null
-                old?.copy(radio = snapshot, radioSampledAtMillis = SystemClock.elapsedRealtime()).also { latest = it }
+                val volume = volumeSample
+                val old = latest ?: if (snapshot?.connected == true || volume.level != null) UltraClimateSample(Double.NaN, 0) else null
+                old?.copy(radio = snapshot, radioSampledAtMillis = SystemClock.elapsedRealtime(),
+                    vehicle = (old.vehicle ?: UltraVehicleReadings()).copy(volumeLevel = volume.level, muted = volume.muted),
+                    volumeSampledAtMillis = volume.sampledAt, audioChannels = extraAudio.values,
+                    audioChannelsSampledAtMillis = extraAudio.sampledAt).also { latest = it }
             }
             callback?.invoke(value)
         }
@@ -321,16 +372,29 @@ object VoyahUltraSettings {
             if (stopped) return UltraClimateWriteResult(false, "Radio source closed")
             return radio?.write(request) ?: UltraClimateWriteResult(false, "Radio disabled for this session")
         }
-        /** Native stream index and mute; no lossy percent conversion between CarPlay and the car. */
-        private fun volume(): Pair<Long?, Boolean?> = mediaVolume.read()
+        override val audioChannelRanges by lazy { extraAudio.ranges().toMap() }
+        override fun writeAudioChannel(channel: UltraAudioChannel, value: Int): UltraClimateWriteResult {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            if (stopped) return UltraClimateWriteResult(false, "Audio closed")
+            record(app, "AUDIO_PLAYBACK channel=$channel " + com.shilapi.xcertplay.media.VoyahPlaybackRoutes.describe() +
+                " navigation=" + com.shilapi.xcertplay.media.NavigationPlayback.snapshot())
+            val result = extraAudio.write(channel, value)
+            synchronized(lock) {
+                latest = (latest ?: UltraClimateSample(Double.NaN, 0)).copy(
+                    audioChannels = extraAudio.values, audioChannelsSampledAtMillis = extraAudio.sampledAt)
+            }
+            handler.post { emit() }
+            return result
+        }
         override val supportsVolume get() = mediaVolumeRange != null
         override val volumeRange get() = mediaVolumeRange ?: 0..100
-        override fun writeVolume(level: Int?, mute: Boolean?): UltraClimateWriteResult {
+        @Synchronized override fun writeVolume(level: Int?, mute: Boolean?): UltraClimateWriteResult {
             if (stopped) return UltraClimateWriteResult(false, "Volume closed")
             val result = mediaVolume.write(level, mute)
-            val (readback, muted) = volume()
+            val after = readVolume()
             synchronized(lock) {
-                latest = latest?.let { it.copy(vehicle = (it.vehicle ?: UltraVehicleReadings()).copy(volumeLevel = readback, muted = muted)) }
+                latest = latest?.let { it.copy(vehicle = (it.vehicle ?: UltraVehicleReadings()).copy(volumeLevel = after.level, muted = after.muted),
+                    volumeSampledAtMillis = after.sampledAt) }
             }
             handler.post { emit() }
             return result
@@ -360,7 +424,18 @@ object VoyahUltraSettings {
         }
         override fun writeVehicleControl(control: UltraVehicleControl, value: Int): UltraClimateWriteResult {
             check(Looper.myLooper() != Looper.getMainLooper())
-            if (stopped || control !in supportedVehicleControls || control.normalize(value) == null ||
+            if (stopped || control !in supportedVehicleControls || control.normalize(value) == null)
+                return UltraClimateWriteResult(false, "Unsupported vehicle action/value")
+            val snapshot = synchronized(lock) { latest }
+            val readings = snapshot?.takeIf {
+                SystemClock.elapsedRealtime() - it.vehicleControlsSampledAtMillis in 0..2_500
+            }?.vehicleControlValues.orEmpty()
+            val action = com.shilapi.xcertplay.voyah.VoyahVehicleControlSchema.resolveAction(control, value, readings)
+                ?: return UltraClimateWriteResult(false, "Fresh ambient colour unavailable")
+            return writeVehicleValue(action.first, action.second)
+        }
+        private fun writeVehicleValue(control: UltraVehicleControl, value: Int): UltraClimateWriteResult {
+            if (stopped || control.normalize(value) == null ||
                 (!control.isAppAction && !permitted()) || !writeBusy.compareAndSet(false, true))
                 return UltraClimateWriteResult(false, "Vehicle control closed, busy, invalid or permission denied")
             val request = ComfortRequest(); pending = request
@@ -392,7 +467,8 @@ object VoyahUltraSettings {
                                     latest = (latest ?: UltraClimateSample(Double.NaN, 0)).copy(
                                         vehicleControlValues = readings, vehicleControlsSampledAtMillis = SystemClock.elapsedRealtime())
                                 }
-                                request.result = UltraClimateWriteResult(readings[control] == value, "$message readback=${readings[control]}")
+                                request.result = UltraClimateWriteResult(com.shilapi.xcertplay.voyah.VoyahVehicleControlSchema.confirms(control, value, states),
+                                    "$message readback=${readings[control]} modeConfirmed=${states["MODE_CONFIRMED"]} cabinConfirmed=${states["CABIN_CONFIRMED"]}")
                                 emit()
                             } else request.result = UltraClimateWriteResult(false, "$message; awaiting LightStatus")
                         }
@@ -462,6 +538,8 @@ object VoyahUltraSettings {
         }
         override fun close() {
             stopped = true
+            audioHandler.removeCallbacksAndMessages(null)
+            audioThread.quitSafely()
             radio?.close()
             val request = pending; pending = null; request?.ready?.countDown()
             handler.post { handler.removeCallbacksAndMessages(null); request?.ticket?.cancel(); lights.stop(); client.cancel(); callback = null; latest = null }

@@ -71,6 +71,34 @@ class VoyahUltraVehicleTest {
         assertEquals(mapOf(V.pressure(1) to 240L, V.FUEL_LEVEL to 40L), reader(a.changed()!!).valuesMap())
     }
 
+    @Test fun nativeMuteAndUnmuteReachThePhoneAsNotificationsWithoutAPhoneWrite() {
+        val a = accessory()
+        register(a, listOf(V.MUTE))
+        sample = sample!!.copy(vehicle = car.copy(muted = true))
+        assertEquals(mapOf(V.MUTE to true), reader(a.changed()!!).valuesMap())
+        sample = sample!!.copy(vehicle = car.copy(muted = false))
+        assertEquals(mapOf(V.MUTE to false), reader(a.changed()!!).valuesMap())
+        assertTrue(volumeWrites.isEmpty())
+    }
+
+    @Test fun freshVolumeSurvivesAStaleCanCacheWithoutRefreshingTiresOrFuel() {
+        sample = sample!!.copy(vehicleSampledAtMillis = -100_000, volumeSampledAtMillis = now)
+        val a = accessory()
+        val reply = register(a, listOf(V.VOLUME, V.MUTE, V.FUEL_LEVEL, V.pressure(0)))
+        assertEquals(35L, reply.valuesMap()[V.VOLUME])
+        assertEquals(false, reply.valuesMap()[V.MUTE])
+        assertNull(reply.valuesMap()[V.FUEL_LEVEL])
+        assertNull(reply.valuesMap()[V.pressure(0)])
+    }
+
+    @Test fun freshCanCacheCannotMakeStaleAudioLookCurrent() {
+        sample = sample!!.copy(volumeSampledAtMillis = -100_000)
+        val reply = register(accessory(), listOf(V.VOLUME, V.MUTE, V.FUEL_LEVEL))
+        assertNull(reply.valuesMap()[V.VOLUME])
+        assertNull(reply.valuesMap()[V.MUTE])
+        assertEquals(41L, reply.valuesMap()[V.FUEL_LEVEL])
+    }
+
     @Test fun theVolumeSliderSetsAndConfirmsTheAndroidVolume() {
         val a = accessory()
         register(a, listOf(V.VOLUME, V.MUTE))

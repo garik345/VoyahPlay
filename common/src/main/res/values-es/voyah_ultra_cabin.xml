@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_ambient_switch">Iluminación ambiental</string>
+    <string name="carplay_ambient_brightness">Brillo ambiental</string>
+    <string name="carplay_ambient_color">Color ambiental</string>
+    <string name="carplay_aroma_level">Intensidad del ambientador</string>
+    <string name="carplay_aroma_taste">Cartucho del ambientador</string>
+    <string name="carplay_aroma_time">Duración del ambientador</string>
+    <string name="carplay_control_on">Activado</string>
+    <string-array name="carplay_aroma_durations">
+        <item>Siempre</item>
+        <item>30 min</item>
+        <item>60 min</item>
+    </string-array>
+    <string-array name="carplay_ambient_colors">
+        <item>Azul</item>
+        <item>Cian</item>
+        <item>Morado</item>
+        <item>Verde</item>
+        <item>Rosa</item>
+        <item>Amarillo</item>
+        <item>Marrón</item>
+        <item>Naranja</item>
+        <item>Rojo</item>
+    </string-array>
+    <string name="carplay_aroma_off">Apagar el ambientador</string>
+</resources>

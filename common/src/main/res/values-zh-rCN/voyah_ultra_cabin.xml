@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_ambient_switch">氛围灯</string>
+    <string name="carplay_ambient_brightness">氛围灯亮度</string>
+    <string name="carplay_ambient_color">氛围灯颜色</string>
+    <string name="carplay_aroma_level">香氛强度</string>
+    <string name="carplay_aroma_taste">香氛香盒</string>
+    <string name="carplay_aroma_time">香氛时长</string>
+    <string name="carplay_control_on">开启</string>
+    <string-array name="carplay_aroma_durations">
+        <item>持续</item>
+        <item>30分钟</item>
+        <item>60分钟</item>
+    </string-array>
+    <string-array name="carplay_ambient_colors">
+        <item>蓝色</item>
+        <item>青色</item>
+        <item>紫色</item>
+        <item>绿色</item>
+        <item>粉色</item>
+        <item>黄色</item>
+        <item>棕色</item>
+        <item>橙色</item>
+        <item>红色</item>
+    </string-array>
+    <string name="carplay_aroma_off">关闭香氛</string>
+</resources>

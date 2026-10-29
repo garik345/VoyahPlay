@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.voyah;
 
-/** Wire layouts from the exact user-supplied CAN APK; no OEM executable code bundled. */
+/** Shared RU/PI wire layouts from the APKs in VoyahOemBuilds; no OEM executable code bundled. */
 final class CanSchema {
     static final class Spec {
         final int code; final String method; final boolean nullable; final String[] fields; final String types;

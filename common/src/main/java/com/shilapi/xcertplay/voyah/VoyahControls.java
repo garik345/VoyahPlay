@@ -13,11 +13,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class VoyahControls {
     private static final String PKG="com.qinggan.canbus.service";
     private static final String API="com.qinggan.canbus.ICanBusService";
-    private static final String HASH="96ac5182e795ad70c43c78f26b9cf29e76b59db67c2d5c09216ba1d8425c427c";
     private static final Handler MAIN=new Handler(Looper.getMainLooper());
     private static final ExecutorService WORK=Executors.newSingleThreadExecutor();
     private static final AtomicBoolean BUSY=new AtomicBoolean();
     private static volatile String verifiedApk;
+    private static volatile boolean verifiedHeatedWheel;
     public interface Callback { void done(Map<String,Integer> states, String message); }
     public interface Ticket { void cancel(); }
     private enum Field {
@@ -31,7 +31,11 @@ public final class VoyahControls {
         AROMA_SWITCH(555,774,1,2), AROMA_TASTE(556,775,1,2,3), AROMA_INTENSITY(558,777,1,2,3),
         AROMA_TIME(850,1067,0,1,2),
         LIGHT_LOW(136,215,1), LIGHT_POSITION(878,1095,1), LIGHT_OFF(879,1096,1), LIGHT_AUTO(880,1097,1),
-        LIGHT_MODE(225,292), LIGHT_STATUS(76,160);
+        LIGHT_MODE(225,292), LIGHT_STATUS(76,160),
+        DRIVE(328,545,1,2,3,4,5,6), STEERING(504,722,2,3), ACCELERATOR(563,782,1,2,3),
+        HYBRID(740,957,1,2,3,4,5),
+        AMBIENT_SWITCH(171,327,1,2), AMBIENT_COLOR(161,239,java.util.stream.IntStream.rangeClosed(1,64).toArray()),
+        AMBIENT_BRIGHTNESS(162,240,java.util.stream.IntStream.rangeClosed(1,10).toArray()), AMBIENT_MUSIC(165,321,1,2);
         final int ordinalValue,id; final int[] allowed;
         Field(int o,int i,int... values){ordinalValue=o;id=i;allowed=values;}
         boolean accepts(int v){for(int a:allowed)if(a==v)return true;return false;}
@@ -56,7 +60,7 @@ public final class VoyahControls {
     private static final class Session implements ServiceConnection,Ticket {
         final Context context;final String command;final int side,function,value;final Callback callback;
         final CountDownLatch ready=new CountDownLatch(1);final AtomicBoolean delivered=new AtomicBoolean();
-        volatile boolean cancelled;boolean bound;volatile IBinder binder;
+        volatile boolean cancelled;boolean modeConfirmed;boolean cabinConfirmed;boolean bound;volatile IBinder binder;boolean heatedWheel;
         final Runnable timeout=()->{cancel();deliver(Collections.emptyMap(),"Тайм-аут. Состояние неизвестно; повторите чтение.");};
         Session(Context c,String cmd,int s,int f,int v,Callback cb){context=c;command=cmd;side=s;function=f;value=v;callback=cb;}
         public void cancel(){cancelled=true;ready.countDown();MAIN.post(this::release);}
@@ -66,6 +70,7 @@ public final class VoyahControls {
             Map<String,Integer> values=new LinkedHashMap<>();String message="Кэш автомобиля прочитан.";
             try{
                 verify();live();
+                if(command.startsWith("wheel-") && !heatedWheel)throw new IOException("Подогрев руля отсутствует в этой комплектации");
                 MAIN.post(()->{if(cancelled){ready.countDown();return;}try{
                     bound=context.bindService(new Intent().setComponent(new ComponentName(PKG,PKG+".CanBusService")),this,Context.BIND_AUTO_CREATE);
                     if(!bound)ready.countDown();
@@ -75,11 +80,16 @@ public final class VoyahControls {
                 try{apply();if(!command.endsWith("read"))message=command.equals("light-mode") ? "Запрос света отправлен; текущий режим не подтверждён." : command.equals("auto-high") ? "Запрос автодальнего отправлен; текущий режим не подтверждён." : "Команда подтверждена кэшем автомобиля.";}
                 catch(Exception e){message="Команда не подтверждена: "+e.getMessage();}
                 for(Field f:Field.values()){
+                    if(!heatedWheel && (f==Field.WHEEL || f==Field.WHEEL_FB))continue;
                     if(command.startsWith("sign") != (f.ordinal()<=Field.ISA_STATUS.ordinal()))continue;
-                    live();values.put(f.name(),get(f));
+                    live();
+                    try { values.put(f.name(),get(f)); }
+                    catch(Exception error) { if(!f.name().startsWith("AMBIENT_") || cancelled)throw error; }
                 }
             }catch(Exception | LinkageError e){message="Ошибка: "+e.getMessage();}
             finally{
+                if(command.equals("drive-mode") || command.equals("hybrid-mode")) values.put("MODE_CONFIRMED",modeConfirmed ? 1 : 0);
+                if(command.startsWith("ambient-")||command.equals("aroma-level")||command.equals("aroma-select")||command.equals("aroma-duration"))values.put("CABIN_CONFIRMED",cabinConfirmed ? 1 : 0);
                 final String result=message;
                 MAIN.post(()->{MAIN.removeCallbacks(timeout);release();BUSY.set(false);if(!cancelled)deliver(values,result);});
             }
@@ -89,6 +99,31 @@ public final class VoyahControls {
             if(context.checkSelfPermission("com.qinggan.permission.WRITE_CANBUS")!=PackageManager.PERMISSION_GRANTED)
                 throw new SecurityException("Нет разрешения WRITE_CANBUS");
             switch(command){
+                case "drive-mode": {
+                    int[] profile=value==5 ? VoyahIndividualDriveProfile.read(context) : new int[]{0,0};
+                    Map<String,Integer> plan=VoyahDriveModePolicy.plan(value,profile[0],profile[1]);
+                    if(plan==null)throw new IOException("Неизвестный режим или индивидуальный профиль");
+                    sendModeBundle(plan); modeConfirmed=true; break;
+                }
+                case "hybrid-mode": {
+                    if(value<1||value>4)throw new IOException("Неизвестный режим силовой установки");
+                    sendModeBundle(Collections.singletonMap("IVI_SOC_MODESET",value)); modeConfirmed=true; break;
+                }
+                case "ambient-switch":case "ambient-brightness":case "ambient-color":
+                case "aroma-level":case "aroma-select":case "aroma-duration":{
+                    Map<String,Integer> current=new LinkedHashMap<>();
+                    if(command.startsWith("ambient-")){
+                        verifyAmbientSchema();
+                        for(Field f:new Field[]{Field.AMBIENT_SWITCH,Field.AMBIENT_COLOR,Field.AMBIENT_BRIGHTNESS,Field.AMBIENT_MUSIC})current.put(f.name(),get(f));
+                    }else{
+                        for(Field f:new Field[]{Field.AROMA_SWITCH,Field.AROMA_INTENSITY,Field.AROMA_TASTE,Field.AROMA_TIME})current.put(f.name(),get(f));
+                    }
+                    List<VoyahCabinControlPolicy.Step> plan=VoyahCabinControlPolicy.plan(command,value,current);
+                    if(plan==null)throw new IOException("Недоступное состояние или значение; для ручного цвета/яркости отключите музыкальный режим подсветки в штатном меню");
+                    for(VoyahCabinControlPolicy.Step step:plan)ensure(Field.valueOf(step.field),step.value);
+                    cabinConfirmed=true;
+                    break;
+                }
                 case "sign-tsr":ensure(Field.TSR,value);break;
                 case "sign-isa":
                     if(value==1){int mode=get(Field.MODE);if(!Field.MODE.accepts(mode))throw new IOException("Режим ISA неизвестен");}
@@ -163,6 +198,57 @@ public final class VoyahControls {
                 default:throw new IOException("Неизвестная команда");
             }
         }
+        void verifyAmbientSchema()throws Exception{
+            android.content.pm.ApplicationInfo info=context.getPackageManager().getApplicationInfo(PKG,0);
+            Class<?> type=new dalvik.system.PathClassLoader(info.sourceDir,context.getClassLoader()).loadClass("com.qinggan.canbus.VehicleState");
+            Object[] constants=type.getEnumConstants();
+            Field[] fields={Field.AMBIENT_SWITCH,Field.AMBIENT_COLOR,Field.AMBIENT_BRIGHTNESS,Field.AMBIENT_MUSIC};
+            String[] names={"VEHICLE_AMBIENT_LIGHT_SWITCH","VEHICLE_AMBIENT_LIGHT_COLOR","VEHICLE_AMBIENT_LIGHT_BRIGHTNESS_LEVEL","VEHICLE_AMBIENT_LIGHT_MUSICAL_RHYTHM_SWITCH"};
+            for(int i=0;i<fields.length;i++){
+                Field f=fields[i];
+                if(constants==null||constants.length<=f.ordinalValue)throw new IOException("Неизвестная схема подсветки");
+                Object constant=constants[f.ordinalValue];
+                if(!((Enum<?>)constant).name().equals(names[i])||((Number)type.getMethod("getValue").invoke(constant)).intValue()!=f.id)
+                    throw new IOException("Схема подсветки отличается от проверенного OEM SDK");
+            }
+        }
+        void sendModeBundle(Map<String,Integer> plan)throws Exception{
+            Map<String,Field> fields=new LinkedHashMap<>();
+            fields.put("DRIVING_MODE_SET",Field.DRIVE); fields.put("EPS_MODE_SET",Field.STEERING);
+            fields.put("PROP_MODE_SET",Field.ACCELERATOR); fields.put("IVI_SOC_MODESET",Field.HYBRID);
+            android.content.pm.ApplicationInfo info=context.getPackageManager().getApplicationInfo(PKG,0);
+            Class<?> type=new dalvik.system.PathClassLoader(info.sourceDir,context.getClassLoader())
+                .loadClass("com.qinggan.canbus.VehicleState");
+            Object[] entries=type.getEnumConstants();
+            boolean changed=false; Bundle vehicle=new Bundle();
+            for(Map.Entry<String,Integer> entry:plan.entrySet()){
+                Field f=fields.get(entry.getKey());
+                if(f==null || !f.accepts(entry.getValue()) || entries==null || f.ordinalValue>=entries.length)
+                    throw new IOException("Неизвестная схема режима");
+                Object constant=entries[f.ordinalValue];
+                if(!((Enum<?>)constant).name().equals(entry.getKey()) ||
+                    ((Number)type.getMethod("getValue").invoke(constant)).intValue()!=f.id)
+                    throw new IOException("Схема режима не совпадает с OEM SDK");
+                int before=get(f);
+                if(!f.accepts(before))throw new IOException("Текущее состояние режима неизвестно");
+                changed |= before!=entry.getValue(); vehicle.putInt(entry.getKey(),entry.getValue());
+            }
+            if(!changed)return;
+            live(); Parcel d=Parcel.obtain(),r=Parcel.obtain();
+            try{
+                d.writeInterfaceToken(API);d.writeInt(0);d.writeInt(1);vehicle.writeToParcel(d,0);
+                if(!binder.transact(77,d,r,0))throw new IOException("TX77 недоступен");
+                r.readException();if(r.dataAvail()!=4 || r.readInt()!=0)throw new IOException("TX77 отклонён");
+            }finally{d.recycle();r.recycle();}
+            // Acceptance is asynchronous; every requested field must match the readback.
+            for(int attempt=0;attempt<8;attempt++){
+                live(); boolean matches=true;
+                for(Map.Entry<String,Integer> entry:plan.entrySet())
+                    if(get(fields.get(entry.getKey()))!=entry.getValue())matches=false;
+                if(matches)return; Thread.sleep(250);
+            }
+            throw new IOException("Кэш не подтвердил выбранный режим");
+        }
         int get(Field f)throws Exception{
             live();Parcel d=Parcel.obtain(),r=Parcel.obtain();
             try{d.writeInterfaceToken(API);d.writeInt(1);d.writeInt(f.ordinalValue);d.writeInt(f.id);
@@ -191,11 +277,12 @@ public final class VoyahControls {
             if(info.splitSourceDirs!=null&&info.splitSourceDirs.length>0)throw new IOException("Неизвестная split-сборка CAN");
             File file=new File(info.sourceDir);if(!file.isFile()||file.length()>128L*1024*1024)throw new IOException("Неизвестный CAN APK");
             String stamp=file.getAbsolutePath()+":"+file.length()+":"+file.lastModified();
-            if(stamp.equals(verifiedApk))return;
+            if(stamp.equals(verifiedApk)){heatedWheel=verifiedHeatedWheel;return;}
             MessageDigest md=MessageDigest.getInstance("SHA-256");
             try(InputStream in=new FileInputStream(file)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1){live();md.update(b,0,n);}}
             StringBuilder hash=new StringBuilder();for(byte b:md.digest())hash.append(String.format(Locale.ROOT,"%02x",b&255));
-            if(!HASH.contentEquals(hash))throw new IOException("CAN APK отличается от проверенного. Команды заблокированы.");
+            if(!VoyahOemBuilds.supportsCanApk(hash.toString()))throw new IOException("CAN APK отличается от проверенного. Команды заблокированы. SHA256="+hash);
+            heatedWheel=VoyahOemBuilds.hasHeatedWheel(hash.toString());verifiedHeatedWheel=heatedWheel;
             verifiedApk=stamp;
         }
         public void onServiceConnected(ComponentName n,IBinder b){binder=b;ready.countDown();}

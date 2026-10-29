@@ -22,9 +22,11 @@ object CarPlayGlance {
         val remainingMeters: Long? = null,
         val song: String? = null,
         val playing: Boolean = false,
+        val navigationActive: Boolean = false,
     )
 
     private val route = BydHudRouteState()
+    private val navigation = com.shilapi.xcertplay.hud.FceNavigationState()
     private val song = ClusterSongState()
     private var connected = false
     private var last = Snapshot()
@@ -43,7 +45,10 @@ object CarPlayGlance {
         val changed = synchronized(this) {
             when (frame.messageId) {
                 BydHudRouteState.ROUTE_GUIDANCE_UPDATE, BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE ->
-                    runCatching { route.accept(frame.messageId, frame.payload) }
+                    runCatching {
+                        navigation.accept(frame.messageId, frame.payload)
+                        route.accept(frame.messageId, frame.payload)
+                    }
                 ClusterSongState.NOW_PLAYING_UPDATE -> runCatching { song.accept(frame) }
                 else -> return
             }
@@ -58,6 +63,7 @@ object CarPlayGlance {
             connected = next
             if (!next) {
                 route.clear()
+                navigation.clear()
                 song.clear()
             }
             publishLocked()
@@ -79,6 +85,7 @@ object CarPlayGlance {
             remainingMeters = maneuver?.remainingMeters,
             song = current?.text,
             playing = current?.playing ?: false,
+            navigationActive = connected && if (navigation.known) navigation.active else maneuver != null,
         )
         if (next == last) return null
         last = next

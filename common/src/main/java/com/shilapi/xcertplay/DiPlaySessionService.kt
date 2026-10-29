@@ -55,6 +55,9 @@ class DiPlaySessionService : Service() {
         return START_NOT_STICKY
     }
     override fun onTaskRemoved(rootIntent: Intent?) {
+        // Closing the separate Voyah media-card task must leave the phone connection alive.
+        if (rootIntent?.component?.let { it.packageName == packageName &&
+                it.className == com.shilapi.xcertplay.voyah.VoyahClusterProbeSpec.ACTIVITY } == true) return
         // BYD's recents force-stops the package ~10 ms after removing the task: end guidance first.
         com.shilapi.xcertplay.hud.BydNavigationOutputs.endNow()
         CarPlayBackgroundSession.stop()

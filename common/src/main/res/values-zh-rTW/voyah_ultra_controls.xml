@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_powertrain_mode">動力模式</string>
+    <string name="carplay_power_smart">智慧</string>
+    <string name="carplay_power_electric">純電</string>
+    <string name="carplay_power_hybrid">混合動力</string>
+    <string name="carplay_power_sustain">保電（燃油）</string>
+    <string name="carplay_audio_ringtone">鈴聲</string>
+</resources>

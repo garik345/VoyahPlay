@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_cluster_probe_title">儀表地圖（實驗性）</string>
+    <string name="settings_cluster_probe_description">路線導航時自動顯示地圖。需要 root 助手 1.2.7。下方手動測試按鈕執行60秒。 手動測試會暫停自動顯示，直到路線結束。</string>
+    <string name="settings_cluster_probe_status">檢查儀表螢幕</string>
+    <string name="settings_cluster_probe_grid">顯示測試網格</string>
+    <string name="settings_cluster_probe_map">顯示 CarPlay 地圖</string>
+    <string name="settings_cluster_probe_stop">停止測試</string>
+    <string name="settings_cluster_probe_copy">複製測試報告</string>
+    <string name="settings_cluster_probe_working">正在等待助手回應…</string>
+    <string name="settings_cluster_probe_stream_description">導航時在儀表顯示地圖，路線結束或 iPhone 中斷後恢復媒體卡片。變更此設定後需要重新連接 CarPlay。</string>
+    <string name="settings_cluster_probe_map_help">在此測試卡片中啟用「%1$s」，並重新連接 CarPlay。開始導航後再次點選「顯示 CarPlay 地圖」。如果已啟用，請檢查測試報告：iPhone 尚未啟動地圖串流。</string>
+    <string name="settings_cluster_probe_waiting">正在等待 CarPlay 地圖</string>
+    <string name="settings_cluster_probe_copied">已複製測試報告</string>
+    <string name="settings_cluster_map_element_size">地圖文字和圖示</string>
+    <string name="settings_cluster_map_element_size_description">單獨調整文字和圖示大小，不改變道路的地理縮放。百分比越大，元素越大。重新連接 CarPlay 後生效。</string>
+    <string name="settings_cluster_map_size_value">%1$d%%</string>
+    <string name="settings_cluster_map_zoom_description">無需重新連接即可縮放目前儀表地圖。導航時 iPhone 可能自動調整地理縮放。</string>
+    <string name="settings_cluster_map_zoom_in">放大地圖</string>
+    <string name="settings_cluster_map_zoom_out">縮小地圖</string>
+    <string name="settings_cluster_map_zoom_unavailable">請先在儀表顯示地圖，並保持 iPhone 連接。</string>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_ambient_switch">الإضاءة المحيطية</string>
+    <string name="carplay_ambient_brightness">سطوع الإضاءة المحيطية</string>
+    <string name="carplay_ambient_color">لون الإضاءة المحيطية</string>
+    <string name="carplay_aroma_level">شدة المعطر</string>
+    <string name="carplay_aroma_taste">خرطوشة المعطر</string>
+    <string name="carplay_aroma_time">مدة التعطير</string>
+    <string name="carplay_control_on">تشغيل</string>
+    <string-array name="carplay_aroma_durations">
+        <item>دائمًا</item>
+        <item>30 دقيقة</item>
+        <item>60 دقيقة</item>
+    </string-array>
+    <string-array name="carplay_ambient_colors">
+        <item>أزرق</item>
+        <item>سماوي</item>
+        <item>بنفسجي</item>
+        <item>أخضر</item>
+        <item>وردي</item>
+        <item>أصفر</item>
+        <item>بني</item>
+        <item>برتقالي</item>
+        <item>أحمر</item>
+    </string-array>
+    <string name="carplay_aroma_off">إيقاف العطر</string>
+</resources>

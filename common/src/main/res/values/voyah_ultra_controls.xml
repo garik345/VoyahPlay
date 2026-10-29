@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_powertrain_mode">Powertrain mode</string>
+    <string name="carplay_power_smart">Smart</string>
+    <string name="carplay_power_electric">Electric</string>
+    <string name="carplay_power_hybrid">Hybrid</string>
+    <string name="carplay_power_sustain">Charge sustaining</string>
+    <string name="carplay_audio_ringtone">Ringtone</string>
+</resources>

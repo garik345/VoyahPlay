@@ -5,11 +5,10 @@ import android.os.Parcel;
 import java.io.IOException;
 import org.json.JSONObject;
 
-/** Read-only TX57 schema, valid only AFTER verifying the reviewed CAN APK SHA-256. */
+/** Read-only TX57 schema, valid only AFTER checking the CAN APK against VoyahOemBuilds. */
 public final class VoyahComfortSchema {
     private VoyahComfortSchema() {}
     public static final String API = "com.qinggan.canbus.ICanBusService";
-    public static final String HASH = "96ac5182e795ad70c43c78f26b9cf29e76b59db67c2d5c09216ba1d8425c427c";
     private static final String[] NAMES = {"HEAD_LIGHT_STATUS",
         "LOW_BEAM",
         "PARK_LIGHT",
@@ -44,13 +43,17 @@ public final class VoyahComfortSchema {
         "STEER_WHEEL_HEAT_SWITCH_FB",
         "STEER_WHEEL_HEAT_ERROR",
         // H97C ui97.DriveModeViewManager reads this state; SET_* constants of other models differ.
-        "DRIVING_MODE_SET"};
-    private static final int[] ORDINALS = {76,136,137,192,193,194,195,225,228,479,480,481,482,483,484,485,486,487,488,555,556,557,558,746,747,748,850,878,879,880,881,891,892,328};
-    private static final int[] IDS = {160,215,216,260,261,262,263,292,295,697,698,699,700,701,702,703,704,705,706,774,775,776,777,963,964,965,1067,1095,1096,1097,1098,1108,1109,545};
+        "DRIVING_MODE_SET", "IVI_SOC_MODESET", "VEHICLE_AMBIENT_LIGHT_SWITCH", "VEHICLE_AMBIENT_LIGHT_COLOR", "VEHICLE_AMBIENT_LIGHT_BRIGHTNESS_LEVEL", "VEHICLE_AMBIENT_LIGHT_MUSICAL_RHYTHM_SWITCH"};
+    private static final int[] ORDINALS = {76,136,137,192,193,194,195,225,228,479,480,481,482,483,484,485,486,487,488,555,556,557,558,746,747,748,850,878,879,880,881,891,892,328,740,171,161,162,165};
+    private static final int[] IDS = {160,215,216,260,261,262,263,292,295,697,698,699,700,701,702,703,704,705,706,774,775,776,777,963,964,965,1067,1095,1096,1097,1098,1108,1109,545,957,327,239,240,321};
     public interface Continue { boolean live(); }
     public static JSONObject read(IBinder binder, Continue active) throws Exception {
+        return read(binder, active, true);
+    }
+    public static JSONObject read(IBinder binder, Continue active, boolean heatedWheel) throws Exception {
         JSONObject result = new JSONObject();
         for (int i=0; i<NAMES.length; i++) {
+            if (!heatedWheel && NAMES[i].startsWith("STEER_WHEEL_HEAT_")) continue;
             if (!active.live()) throw new IOException("Comfort read cancelled or timed out");
             Parcel data=Parcel.obtain(), reply=Parcel.obtain();
             try {
@@ -60,6 +63,9 @@ public final class VoyahComfortSchema {
                 reply.readException();
                 if (reply.dataAvail()!=4) throw new IOException("Unexpected TX57 reply");
                 result.put(NAMES[i], reply.readInt());
+            } catch (Exception error) {
+                // Optional hardware must not invalidate a successfully read climate/seat snapshot.
+                if (!NAMES[i].startsWith("VEHICLE_AMBIENT_LIGHT_") || !active.live()) throw error;
             } finally { data.recycle(); reply.recycle(); }
         }
         return result;

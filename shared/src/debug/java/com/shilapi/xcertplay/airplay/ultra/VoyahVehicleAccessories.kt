@@ -72,7 +72,7 @@ internal object VoyahVehicleDescription {
     val writableIds = setOf(VOLUME, MUTE)
 
     fun accessories(readings: UltraVehicleReadings?, volumeWritable: Boolean,
-        volumeRange: IntRange = 0..100): List<LinkedHashMap<String, Any?>> = listOf(
+        volumeRange: IntRange = 0..100, audioServices: List<Map<String, Any?>> = emptyList()): List<LinkedHashMap<String, Any?>> = listOf(
         accessory(1536, 0x09000006, listOf(
             service(1537, 0x1A000005, listOf(
                 car(FUEL_LEVEL, 0x41000002, CafCharacteristicFormat.UINT8, value(FUEL_LEVEL, readings), range = 0L to 100L, units = PERCENT),
@@ -96,7 +96,7 @@ internal object VoyahVehicleDescription {
                     writable = volumeWritable, enabled = true),
                 car(VOLUME_TYPE, 0x33000005, CafCharacteristicFormat.UINT8, MAIN_VOLUME_TYPE, mutable = false, range = 0L to LAST_VOLUME_TYPE),
                 car(VOLUME_LABEL, 0x30000001, CafCharacteristicFormat.STRING, "VoyahPlay", mutable = false),
-                car(MUTE, 0x33000009, CafCharacteristicFormat.BOOL, value(MUTE, readings), writable = volumeWritable))))),
+                car(MUTE, 0x33000009, CafCharacteristicFormat.BOOL, value(MUTE, readings), writable = volumeWritable)))) + audioServices),
     )
 
     /** The value the phone gets for [iid]; null means no value. */

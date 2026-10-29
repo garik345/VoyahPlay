@@ -611,6 +611,44 @@ class CarPlayController(
         }
     }
 
+    /** Explicit controls for a visible mirror, independent of the physical-display wheel-key policy. */
+    fun zoomMirroredDashboardMap(zoomIn: Boolean, sessionToken: Any?, onComplete: (Boolean) -> Unit) {
+        zoomMirroredDashboardMapWithStatus(zoomIn, sessionToken) { sent, _ -> onComplete(sent) }
+    }
+
+    /** Delivery diagnostics distinguish a rejected command from a navigator ignoring a sent one. */
+    fun zoomMirroredDashboardMapWithStatus(zoomIn: Boolean, sessionToken: Any?, onComplete: (Boolean, String) -> Unit) {
+        val session = activeSession
+        val content = session?.clusterContentRoute()
+        fun complete(sent: Boolean, reason: String) {
+            debugLog("Dashboard zoom: direction=${if (zoomIn) "in" else "out"} sent=$sent reason=$reason")
+            onComplete(sent, reason)
+        }
+        fun visible(): Boolean {
+            val visibility = clusterUiVisibility
+            return visibility?.takeIf { it.first == (session to content?.first) }?.second != false
+        }
+        if (closed || session == null || sessionToken == null || session.mainScreenSessionToken() !== sessionToken || content == null) {
+            complete(false, when {
+                closed -> "controller-closed"
+                session == null -> "no-session"
+                sessionToken == null || session.mainScreenSessionToken() !== sessionToken -> "session-changed"
+                else -> "no-cluster-content"
+            }); return
+        }
+        if (!DashboardMapEligibility.permits(content.second, true, content.first, visible(), closed)) {
+            complete(false, "map-not-active"); return
+        }
+        try {
+            touchExecutor.execute {
+                val eligible = !closed && activeSession === session && session.mainScreenSessionToken() === sessionToken &&
+                    session.clusterContentRoute() == content && visible()
+                val sent = eligible && session.changeMapZoomLevel(zoomIn)
+                complete(sent, if (!eligible) "session-or-map-changed" else if (sent) "sent" else "send-failed")
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) { complete(false, "command-queue-closed") }
+    }
+
     /** Opens Siri on the iPhone, as the car's voice button does in CarPlay. */
     fun requestSiri(): Boolean {
         if (closed) return false
@@ -725,16 +763,29 @@ class CarPlayController(
      * or a retained paused selection; the settings UI can reconnect when delivery fails.
      */
     fun showDashboardContent(url: String, onComplete: (Boolean) -> Unit) {
+        queueDashboardContent(url, activeSession, null, onComplete)
+    }
+
+    /** A retained output must not issue a command to the next phone after a reconnect. */
+    fun showDashboardContentForSession(url: String, sessionToken: Any?, onComplete: (Boolean) -> Unit) {
         val session = activeSession
+        if (sessionToken == null || session?.mainScreenSessionToken() !== sessionToken) {
+            onComplete(false); return
+        }
+        queueDashboardContent(url, session, sessionToken, onComplete)
+    }
+
+    private fun queueDashboardContent(url: String, session: AirPlaySession?, mainToken: Any?, onComplete: (Boolean) -> Unit) {
         val stream = session?.clusterStream ?: 0
-        if (closed || session == null || stream <= 0) {
+        if (closed || session == null || activeSession !== session || stream <= 0) {
             onComplete(false)
             return
         }
         try {
             touchExecutor.execute {
                 val sent = synchronized(clusterUiLock) {
-                    if (closed || activeSession !== session || session.clusterStream != stream) {
+                    if (closed || activeSession !== session || session.clusterStream != stream ||
+                        (mainToken != null && session.mainScreenSessionToken() !== mainToken)) {
                         return@synchronized false
                     }
                     // A cluster stream DiPlay has not paused yet starts with the map drawn.

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_powertrain_mode">Modo de propulsión</string>
+    <string name="carplay_power_smart">Inteligente</string>
+    <string name="carplay_power_electric">Eléctrico</string>
+    <string name="carplay_power_hybrid">Híbrido</string>
+    <string name="carplay_power_sustain">Mantener carga (combustible)</string>
+    <string name="carplay_audio_ringtone">Tono de llamada</string>
+</resources>

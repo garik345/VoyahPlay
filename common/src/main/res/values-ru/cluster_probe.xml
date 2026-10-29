@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_cluster_probe_title">Карта на приборке (экспериментально)</string>
+    <string name="settings_cluster_probe_description">Карта появляется автоматически при активном маршруте. Нужен root-помощник 1.2.7. Кнопки ручной проверки ниже запускают тест на 60 секунд. Ручной тест приостанавливает автопоказ до завершения маршрута.</string>
+    <string name="settings_cluster_probe_status">Проверить экран приборки</string>
+    <string name="settings_cluster_probe_grid">Показать тестовую сетку</string>
+    <string name="settings_cluster_probe_map">Показать карту CarPlay</string>
+    <string name="settings_cluster_probe_stop">Остановить тест</string>
+    <string name="settings_cluster_probe_copy">Скопировать отчёт теста</string>
+    <string name="settings_cluster_probe_working">Ожидание ответа помощника…</string>
+    <string name="settings_cluster_probe_stream_description">Показывает карту на приборке во время навигации. После завершения маршрута или отключения iPhone возвращает медиакарточку. Изменение требует переподключения CarPlay.</string>
+    <string name="settings_cluster_probe_map_help">Включите «%1$s» в этой карточке теста и переподключите CarPlay. Запустите навигацию и снова нажмите «Показать карту CarPlay». Если переключатель уже включён, проверьте отчёт теста: iPhone ещё не запустил поток карты.</string>
+    <string name="settings_cluster_probe_waiting">Ожидание карты CarPlay</string>
+    <string name="settings_cluster_probe_copied">Отчёт теста скопирован</string>
+    <string name="settings_cluster_map_element_size">Надписи и значки карты</string>
+    <string name="settings_cluster_map_element_size_description">Размер надписей и значков регулируется отдельно от приближения дорог. Чем больше процент, тем крупнее элементы. Применяется после переподключения CarPlay.</string>
+    <string name="settings_cluster_map_size_value">%1$d%%</string>
+    <string name="settings_cluster_map_zoom_description">Приближает или отдаляет активную карту на приборке без переподключения. Во время навигации iPhone может менять приближение автоматически.</string>
+    <string name="settings_cluster_map_zoom_in">Приблизить карту</string>
+    <string name="settings_cluster_map_zoom_out">Отдалить карту</string>
+    <string name="settings_cluster_map_zoom_unavailable">Сначала откройте карту на приборке и оставьте iPhone подключённым.</string>
+</resources>

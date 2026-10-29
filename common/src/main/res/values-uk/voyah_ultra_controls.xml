@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="carplay_powertrain_mode">Режим силової установки</string>
+    <string name="carplay_power_smart">Smart</string>
+    <string name="carplay_power_electric">Електро</string>
+    <string name="carplay_power_hybrid">Гібрид</string>
+    <string name="carplay_power_sustain">Збереження заряду (паливо)</string>
+    <string name="carplay_audio_ringtone">Рингтон</string>
+</resources>

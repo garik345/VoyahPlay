@@ -109,6 +109,7 @@ internal enum class SettingsSection {
     VOYAH_SIGNS,
     VOYAH_CLUSTER,
     VOYAH_HELPER,
+    VOYAH_CLUSTER_PROBE,
     ULTRA_CLIMATE,
     VIDEO_PIPELINE,
     CARPLAY_CONTROLS,
@@ -160,6 +161,7 @@ internal object SettingsInformationArchitecture {
             SettingsSection.CLUSTER_MAP,
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.VOYAH_HELPER,
+            SettingsSection.VOYAH_CLUSTER_PROBE,
             SettingsSection.ULTRA_CLIMATE,
             SettingsSection.AMBIENT_LIGHTING,
         ),
@@ -1751,6 +1753,56 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.voyah_helper_title), R.drawable.ic_dp_advanced) { card ->
             card.addView(label(com.shilapi.xcertplay.voyah.VoyahBuildInfo.summary(this), 14, MUTED))
             com.shilapi.xcertplay.voyah.root.RootModuleSettings.add(this, card, card, SettingsTheme.card(palette))
+        }
+        filteredSection(content, SettingsSection.VOYAH_CLUSTER_PROBE,
+            getString(R.string.settings_cluster_probe_title), R.drawable.ic_dp_dashboard) { card ->
+            card.addView(label(getString(R.string.settings_cluster_probe_description), 14, MUTED))
+            // Voyah hides the upstream BYD cluster card, but the probe needs the same iPhone stream.
+            reconnectingToggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
+                getString(R.string.settings_cluster_probe_stream_description),
+                AirPlayPersistence.loadClusterMapEnabled(this)) {
+                AirPlayPersistence.saveClusterMapEnabled(this, it)
+                markReconnectNeeded()
+            }
+            card.addView(label(getString(R.string.settings_cluster_map_element_size_description), 14, MUTED))
+            val elementSizes = VoyahClusterMapLayout.elementSizes
+            val sizeValues = elementSizes.map { getString(R.string.settings_cluster_map_size_value, it) }
+            val sizeTitle = getString(R.string.settings_cluster_map_element_size)
+            var selectedSize = elementSizes.indexOf(AirPlayPersistence.loadVoyahClusterElementSize(this))
+            val sizeButton = button("$sizeTitle · ${sizeValues[selectedSize]}", false) {}.apply { minHeight = dp(CONTROL_HEIGHT_DP) }
+            sizeButton.setOnClickListener {
+                var pending = selectedSize
+                appDialogBuilder().setTitle(sizeTitle).setSingleChoiceItems(sizeValues.toTypedArray(), selectedSize) { _, index -> pending = index }
+                    .setPositiveButton(R.string.save) { _, _ ->
+                        if (pending != selectedSize) {
+                            selectedSize = pending
+                            AirPlayPersistence.saveVoyahClusterElementSize(this, elementSizes[pending])
+                            markReconnectNeeded()
+                            sizeButton.text = "$sizeTitle · ${sizeValues[selectedSize]}"
+                        }
+                    }.setNegativeButton(R.string.cancel, null).show()
+            }
+            card.addView(sizeButton, matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
+            card.addView(label(getString(R.string.settings_cluster_map_zoom_description), 14, MUTED))
+            for ((title, zoomIn) in listOf(R.string.settings_cluster_map_zoom_in to true, R.string.settings_cluster_map_zoom_out to false)) {
+                card.addView(button(getString(title), false) { VoyahClusterProbeSettings.zoom(this, zoomIn) }
+                    .apply { minHeight = dp(CONTROL_HEIGHT_DP) },
+                    matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
+            }
+            val actions = listOf(
+                R.string.settings_cluster_probe_status to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.STATUS,
+                R.string.settings_cluster_probe_grid to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.GRID,
+                R.string.settings_cluster_probe_map to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.MAP,
+                R.string.settings_cluster_probe_stop to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.STOP,
+            )
+            for ((text, action) in actions) card.addView(button(getString(text), false) {
+                VoyahClusterProbeSettings.run(this, action)
+            }.apply { minHeight = dp(CONTROL_HEIGHT_DP) },
+                matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
+            card.addView(button(getString(R.string.settings_cluster_probe_copy), false) {
+                VoyahClusterProbeSettings.copyReport(this)
+            }.apply { minHeight = dp(CONTROL_HEIGHT_DP) },
+                matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
         }
         filteredSection(content, SettingsSection.CARPLAY_CONTROLS,
             getString(R.string.carplay_controls), R.drawable.ic_dp_controls) { card ->
@@ -5621,6 +5673,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         appendLine()
         appendLine("--- Current cluster display diagnostics (even when disabled) ---")
         appendLine(ClusterMapPresentation.diagnosticReport(appContext))
+        appendLine()
+        appendLine("--- Voyah turn-by-turn navigation ---")
+        appendLine(com.shilapi.xcertplay.hud.VoyahNavigationOutput.diagnosticReport(appContext))
         appendLine()
         appendLine("--- ADB cluster activity routing ---")
         appendLine("adbClusterActivityEnabled=${AirPlayPersistence.loadAdbClusterEnabled(appContext)}")

@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_cluster_probe_title">Mapa en el cuadro (experimental)</string>
+    <string name="settings_cluster_probe_description">Muestra el mapa automáticamente durante una ruta. Requiere root helper 1.2.7. Los botones de prueba manual duran 60 segundos. Una prueba manual pausa la visualización automática hasta terminar la ruta.</string>
+    <string name="settings_cluster_probe_status">Comprobar pantalla del cuadro</string>
+    <string name="settings_cluster_probe_grid">Mostrar cuadrícula de prueba</string>
+    <string name="settings_cluster_probe_map">Mostrar mapa de CarPlay</string>
+    <string name="settings_cluster_probe_stop">Detener prueba</string>
+    <string name="settings_cluster_probe_copy">Copiar informe de prueba</string>
+    <string name="settings_cluster_probe_working">Esperando al asistente…</string>
+    <string name="settings_cluster_probe_stream_description">Muestra el mapa durante la navegación y restaura la tarjeta multimedia al terminar la ruta o desconectar el iPhone. Cambiar este ajuste requiere reconectar CarPlay.</string>
+    <string name="settings_cluster_probe_map_help">Active «%1$s» en esta tarjeta de prueba y reconecte CarPlay. Inicie la navegación y vuelva a pulsar «Mostrar mapa de CarPlay». Si ya está activo, consulte el informe: el iPhone aún no ha iniciado el flujo del mapa.</string>
+    <string name="settings_cluster_probe_waiting">Esperando el mapa de CarPlay</string>
+    <string name="settings_cluster_probe_copied">Informe de prueba copiado</string>
+    <string name="settings_cluster_map_element_size">Textos e iconos del mapa</string>
+    <string name="settings_cluster_map_element_size_description">Cambia los textos e iconos independientemente del zoom geográfico. Un porcentaje mayor los amplía. Se aplica tras reconectar CarPlay.</string>
+    <string name="settings_cluster_map_size_value">%1$d%%</string>
+    <string name="settings_cluster_map_zoom_description">Acerca o aleja el mapa activo sin reconectar. El iPhone puede ajustar el zoom geográfico durante la navegación.</string>
+    <string name="settings_cluster_map_zoom_in">Acercar mapa</string>
+    <string name="settings_cluster_map_zoom_out">Alejar mapa</string>
+    <string name="settings_cluster_map_zoom_unavailable">Primero abra un mapa en el cuadro y mantenga el iPhone conectado.</string>
+</resources>

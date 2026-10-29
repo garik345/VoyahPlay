@@ -63,6 +63,7 @@ internal object MapMirrors {
     }
 
     val any: Boolean get() = surfaces.isNotEmpty()
+    val voyahProbeShowsMap: Boolean get() = surfaces.keys.any { it.startsWith("voyah-cluster-probe:") }
 
     /** Whether a launcher shows the map (see [MapEmbedService]), so the centre card is not needed. */
     val launcherShowsMap: Boolean get() = surfaces.keys.any { it != CARD }

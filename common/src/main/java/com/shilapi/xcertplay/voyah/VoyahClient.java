@@ -10,15 +10,13 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Exact OEM build, reviewed cache getters; never sends vehicle commands. */
+/** Inspected H97C OEM builds, reviewed cache getters; never sends vehicle commands. */
 public final class VoyahClient {
     static final String BUSY_MESSAGE = "Предыдущий запрос ещё выполняется";
     private static final String CAN = "com.qinggan.canbus.service";
     private static final String SIGNAL = "com.qinggan.carsignal.service";
     private static final String CAN_DESCRIPTOR = "com.qinggan.canbus.ICanBusService";
     private static final String SIGNAL_DESCRIPTOR = "com.qinggan.carsignal.ICarSignalService";
-    private static final String CAN_HASH = "96ac5182e795ad70c43c78f26b9cf29e76b59db67c2d5c09216ba1d8425c427c";
-    private static final String SIGNAL_HASH = "2bb3e7df1cd672578deeb0e106da8a864adff7d9431784a9a27cbcb8e189f887";
     // Shared across both activities: a stuck synchronous Binder cannot accumulate threads/tasks.
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor();
     private static final AtomicBoolean BUSY = new AtomicBoolean();
@@ -55,8 +53,8 @@ public final class VoyahClient {
             VoyahValues result = null;
             String error = null;
             try {
-                verify(CAN, CAN_HASH, request);
-                verify(SIGNAL, SIGNAL_HASH, request);
+                boolean heatedWheel = VoyahOemBuilds.hasHeatedWheel(verify(CAN, request));
+                verify(SIGNAL, request);
                 IBinder signal = connect(request, SIGNAL, SIGNAL + ".CarSignalService", SIGNAL_DESCRIPTOR);
                 check(request);
                 int type = vehicleType(signal);
@@ -83,7 +81,7 @@ public final class VoyahClient {
                 Map<String, Integer> comfort = new HashMap<>();
                 boolean comfortAvailable = false;
                 try {
-                    JSONObject snapshot = VoyahComfortSchema.read(can, () -> !request.cancelled);
+                    JSONObject snapshot = VoyahComfortSchema.read(can, () -> !request.cancelled, heatedWheel);
                     Iterator<String> keys = snapshot.keys();
                     while (keys.hasNext()) {
                         String key = keys.next();
@@ -100,7 +98,7 @@ public final class VoyahClient {
                     climate == null ? -1 : climate.optInt("airWindSpeed", -1), sampledAt,
                     states(doors, "fLDoor", "fRDoor", "rLDoor", "rRDoor"),
                     states(windows, "fLWindow", "fRWindow", "rLWindow", "rRWindow"),
-                    new VoyahComfortValues(comfort, comfortAvailable), numbers(climate),
+                    new VoyahComfortValues(comfort, comfortAvailable, heatedWheel), numbers(climate),
                     numbers(fuel), numbers(odometer), numbers(tires));
             } catch (Exception e) {
                 error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
@@ -151,7 +149,7 @@ public final class VoyahClient {
         if (request.cancelled) throw new IOException("Запрос отменён");
     }
 
-    private void verify(String pkg, String expected, Request request) throws Exception {
+    private String verify(String pkg, Request request) throws Exception {
         check(request);
         PackageInfo info = context.getPackageManager().getPackageInfo(pkg, 0);
         if (info.applicationInfo.splitSourceDirs != null && info.applicationInfo.splitSourceDirs.length > 0)
@@ -165,7 +163,9 @@ public final class VoyahClient {
         }
         StringBuilder hash = new StringBuilder();
         for (byte b : digest.digest()) hash.append(String.format(Locale.ROOT, "%02x", b & 255));
-        if (!expected.equals(hash.toString())) throw new IOException("Прошивка не проверена: " + pkg);
+        if (!VoyahOemBuilds.supportsApk(pkg, hash.toString()))
+            throw new IOException("Прошивка не проверена: " + pkg + " SHA256=" + hash);
+        return hash.toString();
     }
 
     private IBinder connect(Request request, String pkg, String cls, String descriptor) throws Exception {

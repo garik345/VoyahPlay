@@ -1,4 +1,4 @@
-# PowerShell 5.1+. Root helper 1.2.1 with supervision and scoped driver top-edge support.
+﻿# PowerShell 5.1+. Root helper 1.2.10 with optional OEM-radio labels.
 [CmdletBinding()]
 param(
     [ValidateSet('Install','Start','Status','Stop','EnableAutoStart','DisableAutoStart','RemoveAutoStart')][string]$Mode = 'Status',
@@ -27,7 +27,7 @@ $reportDirectory = Join-Path $ProjectRoot ('build/voyah-root-helper/' + $runName
 [void][System.IO.Directory]::CreateDirectory($reportDirectory)
 $script:Report = Join-Path $reportDirectory 'report.txt'
 $utf8 = [System.Text.UTF8Encoding]::new($false)
-[System.IO.File]::WriteAllText($script:Report, "VoyahPlay root helper 1.2.1`nMode: $Mode`nTime: $(Get-Date -Format o)`n", $utf8)
+[System.IO.File]::WriteAllText($script:Report, "VoyahPlay root helper 1.2.10`nMode: $Mode`nTime: $(Get-Date -Format o)`n", $utf8)
 function Log-Line([string]$Line) {
     Write-Host $Line
     [System.IO.File]::AppendAllText($script:Report, $Line + "`n", [System.Text.UTF8Encoding]::new($false))
@@ -64,8 +64,8 @@ try {
         default { 'HELPER_READY=1' }
     }
     if (-not $result.Contains($expected)) { throw "Helper result not confirmed: expected $expected" }
-    if ($Mode -in @('Install','Start','Status') -and (-not $result.Contains('CAPABILITIES=TWEAKS_BOUNDS_1_1') -or $result -notmatch '(?m)^HELPER_VERSION=1\.2\.1\r?$')) {
-        throw 'Expected root helper 1.2.1. Build and install automotive from the same source update, then run -Mode Install.'
+    if ($Mode -in @('Install','Start','Status') -and (-not $result.Contains('CAPABILITIES=TWEAKS_BOUNDS_1_1') -or $result -notmatch '(?m)^HELPER_VERSION=1\.2\.10\r?$')) {
+        throw 'Expected root helper 1.2.10. Build and install automotive from the same source update, then run -Mode Install.'
     }
     if ($Mode -eq 'Stop') { Log-Line 'DONE. Root helper stopped.' }
     elseif ($result -match '(?m)^REBOOT_REQUIRED=1\r?$' -or ($Mode -eq 'Install' -and $result -match '(?m)^BOOT_MOUNT_READ_ONLY=0\r?$')) {

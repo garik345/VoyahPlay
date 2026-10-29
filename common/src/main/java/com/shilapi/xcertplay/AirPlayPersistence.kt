@@ -90,6 +90,7 @@ object AirPlayPersistence {
     private const val KEY_CENTER_MAP_AUTO_HIDE = "center_map_auto_hide"
     private const val KEY_LAUNCHER_MAP_SHARING = "launcher_map_sharing"
     private const val KEY_CLUSTER_MAP_SCALE = "cluster_map_scale_percent"
+    private const val KEY_VOYAH_CLUSTER_ELEMENT_SIZE = "voyah_cluster_map_element_size_percent"
     private const val KEY_CLUSTER_CONTENT = "cluster_content"
     private const val KEY_CLUSTER_MARKER_X = "cluster_marker_horizontal_step"
     private const val KEY_CLUSTER_MARKER_Y = "cluster_marker_vertical_step"
@@ -1217,6 +1218,14 @@ object AirPlayPersistence {
     fun loadClusterMapScalePercent(context: Context): Int = CarPlayClusterDisplay.STREAM_SCALE_PERCENT.let { default ->
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_CLUSTER_MAP_SCALE, default)
             .takeIf { it in CarPlayClusterDisplay.scalePresets } ?: default
+    }
+
+    fun loadVoyahClusterElementSize(context: Context): Int = VoyahClusterMapLayout.elementSize(
+        runCatching { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_VOYAH_CLUSTER_ELEMENT_SIZE, 100) }.getOrDefault(100))
+
+    fun saveVoyahClusterElementSize(context: Context, percent: Int) {
+        require(percent in VoyahClusterMapLayout.elementSizes)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(KEY_VOYAH_CLUSTER_ELEMENT_SIZE, percent).apply()
     }
 
     fun saveClusterMapScalePercent(context: Context, percent: Int) {

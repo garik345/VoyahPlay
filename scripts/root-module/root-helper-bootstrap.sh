@@ -55,7 +55,7 @@ if ! number "$uid" || [ "$uid" -lt 10000 ] || [ "$uid" -ge 20000 ]; then
 fi
 echo "APP_UID=$uid"
 echo "HELPER_SNAPSHOT_UID=${old_uid:-none}"
-echo EXPECTED_HELPER_VERSION=1.2.1
+echo EXPECTED_HELPER_VERSION=1.2.10
 if [ "$MODE" = status ]; then
     [ -f "$ROOT/app.apk" ] && number "$old_uid" || { echo HELPER_NOT_INSTALLED; exit 2; }
     if [ "$uid" != "$old_uid" ]; then
@@ -68,7 +68,7 @@ if [ "$MODE" = status ]; then
     exit $?
 fi
 if [ "$MODE" = start ]; then
-    [ -f "$ROOT/runtime.sh" ] || fail 'install helper 1.2.1 first'
+    [ -f "$ROOT/runtime.sh" ] || fail 'install helper 1.2.10 first'
     sh "$ROOT/runtime.sh" start
     exit $?
 fi
@@ -98,9 +98,9 @@ if [ "$MODE" = install ]; then
     case "$apk" in /data/app/*.apk|/system/app/*.apk|/system/priv-app/*.apk) ;; *) fail 'unexpected installed APK path';; esac
     [ -f "$apk" ] && [ ! -L "$ROOT/app.apk.new" ] || fail 'invalid installed/staging APK path'
     cp "$apk" "$ROOT/app.apk.new"; chmod 600 "$ROOT/app.apk.new"
-    candidate=$(run_apk "$ROOT/app.apk.new" --check "$uid") || fail 'rebuild and install automotive 1.2.1 first'
+    candidate=$(run_apk "$ROOT/app.apk.new" --check "$uid") || fail 'rebuild and install automotive 1.2.10 first'
     printf '%s\n' "$candidate"
-    printf '%s\n' "$candidate" | grep -Fxq 'HELPER_VERSION=1.2.1' || fail 'APK helper version differs; rebuild and install automotive 1.2.1 before updating the helper'
+    printf '%s\n' "$candidate" | grep -Fxq 'HELPER_VERSION=1.2.10' || fail 'APK helper version differs; rebuild and install automotive 1.2.10 before updating the helper'
     run_apk "$ROOT/app.apk.new" --retire-legacy "$uid" || fail 'old payload retirement incomplete; read the reason above'
 fi
 if [ "$MODE" = install ] || [ "$MODE" = stop ]; then

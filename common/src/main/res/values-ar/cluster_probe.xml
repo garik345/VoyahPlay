@@ -1,0 +1,21 @@
+<resources>
+    <string name="settings_cluster_probe_title">خريطة لوحة العدادات (تجريبي)</string>
+    <string name="settings_cluster_probe_description">تظهر الخريطة تلقائياً أثناء المسار النشط. يتطلب مساعد root الإصدار 1.2.7. تعمل أزرار الاختبار اليدوي أدناه لمدة 60 ثانية. يوقف الاختبار اليدوي العرض التلقائي حتى نهاية المسار.</string>
+    <string name="settings_cluster_probe_status">فحص شاشة لوحة العدادات</string>
+    <string name="settings_cluster_probe_grid">عرض شبكة الاختبار</string>
+    <string name="settings_cluster_probe_map">عرض خريطة CarPlay</string>
+    <string name="settings_cluster_probe_stop">إيقاف الاختبار</string>
+    <string name="settings_cluster_probe_copy">نسخ تقرير الاختبار</string>
+    <string name="settings_cluster_probe_working">بانتظار رد المساعد…</string>
+    <string name="settings_cluster_probe_stream_description">يعرض الخريطة أثناء الملاحة ويعيد بطاقة الوسائط عند انتهاء المسار أو فصل iPhone. يتطلب تغيير هذا الإعداد إعادة توصيل CarPlay.</string>
+    <string name="settings_cluster_probe_map_help">فعّل «%1$s» في بطاقة الاختبار هذه وأعد توصيل CarPlay. ابدأ الملاحة ثم اضغط «عرض خريطة CarPlay» مجدداً. إذا كان مفعّلاً بالفعل، فتحقق من تقرير الاختبار: لم يبدأ iPhone بث الخريطة بعد.</string>
+    <string name="settings_cluster_probe_waiting">بانتظار خريطة CarPlay</string>
+    <string name="settings_cluster_probe_copied">تم نسخ تقرير الاختبار</string>
+    <string name="settings_cluster_map_element_size">نصوص الخريطة ورموزها</string>
+    <string name="settings_cluster_map_element_size_description">يغير حجم النصوص والرموز بشكل مستقل عن تقريب الطرق. تزيد النسب الأعلى حجم العناصر. يسري بعد إعادة توصيل CarPlay.</string>
+    <string name="settings_cluster_map_size_value">%1$d٪</string>
+    <string name="settings_cluster_map_zoom_description">تقريب الخريطة النشطة أو إبعادها دون إعادة الاتصال. قد يضبط iPhone التقريب الجغرافي تلقائياً أثناء الملاحة.</string>
+    <string name="settings_cluster_map_zoom_in">تقريب الخريطة</string>
+    <string name="settings_cluster_map_zoom_out">إبعاد الخريطة</string>
+    <string name="settings_cluster_map_zoom_unavailable">افتح الخريطة على لوحة العدادات أولاً وأبقِ iPhone متصلاً.</string>
+</resources>

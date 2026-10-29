@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_radio_labels_title">أسماء المحطات في راديو السيارة (تجريبي)</string>
+    <string name="settings_radio_labels_description">عرض اسم RDS فوق التردد في قوائم راديو السيارة. يتطلب مساعد root بالإصدار 1.2.4 وإصدار راديو متوافقًا. يُطبّق دون إعادة اتصال CarPlay. يؤدي إيقافه إلى استعادة التسميات الأصلية.</string>
+</resources>

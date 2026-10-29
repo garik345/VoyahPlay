@@ -35,7 +35,7 @@ class VoyahVehicleControlsTest {
         for (control in UltraVehicleControl.entries) {
             val s = services.single { it.iid.value == control.serviceIid }
             val value = s.characteristics.single { it.iid.value == control.valueIid }
-            val button = control.isAppAction
+            val button = control.isButton
             assertEquals(if (button) 0x16000002L else 0x16000007L, s.type.value)
             assertEquals(if (button) 0x36000010L else 0x30000010L, value.type.value)
             assertEquals(if (button) CafCharacteristicFormat.UINT8 else CafCharacteristicFormat.INT32, value.format)
