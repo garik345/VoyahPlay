@@ -12,7 +12,7 @@ public final class VoyahRootModule {
     private static final Executor WORK = Executors.newSingleThreadExecutor();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     public interface Callback { void complete(boolean success, String report); }
-    public enum ClusterProbeAction { STATUS, GRID, MAP, STOP }
+    public enum ClusterProbeAction { STATUS, GRID, MAP, STOP, NAVI_GRID, NAVI_MAP, AR_GRID, AR_MAP }
     private VoyahRootModule() {}
     public static String lastReport(Context context) {
         return context.getSharedPreferences("voyah_root_helper", 0).getString("report", "Root-помощник ещё не проверен.");
@@ -32,13 +32,19 @@ public final class VoyahRootModule {
                 } else {
                     if (request.action == RootHelperProtocol.Action.RADIO_STATUS || request.action == RootHelperProtocol.Action.RADIO_POLICY)
                         state.requireRadioLabels();
+                    else if (request.action == RootHelperProtocol.Action.CLUSTER_NAVI_GRID || request.action == RootHelperProtocol.Action.CLUSTER_NAVI_MAP || request.action == RootHelperProtocol.Action.CLUSTER_NAVI_READY
+                            || request.action == RootHelperProtocol.Action.CLUSTER_AR_GRID || request.action == RootHelperProtocol.Action.CLUSTER_AR_MAP)
+                        state.requireClusterNavi();
                     else if (request.action == RootHelperProtocol.Action.CLUSTER_AUTO_TICK || request.action == RootHelperProtocol.Action.CLUSTER_AUTO_STOP)
                         state.requireClusterAuto();
                     else if (request.action == RootHelperProtocol.Action.CLUSTER_STATUS || request.action == RootHelperProtocol.Action.CLUSTER_GRID
                             || request.action == RootHelperProtocol.Action.CLUSTER_MAP || request.action == RootHelperProtocol.Action.CLUSTER_STOP)
                         state.requireClusterProbe();
                     else state.requireCompatible();
-                    RootProcess.Result result = RootHelperClient.call(android.os.Process.myUid(), request, 15);
+                    int timeout = request.action == RootHelperProtocol.Action.CLUSTER_NAVI_GRID ||
+                            request.action == RootHelperProtocol.Action.CLUSTER_NAVI_MAP || request.action == RootHelperProtocol.Action.CLUSTER_STOP ||
+                            request.action == RootHelperProtocol.Action.CLUSTER_AR_GRID || request.action == RootHelperProtocol.Action.CLUSTER_AR_MAP ? 30 : 15;
+                    RootProcess.Result result = RootHelperClient.call(android.os.Process.myUid(), request, timeout);
                     ok = result.successful(); text = result.output;
                 }
             } catch (RootHelperClient.Unavailable error) {
@@ -74,6 +80,10 @@ public final class VoyahRootModule {
         switch (action) {
             case GRID: request = RootHelperProtocol.Action.CLUSTER_GRID; break;
             case MAP: request = RootHelperProtocol.Action.CLUSTER_MAP; break;
+            case NAVI_GRID: request = RootHelperProtocol.Action.CLUSTER_NAVI_GRID; break;
+            case NAVI_MAP: request = RootHelperProtocol.Action.CLUSTER_NAVI_MAP; break;
+            case AR_GRID: request = RootHelperProtocol.Action.CLUSTER_AR_GRID; break;
+            case AR_MAP: request = RootHelperProtocol.Action.CLUSTER_AR_MAP; break;
             case STOP: request = RootHelperProtocol.Action.CLUSTER_STOP; break;
             default: request = RootHelperProtocol.Action.CLUSTER_STATUS;
         }
@@ -81,5 +91,8 @@ public final class VoyahRootModule {
     }
     public static void clusterAuto(Context context, boolean keepAlive, Callback callback) {
         execute(context, new RootHelperProtocol.Request(keepAlive ? RootHelperProtocol.Action.CLUSTER_AUTO_TICK : RootHelperProtocol.Action.CLUSTER_AUTO_STOP), callback);
+    }
+    public static void clusterNaviReady(Context context, Callback callback) {
+        execute(context, new RootHelperProtocol.Request(RootHelperProtocol.Action.CLUSTER_NAVI_READY), callback);
     }
 }

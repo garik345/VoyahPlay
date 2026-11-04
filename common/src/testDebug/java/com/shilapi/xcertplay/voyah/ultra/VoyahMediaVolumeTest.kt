@@ -39,6 +39,50 @@ class VoyahMediaVolumeTest {
         verify(audio, never()).adjustStreamVolume(anyInt(), eq(AudioManager.ADJUST_MUTE), anyInt())
     }
 
+    @Test fun siriTemporarilyReducesRadioAndKeepsTheDriversLevelInCarPlay() {
+        index = 4
+        try {
+            volume.setSpeechDuck(true)
+            assertEquals(1, index)
+            assertEquals(4L to false, volume.read())
+            volume.setSpeechDuck(true)
+            assertEquals(1, index)
+        } finally { volume.setSpeechDuck(false) }
+        assertEquals(4, index)
+        assertFalse(saved.contains("siriRadioVolumeRestore"))
+        verify(audio, never()).adjustStreamVolume(anyInt(), anyInt(), anyInt())
+    }
+
+    @Test fun endingSiriDoesNotOverwriteAnExternalVolumeChange() {
+        volume.setSpeechDuck(true)
+        index = 8
+        volume.setSpeechDuck(false)
+        assertEquals(8, index)
+    }
+
+    @Test fun carPlayMuteWhileDuckedKeepsTheOriginalUnmuteLevel() {
+        index = 4
+        volume.setSpeechDuck(true)
+        try {
+            assertTrue(volume.write(null, true).confirmed)
+            assertEquals(0, index)
+        } finally { volume.setSpeechDuck(false) }
+        assertEquals(0, index)
+        assertTrue(volume.write(null, false).confirmed)
+        assertEquals(4, index)
+    }
+
+    @Test fun restartRestoresAnInterruptedReductionOnlyWhenTheIndexStillMatches() {
+        index = 1
+        saved.edit().putString("siriRadioVolumeRestore", "4:1").commit()
+        assertEquals(4L to false, volume.read())
+        assertEquals(4, index)
+        index = 7
+        saved.edit().putString("siriRadioVolumeRestore", "4:1").commit()
+        assertEquals(7L to false, volume.read())
+        assertEquals(7, index)
+    }
+
     @Test fun unmuteRestoresTheAudibleIndexAcrossACarPlayReconnect() {
         assertTrue(volume.write(null, true).confirmed)
         volume = VoyahMediaVolume(audio, saved)

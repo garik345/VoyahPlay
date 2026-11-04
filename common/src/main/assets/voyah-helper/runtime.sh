@@ -4,7 +4,7 @@ set -u
 umask 077
 ROOT=/data/local/voyahplay-root-helper
 CLASS=com.shilapi.xcertplay.voyah.root.VoyahRootHelper
-VERSION=1.2.10
+VERSION=1.2.16
 MODE=${1:-status}
 case "$MODE" in boot|start|status|stop|watch|quiesce) ;; *) exit 2;; esac
 [ "$(id -u)" = 0 ] || exit 1
@@ -23,6 +23,23 @@ record() {
 }
 enabled() { private_file "$ROOT/autostart.conf" && [ "$(cat "$ROOT/autostart.conf")" = 1 ]; }
 radio() {
+    # No opt-in and no owned agent means there is nothing to maintain or lock.
+    if [ ! -e "$ROOT/radio-agent.pid" ] && [ ! -L "$ROOT/radio-agent.pid" ]; then
+        if [ "$1" = tick ] && private_file "$ROOT/radio-labels.conf" &&
+                [ "$(cat "$ROOT/radio-labels.conf")" = 0 ]; then return 0; fi
+        if [ "$1" = stop ] && private_file "$ROOT/radio-labels.conf" &&
+                [ "$(cat "$ROOT/radio-labels.conf")" = 0 ]; then
+            radio_pid_code=0
+            radio_pids=$(pidof com.pateo.rdsapp 2>/dev/null) || radio_pid_code=$?
+            if [ "$radio_pid_code" = 1 ] && [ -z "$radio_pids" ]; then
+                echo RADIO_LABELS_SKIPPED=disabled-no-process; return 0
+            fi
+            [ "$radio_pid_code" = 0 ] || return 1
+        fi
+        radio_packages=$(cmd package list packages --user 0 com.pateo.rdsapp 2>/dev/null) || return 1
+        if [ -z "$radio_packages" ]; then echo RADIO_LABELS_SKIPPED=not-installed; return 0; fi
+        [ "$radio_packages" = package:com.pateo.rdsapp ] || return 1
+    fi
     private_file "$ROOT/radio-runtime.sh" && private_file "$ROOT/radio-runtime.sha256" || return 1
     sha256sum -c "$ROOT/radio-runtime.sha256" >/dev/null 2>&1 || return 1
     /system/bin/sh "$ROOT/radio-runtime.sh" "$1"
@@ -112,9 +129,9 @@ start_agent() {
         top) target_name=system_server;;
         status) target_name=com.qinggan.systemui;;
         dock)
-            # Optional guard for the exact reviewed PI Launcher. Skip other builds cheaply.
+            # Optional guard for exact reviewed RU/PI Launchers. Skip other builds cheaply.
             case "$(stat -c %s /system/priv-app/Launcher-release-signed/Launcher-release-signed.apk 2>/dev/null)" in
-                126586649|126653880) ;;
+                51888996|126586649|126653880) ;;
                 *) return 0;;
             esac
             target_name=com.qinggan.app.launcher;;
@@ -131,6 +148,8 @@ start_agent() {
     if [ "$agent_kind" = dock ]; then
         actual_launcher=$(sha256sum /system/priv-app/Launcher-release-signed/Launcher-release-signed.apk | awk '{print $1}')
         case "$actual_launcher" in
+            745db9f151f00677fd0f0de8faf6921d9bc48150387d32936ad482dc424b5394)
+                [ "$fw_services:$fw_ui" = '0faed7ebf1094c62a4f92b4bc533bbb3c08480a2cd847567cb1cff91b2d1d045:28f5d93eaec22b755b339193a733bd0d4160c496cf301bcd2fcfb88c36ade162' ] || return 1;;
             0430e677f8eabafd59876f56bc5835a06e626c2aa484b6f306c0a7b31b04d63d|b3287150827e7fa51072bcbcba257539101cda8433c5f9d3a95f4ca905abd567) ;;
             *) return 1;;
         esac

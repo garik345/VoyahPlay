@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_helper_required">Instala el asistente root de VoyahPlay desde el paquete de instalación y vuelve a abrir Ajustes.</string>
+    <string name="settings_fullscreen_required">La pantalla completa no está disponible. Instala el asistente root y el puente Tweaks compatibles, reinicia el equipo y vuelve a abrir Ajustes.</string>
+    <string name="settings_map_required">El mapa del cuadro no está disponible. Instala el asistente root y el puente Tweaks compatibles, reinicia el equipo y abre su tarjeta multimedia.</string>
+    <string name="settings_features_subtitle">Funciones CarPlay para tu vehículo</string>
+    <string name="settings_ultra_features_hint">Climatización y controles del vehículo. Se aplica al reconectar CarPlay.</string>
+    <string name="settings_radio_feature_hint">Radio del vehículo en CarPlay. Se aplica al reconectar.</string>
+    <string name="settings_radio_labels_feature_hint">Nombres de emisoras en la radio del vehículo. Se aplica al instante.</string>
+    <string name="settings_map_feature_hint">Mapa durante la navegación. Se aplica al reconectar CarPlay.</string>
+    <string name="settings_split_feature_hint">Adaptar CarPlay a una ventana dividida. Se aplica al reconectar.</string>
+</resources>

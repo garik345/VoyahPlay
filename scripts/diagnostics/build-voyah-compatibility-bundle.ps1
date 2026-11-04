@@ -1,10 +1,11 @@
 ﻿[CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$AdbDirectory, [Parameter(Mandatory=$true)][string]$OutputDirectory)
+param([Parameter(Mandatory=$true)][string]$AdbDirectory, [Parameter(Mandatory=$true)][string]$OutputDirectory, [switch]$WheelPhone)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $out=[IO.Path]::GetFullPath($OutputDirectory)
-$bundle=Join-Path $out 'Voyah-PI-compatibility'
-$archive=Join-Path $out 'Voyah-PI-compatibility-1.0-with-ADB.zip'
+$bundleName = if ($WheelPhone) { 'Voyah-wheel-phone' } else { 'Voyah-PI-compatibility' }
+$bundle=Join-Path $out $bundleName
+$archive=Join-Path $out ($bundleName + '-1.0-with-ADB.zip')
 if ((Test-Path -LiteralPath $bundle) -or (Test-Path -LiteralPath $archive)) { throw 'Output already exists.' }
 [void][IO.Directory]::CreateDirectory((Join-Path $bundle 'adb'))
 $adbSource=(Resolve-Path -LiteralPath $AdbDirectory).Path
@@ -15,6 +16,10 @@ foreach ($name in @('start-voyah-compatibility.ps1','collect-voyah-compatibility
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle $name)
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start-voyah-compatibility.cmd') -Destination (Join-Path $bundle 'START.cmd')
+if ($WheelPhone) {
+    $cmd = [IO.File]::ReadAllText((Join-Path $bundle 'START.cmd')).Replace('-File "%~dp0start-voyah-compatibility.ps1"','-File "%~dp0start-voyah-compatibility.ps1" -WheelPhone')
+    [IO.File]::WriteAllText((Join-Path $bundle 'START.cmd'),$cmd,[Text.UTF8Encoding]::new($false))
+}
 $readme=@'
 VOYAH PLAY — СБОР ДЛЯ ПРОВЕРКИ ДРУГИХ ПРОШИВОК ПИ, ВЕРСИЯ 1.0
 
@@ -76,6 +81,49 @@ OEM APK/JAR и скрипты сохраняются без изменения, 
 После анализа можно добавить поддержку конкретной прошивки. Сам факт успешного
 сбора не означает, что неизвестные CAN-службы или root-helper уже поддерживаются.
 '@
+if ($WheelPhone) {
+    $readme=@'
+VOYAHPLAY — ПРОВЕРКА КНОПКИ ТРУБКИ НА РУЛЕ, ВЕРСИЯ 1.0
+
+1. Распакуйте весь архив в обычную папку. ADB уже включён в комплект.
+2. Подключите стоящий автомобиль по ADB и откройте CarPlay.
+   Активного звонка быть не должно. Длительное нажатие пока не проверяем.
+3. Дважды нажмите START.cmd. Если ADB видит несколько устройств, выберите
+   автомобиль по номеру; если устройство одно, оно выбирается автоматически.
+4. Дождитесь строки «Запись кнопки трубки: 20 секунд».
+   Нажмите трубку один раз, затем ещё раз через 3 секунды.
+   Если открылась штатная звонилка, это нормально: сборщик ничего не перехватывает.
+5. Дождитесь зелёной строки «Готовый архив». Пришлите НОВЫЙ
+   Voyah-compatibility-ДАТА-ВРЕМЯ-....zip с рабочего стола.
+   Также напишите, какое окно открывалось при каждом нажатии.
+
+ЧТО СОБИРАЕТСЯ:
+- APK штатного KeyManager и Bluetooth Phone, их версии, размеры и SHA-256;
+- QGAPI.jar и обработчик Tweaks /data/local/tmp/keymanager.bin;
+- оконные скрипты Tweaks и сведения установленного root-helper;
+- события кнопок из уже доступного logcat: только время, код и действие;
+- имена активных OEM-компонентов окон без заголовков, номеров и имён контактов.
+
+Если KeyManager не пишет события в доступный журнал, wheel-events.txt может быть
+пустым. Это не означает, что кнопка не работает. Нужные APK и скрипт Tweaks
+помогут определить следующий способ диагностики без замены его обработчика.
+
+Сбор выполняет только чтение. Он не устанавливает APK, не меняет назначения
+кнопок, не включает перехватчики, не очищает logcat и не перезапускает службы.
+Контакты, журнал вызовов, сообщения и записи звука не извлекаются.
+Для закрытых файлов нужен уже существующий root (su 0 или root adbd).
+Без root получится частичный отчёт; его тоже можно передать для анализа.
+Полный вывод логов телефонного сервиса не сохраняется: только поля событий кнопок.
+
+Android Studio, Java и отдельная установка adb.exe на компьютере не нужны.
+Права администратора Windows не нужны. При нескольких устройствах serial можно
+передать явно, хотя START.cmd сам предложит выбор:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\start-voyah-compatibility.ps1 -WheelPhone -Serial НОМЕР_УСТРОЙСТВА
+
+Это диагностический комплект. Он не добавляет открытие «Недавних» в CarPlay.
+Команду открытия списка и приоритет штатного перехвата нужно проверить на машине.
+'@
+}
 [IO.File]::WriteAllText((Join-Path $bundle 'README.txt'),$readme,[Text.UTF8Encoding]::new($true))
 $manifest=@(Get-ChildItem -LiteralPath $bundle -File -Recurse | Sort-Object FullName | ForEach-Object {
     [PSCustomObject]@{file=$_.FullName.Substring($bundle.Length+1).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}

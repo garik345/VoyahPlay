@@ -1,6 +1,6 @@
 ﻿# Windows PowerShell 5.1+. Read-only evidence for unknown Voyah firmware.
 [CmdletBinding()]
-param([string]$Adb = 'adb', [string]$Serial, [string]$OutputDirectory, [ValidateRange(0,60)][int]$TraceSeconds = 20)
+param([string]$Adb = 'adb', [string]$Serial, [string]$OutputDirectory, [ValidateRange(0,60)][int]$TraceSeconds = 20, [switch]$WheelPhone)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:AdbExe = (Get-Command $Adb -CommandType Application -ErrorAction Stop).Source
@@ -145,6 +145,51 @@ function Window-Snapshot {
     } | Select-Object -First 1200)
     return "EXIT=$code`n" + ($filtered -join "`n")
 }
+function Phone-KeyEvents {
+    # Keep only the event fields, never the rest of a phone-service log line.
+    # Do not clear logcat, enable logging, register a callback or inject a hook.
+    $raw = Read-Adb @('shell','logcat','-d','-v','threadtime','-t','2000','-s','KeyManager:V','KeyManagerReader:V','KeyManagerService:V','QGKeyManager:V','*:S') -QuietReport
+    if ($script:AdbCode -ne 0) { return }
+    foreach ($line in $raw -split "`r?`n") {
+        $time = [regex]::Match($line,'^\s*(\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s')
+        $key = [regex]::Match($line,'(?i)\b(?:keyCode|Key|Code)\s*[:= ]\s*(KEYCODE_[A-Z0-9_]+|None_\d{1,5}|\d{1,5})\b')
+        $action = [regex]::Match($line,'(?i)\b(?:keyAction|Action)\s*[:= ]\s*((?:KEY)?ACTION_[A-Z_]+|\d{1,6})\b')
+        if ($time.Success -and $key.Success -and $action.Success) {
+            $time.Groups[1].Value + ' key=' + $key.Groups[1].Value + ' action=' + $action.Groups[1].Value
+        }
+    }
+}
+function Phone-Focus {
+    $raw = Read-Adb @('shell','dumpsys','window','windows') -QuietReport
+    $code = $script:AdbCode
+    $components = @($raw -split "`r?`n" | Where-Object { $_ -match 'mCurrentFocus|mFocusedApp' } | ForEach-Object {
+        # No window titles, phone numbers or contact names in this report.
+        foreach ($match in [regex]::Matches($_,'\b(com\.(?:qinggan|shilapi|pateo)\.[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)')) { $match.Groups[1].Value }
+    } | Sort-Object -Unique)
+    return "EXIT=$code`n" + ($components -join "`n")
+}
+function Capture-PhoneKeys {
+    $seen = [Collections.Generic.HashSet[string]]::new()
+    foreach ($event in @(Phone-KeyEvents)) { [void]$seen.Add($event) }
+    $events = [Collections.Generic.List[string]]::new()
+    $focus = [Collections.Generic.List[string]]::new()
+    Write-Host ("Запись кнопки трубки: $TraceSeconds секунд. Без активного звонка нажмите трубку один раз, затем ещё раз через 3 секунды. Другие кнопки не нажимайте.") -ForegroundColor Cyan
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($clock.Elapsed.TotalSeconds -lt $TraceSeconds) {
+        foreach ($event in @(Phone-KeyEvents)) {
+            if ($seen.Add($event) -and $events.Count -lt 400) { $events.Add($event) }
+        }
+        $focus.Add(('ELAPSED_MS=' + $clock.ElapsedMilliseconds + "`n" + (Phone-Focus)))
+        Start-Sleep -Milliseconds 1000
+    }
+    $script:PhoneEventCount = $events.Count
+    Save-Text 'wheel-events.txt' ("EVENT_COUNT=$($events.Count)`n" + ($events -join "`n"))
+    Save-Text 'wheel-focus.txt' ($focus -join "`n`n")
+    if ($events.Count -eq 0) {
+        Append-Report 'PHONE_KEYS=NO_OBSERVABLE_EVENTS; absence in logcat does not prove absence of key input.'
+        Write-Host 'В доступном журнале нет событий кнопки. Файлы сервиса всё равно будут собраны; перехват кнопок не включался.' -ForegroundColor Yellow
+    }
+}
 
 $deviceText = Read-Adb @('devices','-l')
 if ($script:AdbCode -ne 0) { throw 'ADB devices failed.' }
@@ -163,7 +208,7 @@ $script:Capture=[IO.Path]::GetFullPath((Join-Path $OutputDirectory $captureName)
 if (Test-Path -LiteralPath $script:Capture) { throw 'Capture already exists.' }
 [void][IO.Directory]::CreateDirectory($script:Capture)
 $script:Report=Join-Path $script:Capture 'report.txt'
-Append-Report "VoyahPlay compatibility collector 1.0`nREAD ONLY`nDEVICE=$Serial"
+Append-Report "VoyahPlay compatibility collector 1.0`nREAD ONLY`nDEVICE=$Serial`nWHEEL_PHONE=$([int][bool]$WheelPhone)"
 $identity=Read-Adb @('shell','su','0','id') -TimeoutSeconds 8
 $script:Root=$script:AdbCode -eq 0 -and $identity -match '(?m)^uid=0(?:\(|\s|$)'
 $script:UseSu=$script:Root
@@ -176,6 +221,9 @@ Append-Report ('ROOT_TRANSPORT=' + $(if ($script:UseSu) {'su-0'} elseif ($script
 if (-not $script:Root) { Write-Host 'Root недоступен: сохраню доступные файлы и отмечу ограничения в отчёте.' -ForegroundColor Yellow }
 foreach ($property in @('ro.build.fingerprint','ro.build.display.id','ro.build.version.sdk','ro.build.version.release','ro.product.model','ro.product.device','ro.product.manufacturer','ro.build.version.incremental')) { [void](Read-Adb @('shell','getprop',$property)) }
 [void](Read-Adb @('shell','wm','size')); [void](Read-Adb @('shell','wm','density'))
+if ($WheelPhone) {
+    Capture-PhoneKeys
+} else {
 $before=Window-Snapshot
 Save-Text 'windows-before.txt' $before
 if ($TraceSeconds -gt 0) {
@@ -191,15 +239,19 @@ if ($TraceSeconds -gt 0) {
 Save-Text 'windows-after.txt' (Window-Snapshot)
 $traceLog=Read-Adb @('shell','logcat','-d','-v','threadtime','-t','4000','-s','VoyahDockVisibility:V','VoyahTweaksFullscreen:V','*:S')
 Save-Text 'window-events.txt' $traceLog
-Write-Host 'Снимки окон сохранены. Собираю файлы прошивки; дождитесь готового ZIP.'
+}
+if ($WheelPhone) { Write-Host 'Запись кнопки завершена. Собираю файлы сервиса и Tweaks; дождитесь готового ZIP.' }
+else { Write-Host 'Снимки окон сохранены. Собираю файлы прошивки; дождитесь готового ZIP.' }
 
 # Only public OEM packages matching these functions; no user-installed application inventory is saved.
 $inventory=Read-Adb @('shell','pm','list','packages') -QuietReport
 $wanted=@('com.qinggan.canbus.service','com.qinggan.carsignal.service','com.qinggan.app.launcher','com.qinggan.systemui','com.qinggan.QGBus','com.qinggan.cluster','com.qinggan.app.vehicle','com.pateo.rdsapp','com.shilapi.xcertplay')
+if ($WheelPhone) { $wanted=@('com.qinggan.keymanager.service','com.qinggan.bluetoothphone','com.shilapi.xcertplay') }
 $extra=@($inventory -split "`r?`n" | ForEach-Object {
     if ($_ -match '^package:((?:com\.(?:qinggan|pateo|lantu|dongfeng))\.[A-Za-z0-9_.]+)$') {
         $name=$Matches[1]
-        if ($name -match '(?i)canbus|carsignal|launcher|systemui|cluster|qgbus|windowpolicy|climate|aircondition|hvac|rdsapp|vehicle|volume') { $name }
+        $pattern = if ($WheelPhone) { '(?i)keymanager' } else { '(?i)canbus|carsignal|launcher|systemui|cluster|qgbus|windowpolicy|climate|aircondition|hvac|rdsapp|vehicle|volume' }
+        if ($name -match $pattern) { $name }
     }
 })
 $candidatePackages=@(@($wanted)+@($extra) | Sort-Object -Unique | Select-Object -First 32)
@@ -227,13 +279,15 @@ foreach ($package in $candidatePackages) {
         $index++
     }
 }
-foreach ($file in @('QGVehicle.jar','QGAPI.jar','QGMOD.jar','ActivityExt.jar','car-frameworks-service.jar','services.jar','framework.jar')) {
+$frameworkFiles = if ($WheelPhone) { @('QGAPI.jar') } else { @('QGVehicle.jar','QGAPI.jar','QGMOD.jar','ActivityExt.jar','car-frameworks-service.jar','services.jar','framework.jar') }
+foreach ($file in $frameworkFiles) {
     foreach ($partition in @('system','system_ext','vendor','product')) {
         $name=if ($partition -eq 'system') {$file} else {$partition+'-'+$file}
         Save-RemoteBinary ('/'+$partition+'/framework/'+$file) ('framework/'+$name) 'SDK/framework' (128MB)
         if ($script:Files[$script:Files.Count-1].captured) { break }
     }
 }
+if ($WheelPhone) { Save-RemoteBinary '/data/local/tmp/keymanager.bin' 'tweaks/keymanager.bin' 'Tweaks key hook' (4MB) }
 foreach ($file in @('ss11.bin','ss9.bin','load.bin')) { Save-RemoteBinary ('/data/local/tmp/'+$file) ('tweaks/'+$file) 'Tweaks' (4MB) }
 Save-RemoteBinary '/data/local/tmp/frida-inject' 'tweaks/frida-inject' 'Tweaks' (64MB) '0d99be0e44d4ca3449056fa0a0b868fca1cf66c8ad704508949945afc07706aa'
 Save-RemoteBinary '/system/etc/init.logcat.sh' 'boot/init.logcat.sh' 'Boot' (128KB)
@@ -247,7 +301,8 @@ $log=Read-Adb @('shell','logcat','-d','-v','threadtime','-t','2000','-s','VoyahD
 Save-Text 'voyahplay-logcat.txt' $log
 $helperLog=Remote-Read @('tail','-n','200','/data/local/voyahplay-root-helper/server.log')
 Save-Text 'helper-log.txt' $helperLog
-$summary=[PSCustomObject]@{collector='1.0';readOnly=$true;root=$script:Root;useSu=$script:UseSu;traceSeconds=$TraceSeconds;capturedBytes=$script:CapturedBytes;packages=@($script:Packages.ToArray());files=@($script:Files.ToArray());unavailable=@($script:Missing.ToArray())}
+$phoneCount = if ($WheelPhone) { $script:PhoneEventCount } else { $null }
+$summary=[PSCustomObject]@{collector='1.0';readOnly=$true;wheelPhone=[bool]$WheelPhone;phoneEventCount=$phoneCount;root=$script:Root;useSu=$script:UseSu;traceSeconds=$TraceSeconds;capturedBytes=$script:CapturedBytes;packages=@($script:Packages.ToArray());files=@($script:Files.ToArray());unavailable=@($script:Missing.ToArray())}
 [IO.File]::WriteAllText((Join-Path $script:Capture 'summary.json'),(ConvertTo-Json -InputObject $summary -Depth 7),$utf8)
 Append-Report ("`nCAPTURED_BYTES=$script:CapturedBytes`nUNAVAILABLE_COUNT=$($script:Missing.Count)`n" + ($script:Missing -join "`n"))
 Add-Type -AssemblyName System.IO.Compression.FileSystem

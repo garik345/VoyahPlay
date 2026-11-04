@@ -29,6 +29,27 @@ class VoyahLauncherSettingsTest {
     }
     private fun launcher() = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
 
+    @Test fun aFastHideAndReturnIsObservedEvenWhenTheVisibleFlagIsTheSameAtBothPolls() {
+        CarPlayBackgroundSession.projectionVisible = true
+        val before = CarPlayBackgroundSession.projectionVisibilityVersion
+        val recovery = VoyahClusterPictureRecovery { 0L }
+        recovery.start(); recovery.picture(true); recovery.hostVisibility(before)
+        assertNull(recovery.due())
+
+        // Both callbacks happen before the cluster's next one-second poll.
+        CarPlayBackgroundSession.projectionVisible = false
+        CarPlayBackgroundSession.projectionVisible = true
+        assertTrue(CarPlayBackgroundSession.projectionVisible)
+        assertEquals(before + 2, CarPlayBackgroundSession.projectionVisibilityVersion)
+        recovery.hostVisibility(CarPlayBackgroundSession.projectionVisibilityVersion)
+        assertEquals(VoyahClusterPictureRecovery.Action.REFRESH, recovery.due())
+        CarPlayBackgroundSession.projectionVisible = true // Repeated callbacks are idempotent.
+        assertEquals(before + 2, CarPlayBackgroundSession.projectionVisibilityVersion)
+        recovery.hostVisibility(CarPlayBackgroundSession.projectionVisibilityVersion)
+        assertNull(recovery.due())
+        assertEquals(0, stops)
+    }
+
     @Test fun iconOverVisibleProjectionOpensSettingsAndBackReturnsWithoutDisconnect() {
         CarPlayBackgroundSession.projectionVisible = true
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java, launcher()).create()

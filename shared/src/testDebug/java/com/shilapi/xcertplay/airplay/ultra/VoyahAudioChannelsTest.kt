@@ -49,6 +49,24 @@ class VoyahAudioChannelsTest {
             assertEquals(-50L, request(a, CarAccessoryMessages.writeRequest(0, 2, mapOf(iid to 1))).errors()[iid])
         assertTrue(writes.isEmpty())
     }
+    @Test fun aConfirmedWriteEchoesTheAudioReadbackBeforeTheNextVehicleSample() {
+        val siri = UltraAudioChannel.SIRI
+        sample = sample.copy(audioChannels = mapOf(nav to 4, siri to 7))
+        var readback = UltraAudioChannelSample(sample.audioChannels, now)
+        val a = VoyahClimateAccessory({ sample }, { now }, audioRanges = mapOf(nav to (0..30), siri to (0..30)),
+            audioWriter = { channel, wanted ->
+                readback = UltraAudioChannelSample(readback.values + (channel to wanted), now)
+                UltraClimateWriteResult(true, "readback")
+            }, audioChannelSample = { readback })
+        val ids = listOf(nav.valueIid, siri.valueIid)
+        request(a, CarAccessoryMessages.registerRequest(0, 1, CafRegistration.Identifiers(ids)))
+        val reply = request(a, CarAccessoryMessages.writeRequest(0, 2, mapOf(nav.valueIid to 8L, siri.valueIid to 11L)))
+        assertEquals(mapOf(nav.valueIid to 0L, siri.valueIid to 0L), reply.errors())
+        val expected = mapOf(nav.valueIid to 8L, siri.valueIid to 11L)
+        assertEquals(expected, CarAccessoryMessages.reader(a.changed()!!.rcsBody).valuesMap())
+        assertEquals(expected, request(a, CarAccessoryMessages.readRequest(0, 3, ids)).valuesMap())
+        assertNull(a.changed())
+    }
     @Test fun freshCanAndMainAudioCannotMakeExpiredExtraAudioFresh() {
         val a = accessory()
         now += 6_001

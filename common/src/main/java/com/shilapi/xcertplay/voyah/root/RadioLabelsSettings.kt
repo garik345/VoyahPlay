@@ -49,7 +49,7 @@ object RadioLabelsSettings {
         }
         row = SettingsWidgets.createSwitchRow(
             activity, activity.getString(R.string.settings_radio_labels_title),
-            activity.getString(R.string.settings_radio_labels_description), enabled, theme,
+            activity.getString(R.string.settings_radio_labels_feature_hint), enabled, theme,
             onChanged = { value -> if (!painting && !busy) perform(true) { change(value, it) } },
         )
         parent.addView(row.rowView)

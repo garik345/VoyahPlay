@@ -227,10 +227,19 @@ class CarPlayController(
     @Volatile private var mux: Iap2UsbMuxHost? = null
     @Volatile private var csm: Iap2Session? = null
     @Volatile private var activeSession: AirPlaySession? = null
+    private data class PhoneUiObservation(val session: AirPlaySession, val token: Any,
+        val began: Long, val record: (String) -> Unit)
+    @Volatile private var phoneUiObservation: PhoneUiObservation? = null
     @Volatile private var requestedDashboardUrl: String? = airPlayConfig.cluster?.initialUrl
     private val clusterUiLock = Any()
     private var clusterUiStream: Pair<AirPlaySession, Int>? = null
     private var clusterUiShown = true
+    private data class DashboardSuggestion(val session: AirPlaySession, val stream: Int,
+        val mainToken: Any, val urls: List<String>)
+    private val dashboardSuggestionLock = Any()
+    private var lastDashboardSuggestion: DashboardSuggestion? = null
+    private val pendingDashboardSuggestion = java.util.concurrent.atomic.AtomicReference<DashboardSuggestion?>()
+    private val dashboardSuggestionScheduled = java.util.concurrent.atomic.AtomicBoolean()
     // Immutable snapshots keep accessibility key filtering away from the network-writing UI lock.
     @Volatile private var clusterUiVisibility: Pair<Pair<AirPlaySession, Int>, Boolean>? = null
     @Volatile private var dashboardMapOutputVisible = false
@@ -419,9 +428,22 @@ class CarPlayController(
         }
 
         override fun onCommand(session: AirPlaySession, type: String, params: Map<String, Any?>) {
+            if (type == "requestUI") {
+                val probe = phoneUiObservation
+                if (probe != null && !closed && activeSession === session && probe.session === session &&
+                    session.mainScreenSessionToken() === probe.token &&
+                    android.os.SystemClock.elapsedRealtime() - probe.began in 0L until 8_000L) {
+                    val url = params["url"] as? String
+                    // Record only the scheme; paths/query strings may contain personal information.
+                    val scheme = url?.let { Regex("^[A-Za-z][A-Za-z0-9+.-]{0,40}:").find(it)?.value }
+                        ?: if (url.isNullOrEmpty()) "absent-or-empty" else "unrecognized"
+                    runCatching { probe.record("scheme=$scheme") }
+                }
+            }
             debugLog(
                 "AirPlay command type=$type params=${params.keys.sorted().joinToString(",")}",
             )
+            if (type == "suggestUI") acceptDashboardSuggestion(session, params)
             if (
                 config.transport == CarPlayTransport.WIRELESS &&
                 !closed &&
@@ -581,6 +603,32 @@ class CarPlayController(
 
     fun configuredClusterSize(): Pair<Int, Int>? = airPlayConfig.cluster?.let { it.widthPixels to it.heightPixels }
 
+    /** Allows an authorized output to attach before the first deferred video frame exists. */
+    fun hasPreparedDashboardScreenForSession(sessionToken: Any?): Boolean {
+        val session = activeSession ?: return false
+        return !closed && sessionToken != null && session.mainScreenSessionToken() === sessionToken && session.clusterScreenReady()
+    }
+
+    private val initialClusterPreparationQueued = java.util.concurrent.atomic.AtomicBoolean()
+
+    fun prepareIdleDashboardMap(sessionToken: Any) {
+        val session = activeSession ?: return
+        if (closed || session.mainScreenSessionToken() !== sessionToken || !session.needsInitialClusterViewArea(sessionToken) ||
+            !initialClusterPreparationQueued.compareAndSet(false, true)) return
+        try {
+            touchExecutor.execute {
+                try {
+                    synchronized(clusterUiLock) {
+                        session.prepareInitialClusterViewArea(sessionToken) {
+                            !closed && activeSession === session && session.mainScreenSessionToken() === sessionToken &&
+                                !com.shilapi.xcertplay.glance.CarPlayGlance.snapshot().navigationActive
+                        }
+                    }
+                } finally { initialClusterPreparationQueued.set(false) }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) { initialClusterPreparationQueued.set(false) }
+    }
+
     /** A visible physical map and its session/stream generation; null for a paused/virtual/turn-card route. */
     fun dashboardMapRoute(): Any? {
         val session = activeSession ?: return null
@@ -664,6 +712,34 @@ class CarPlayController(
     /** Answers the ringing call on the iPhone (telephony Hook Switch), as the wheel's call button does. */
     fun answerCall(): Boolean = sendTelephony(TELEPHONY_HOOK_SWITCH)
 
+    /** Queues the experimental Recents URL for this exact primary stream, never a replacement phone. */
+    fun requestPhoneRecentsForSession(expected: Any, complete: (Boolean) -> Unit = {}): Boolean {
+        return requestPhoneRecentsForSession(expected, { true }, complete)
+    }
+
+    /** The key owner may be disabled or a call may start while the UI command waits in the queue. */
+    fun requestPhoneRecentsForSession(expected: Any, permitted: () -> Boolean, complete: (Boolean) -> Unit): Boolean {
+        val session = activeSession
+        if (closed || session == null || activeAirPlaySessionToken() !== expected || !permitted()) { complete(false); return false }
+        return try {
+            touchExecutor.execute {
+                val current = !closed && activeSession === session && session.mainScreenSessionToken() === expected && permitted()
+                complete(current && session.requestPhoneRecents())
+            }
+            true
+        } catch (_: java.util.concurrent.RejectedExecutionException) { complete(false); false }
+    }
+
+    /** Short diagnostic observation; does not change how the iPhone's UI requests are handled. */
+    fun observePhoneUiRequestsForSession(expected: Any, record: (String) -> Unit): Boolean {
+        val session = activeSession ?: return false
+        if (closed || activeAirPlaySessionToken() !== expected) return false
+        val probe = PhoneUiObservation(session, expected, android.os.SystemClock.elapsedRealtime(), record)
+        phoneUiObservation = probe
+        mainHandler.postDelayed({ if (phoneUiObservation === probe) phoneUiObservation = null }, 8_000)
+        return true
+    }
+
     /** Ends the current call or declines the ringing one (telephony Drop). */
     fun endCall(): Boolean = sendTelephony(TELEPHONY_DROP)
 
@@ -690,6 +766,7 @@ class CarPlayController(
     }
 
     override fun close() {
+        phoneUiObservation = null
         synchronized(wirelessResourceLock) {
             if (closed) return
             closed = true
@@ -775,7 +852,29 @@ class CarPlayController(
         queueDashboardContent(url, session, sessionToken, onComplete)
     }
 
-    private fun queueDashboardContent(url: String, session: AirPlaySession?, mainToken: Any?, onComplete: (Boolean) -> Unit) {
+    /** Only for a confirmed empty retained map; a deliberately paused cluster stays paused. */
+    fun recoverDashboardMapForSession(sessionToken: Any?, onComplete: (Boolean) -> Unit) {
+        val session = activeSession
+        if (sessionToken == null || session?.mainScreenSessionToken() !== sessionToken) {
+            onComplete(false); return
+        }
+        queueDashboardContent(com.shilapi.xcertplay.airplay.CarPlayClusterDisplay.MAP_URL,
+            session, sessionToken, onComplete, reopen = true)
+    }
+
+    /** One bounded empty-picture recovery, without stopping the UI or reconnecting the phone. */
+    fun refreshDashboardMapViewAreaForSession(sessionToken: Any?, onComplete: (Boolean) -> Unit) {
+        val session = activeSession
+        if (sessionToken == null || session?.mainScreenSessionToken() !== sessionToken) {
+            onComplete(false); return
+        }
+        queueDashboardContent(com.shilapi.xcertplay.airplay.CarPlayClusterDisplay.MAP_URL,
+            session, sessionToken, onComplete, refreshViewArea = true)
+    }
+
+    private fun queueDashboardContent(url: String, session: AirPlaySession?, mainToken: Any?,
+        onComplete: (Boolean) -> Unit, reopen: Boolean = false, refreshViewArea: Boolean = false,
+        resumeViewArea: (() -> Boolean)? = null) {
         val stream = session?.clusterStream ?: 0
         if (closed || session == null || activeSession !== session || stream <= 0) {
             onComplete(false)
@@ -790,14 +889,39 @@ class CarPlayController(
                     }
                     // A cluster stream DiPlay has not paused yet starts with the map drawn.
                     val shown = clusterUiShown || clusterUiStream != session to stream
-                    val delivered = session.setClusterUrl(url, send = shown)
+                    val firstMap = !refreshViewArea && shown && session.clusterUiNeedsActivation() &&
+                        url == com.shilapi.xcertplay.airplay.CarPlayClusterDisplay.MAP_URL
+                    if (firstMap) {
+                        requestedDashboardUrl = url
+                        session.setClusterUrl(url, send = false)
+                    }
+                    val refreshArea = refreshViewArea || firstMap
+                    if (refreshArea && resumeViewArea == null) {
+                        val geometryMainToken = mainToken ?: session.mainScreenSessionToken()
+                            ?: return@synchronized false
+                        val resume = if (shown && requestedDashboardUrl == url) session.prepareClusterMapViewAreaRefresh(
+                            preparedFor = geometryMainToken.takeIf { firstMap }) {
+                            !closed && activeSession === session && session.clusterStream == stream &&
+                                session.mainScreenSessionToken() === geometryMainToken
+                        } else null
+                        if (resume != null && mainHandler.postDelayed({
+                                queueDashboardContent(url, session, geometryMainToken, onComplete,
+                                    refreshViewArea = true, resumeViewArea = resume)
+                            }, DASHBOARD_VIEW_AREA_SETTLE_MILLIS)) return@execute
+                        return@synchronized false
+                    }
+                    val delivered = if (refreshArea) shown && requestedDashboardUrl == url && resumeViewArea?.invoke() == true
+                    else if (reopen) shown && session.reopenClusterUrl(url) {
+                        !closed && activeSession === session && session.clusterStream == stream &&
+                            session.mainScreenSessionToken() === mainToken
+                    } else session.setClusterUrl(url, send = shown)
                     val sent = delivered && !closed && activeSession === session && session.clusterStream == stream
                     // The wheel zoom follows what the dashboard shows now, so zoom mode starts over.
                     if (sent) {
                         requestedDashboardUrl = url
                         dashboardMapEpoch.incrementAndGet()
                     }
-                    debugLog("Dashboard content: $url sent=$sent")
+                    debugLog("Dashboard content: $url sent=$sent reopen=$reopen refreshViewArea=$refreshArea shown=$shown stream=$stream")
                     sent
                 }
                 onComplete(sent)
@@ -827,7 +951,56 @@ class CarPlayController(
         }
     }
 
-    // Each new cluster stream starts with the map drawn (its initialURL); send only real changes.
+    /** A phone offers its navigation scene after startup/provider changes, independently of iAP2.
+     * Keep the driver's selected URL; repeated offers do not create repeated showUI commands.
+     * Coalesce work before the HID executor so suggestions cannot build an unbounded queue.
+     */
+    private fun acceptDashboardSuggestion(session: AirPlaySession, params: Map<String, Any?>) {
+        val urls = params["urls"] as? List<*> ?: return
+        if (urls.size > 16 || urls.any { it !is String }) return
+        val token = session.mainScreenSessionToken() ?: return
+        if (closed || activeSession !== session || session.clusterStream <= 0 || requestedDashboardUrl == null) return
+        val next = DashboardSuggestion(session, session.clusterStream, token, urls.filterIsInstance<String>().distinct().sorted())
+        synchronized(dashboardSuggestionLock) {
+            if (lastDashboardSuggestion == next) return
+            lastDashboardSuggestion = next
+            pendingDashboardSuggestion.set(next)
+        }
+        scheduleDashboardSuggestion()
+    }
+
+    private fun scheduleDashboardSuggestion() {
+        if (!dashboardSuggestionScheduled.compareAndSet(false, true)) return
+        try {
+            touchExecutor.execute {
+                try {
+                    val next = pendingDashboardSuggestion.getAndSet(null) ?: return@execute
+                    synchronized(clusterUiLock) {
+                        if (closed || activeSession !== next.session || next.session.clusterStream != next.stream ||
+                            next.session.mainScreenSessionToken() !== next.mainToken ||
+                            synchronized(dashboardSuggestionLock) { lastDashboardSuggestion !== next }) return@synchronized
+                        val url = requestedDashboardUrl ?: return@synchronized
+                        val shown = clusterUiShown || clusterUiStream != next.session to next.stream
+                        if (!shown || url !in next.urls) return@synchronized
+                        val sent = next.session.activateSuggestedClusterUrl(url)
+                        if (sent) dashboardMapEpoch.incrementAndGet()
+                        else synchronized(dashboardSuggestionLock) {
+                            if (lastDashboardSuggestion === next) lastDashboardSuggestion = null
+                        }
+                        debugLog("Dashboard suggestion: stream=${next.stream} urls=${next.urls} selected=$url sent=$sent")
+                    }
+                } finally {
+                    dashboardSuggestionScheduled.set(false)
+                    if (!closed && pendingDashboardSuggestion.get() != null) scheduleDashboardSuggestion()
+                }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            dashboardSuggestionScheduled.set(false)
+            pendingDashboardSuggestion.set(null)
+        }
+    }
+
+    // Keep visibility per stream; deferred content waits for its physical output before first showUI.
     private fun applyClusterUi(shown: Boolean) = synchronized(clusterUiLock) {
         val session = activeSession ?: return@synchronized
         val stream = session.clusterStream.takeIf { it > 0 } ?: return@synchronized
@@ -841,7 +1014,8 @@ class CarPlayController(
             clusterUiShown = shown
             clusterUiVisibility = (session to stream) to shown
             dashboardMapEpoch.incrementAndGet()
-            debugLog("Cluster map: ${if (shown) "showUI, the cluster shows the map" else "stopUI, the cluster hides the map"}")
+            if (session.clusterUiNeedsActivation()) debugLog("Cluster visibility retained: shown=$shown; first output pending")
+            else debugLog("Cluster map: ${if (shown) "showUI, the cluster shows the map" else "stopUI, the cluster hides the map"}")
         }
     }
 
@@ -860,13 +1034,19 @@ class CarPlayController(
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
         BydNavigationOutputs.onFrame(frame)
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
-        synchronized(playbackStatus) {
+        val playback = synchronized(playbackStatus) {
             val previousPlaying = playbackStatus.playing
-            playbackStatus.acceptUpdate(frame)?.let { it to (it.playing != previousPlaying) }
-        }?.let { (update, playingChanged) ->
-            nowPlayingListener?.invoke(update)
-            if (playingChanged) playbackListener?.invoke(update.playing)
+            val wasKnown = playbackStatus.playbackKnown
+            val update = playbackStatus.acceptUpdate(frame)
+            val changed = playbackStatus.playing != previousPlaying
+            Triple(update, changed, if (playbackStatus.playbackKnown && (!wasKnown || changed))
+                playbackStatus.playing to !wasKnown else null)
         }
+        playback.first?.let { update ->
+            nowPlayingListener?.invoke(update)
+            if (playback.second) playbackListener?.invoke(update.playing)
+        }
+        playback.third?.let { (playing, initial) -> activeSession?.iphoneMediaPlayback(playing, initial) }
     }
 
     enum class InitialAlbumRefreshResult { SENT, FAILED, CLOSED, INACTIVE_SESSION, CANCELLED, CHANNEL_UNAVAILABLE }
@@ -3115,6 +3295,8 @@ class CarPlayController(
 
     companion object {
         const val CONNECTION_DIAGNOSTIC_PREFIX = "CONNECTION_DIAGNOSTIC"
+        // updateViewArea declares a 300 ms animation. Keep phone input free while it settles.
+        private const val DASHBOARD_VIEW_AREA_SETTLE_MILLIS = 350L
         // Indices in the telephony HID report (AirPlayHid.telephonyDescriptor).
         private const val TELEPHONY_HOOK_SWITCH = 1
         private const val TELEPHONY_DROP = 3

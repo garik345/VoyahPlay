@@ -10,16 +10,17 @@ import java.util.Locale;
 public final class VoyahEquipment {
     private static String stamp;
     private static boolean heatedWheel;
+    private static boolean radio;
     private VoyahEquipment() {}
 
     public static synchronized boolean hasHeatedWheel(Context context) {
         try {
             ApplicationInfo info = context.getPackageManager().getApplicationInfo("com.qinggan.canbus.service", 0);
-            if (info.splitSourceDirs != null && info.splitSourceDirs.length != 0) return false;
+            if (info.splitSourceDirs != null && info.splitSourceDirs.length != 0) { stamp = null; radio = false; return false; }
             File apk = new File(info.sourceDir);
             // Bound this UI metadata probe to the two inspected, ~2 MB APKs. Actual commands
             // retain their independent full verification; file size alone never enables hardware.
-            if (!apk.isFile() || (apk.length() != 2229868 && apk.length() != 2233964)) return false;
+            if (!apk.isFile() || (apk.length() != 2229868 && apk.length() != 2233964)) { stamp = null; radio = false; return false; }
             String current = apk.getAbsolutePath() + ":" + apk.length() + ":" + apk.lastModified();
             if (current.equals(stamp)) return heatedWheel;
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -30,8 +31,19 @@ public final class VoyahEquipment {
             StringBuilder hash = new StringBuilder();
             for (byte value : digest.digest()) hash.append(String.format(Locale.ROOT, "%02x", value & 255));
             heatedWheel = VoyahOemBuilds.hasHeatedWheel(hash.toString());
+            radio = VoyahOemBuilds.hasRadio(hash.toString());
             stamp = current;
             return heatedWheel;
+        } catch (Exception error) { stamp = null; radio = false; return false; }
+    }
+    public static synchronized boolean hasRadio(Context context) {
+        // Reuse the bounded, cached OEM lookup; no radio service is started to detect equipment.
+        hasHeatedWheel(context);
+        try {
+            ApplicationInfo info = context.getPackageManager().getApplicationInfo("com.qinggan.canbus.service", 0);
+            File apk = new File(info.sourceDir);
+            String current = apk.getAbsolutePath() + ":" + apk.length() + ":" + apk.lastModified();
+            return current.equals(stamp) && radio;
         } catch (Exception error) { return false; }
     }
 }

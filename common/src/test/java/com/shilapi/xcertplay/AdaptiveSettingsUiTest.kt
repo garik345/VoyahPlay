@@ -704,6 +704,7 @@ class AdaptiveSettingsUiTest {
         val audio = visibleIn(R.string.audio)
         val vehicle = visibleIn(R.string.settings_vehicle)
         val advanced = visibleIn(R.string.settings_advanced)
+        val diagnostics = visibleIn(R.string.diagnostics)
         val connection = visibleIn(R.string.connection)
 
         assertTrue(display.any { it.startsWith(text(R.string.carplay_dock)) })
@@ -729,13 +730,13 @@ class AdaptiveSettingsUiTest {
         assertTrue(text(R.string.car_button_in_carplay) in vehicle)
         assertTrue(text(R.string.voyah_controls_title) in vehicle)
         assertTrue(text(R.string.voyah_signs_title) in vehicle)
-        assertTrue(text(R.string.voyah_helper_title) in advanced)
+        assertTrue(text(R.string.voyah_helper_title) in diagnostics)
+        assertFalse(text(R.string.voyah_helper_title) in advanced)
         assertTrue(text(R.string.settings_cluster_probe_title) in advanced)
         assertFalse(text(R.string.settings_cluster_probe_title) in vehicle)
         val shown = display + audio + vehicle + advanced + connection
-        listOf(R.string.wheel_siri_key,R.string.settings_wheel_keys,R.string.settings_navigation_wheel_volume,
-            R.string.side_panel,R.string.carplay_rotation,R.string.settings_disable_media_key_audio_focus,
-            R.string.open_after_the_car_starts,R.string.boot_start_repair).forEach {
+        listOf(R.string.wheel_siri_key,R.string.settings_wheel_keys,
+            R.string.side_panel,R.string.carplay_rotation,R.string.settings_disable_media_key_audio_focus).forEach {
             assertFalse(text(it),text(it) in shown)
         }
     }

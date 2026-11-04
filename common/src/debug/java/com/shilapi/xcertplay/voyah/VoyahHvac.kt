@@ -25,10 +25,15 @@ internal object VoyahHvacSchema {
         UltraHvacControl.RECIRCULATION -> Field(10, 11, "airCirculationMode")
         UltraHvacControl.FRONT_DEFROST -> Field(8, 9, "airFrontWindowDefogger")
         UltraHvacControl.REAR_DEFROST -> Field(9, 10, "airRearWindowDefogger")
+        UltraHvacControl.ZONES_SYNCED -> Field(11, 12, "airDUALStatus")
     }
     fun decode(raw: Map<String, Number>): Map<UltraHvacControl, Any?> = UltraHvacControl.entries.associateWith { control ->
         val number = raw[field(control).cacheName]?.toDouble()
         if (control == UltraHvacControl.RECIRCULATION) VoyahRecirculation.decode(raw["airCirculationMode"])?.on
+        // The OEM front SYNC button reads DUAL: 0 = shared zone, 1 = independent zones.
+        // airSyncStatus is unused on H97C and must not confirm the AC_DUAL command.
+        else if (control == UltraHvacControl.ZONES_SYNCED)
+            when (number) { 0.0 -> true; 1.0 -> false; else -> null }
         else if (control.format == com.shilapi.xcertplay.airplay.rcs.caf.CafCharacteristicFormat.BOOL)
             when (number) { 0.0 -> false; 1.0 -> true; else -> null }
         else control.normalize(number)
@@ -38,24 +43,20 @@ internal object VoyahHvacSchema {
         UltraClimateReading.CABIN_TEMPERATURE -> "airTempInCar"
         UltraClimateReading.MAX_AC -> "airACMaxSW"
         UltraClimateReading.MAX_DEFROST -> "airMaxFrontStatus"
-        UltraClimateReading.ZONES_SYNCED -> "airSyncStatus"
         UltraClimateReading.RECIRCULATION_AUTO -> "airCirculationMode"
     }
     fun decodeReadings(raw: Map<String, Number>): Map<UltraClimateReading, Any?> =
         UltraClimateReading.entries.associateWith { reading ->
             if (reading == UltraClimateReading.RECIRCULATION_AUTO) VoyahRecirculation.decode(raw["airCirculationMode"])?.automatic
-            else reading.normalize(raw[readingField(reading)]) ?: if (reading == UltraClimateReading.ZONES_SYNCED) {
-                // H97C leaves airSyncStatus at -1; airDUALStatus 0 means one shared zone, 1 independent zones.
-                when (raw["airDUALStatus"]?.toInt()) { 0 -> true; 1 -> false; else -> null }
-            } else null
+            else reading.normalize(raw[readingField(reading)])
         }
     fun cycleAdvanced(before: Int?, after: Int?): Boolean = before in 0..2 && after in 0..2 && before != after
     fun wireValue(control: UltraHvacControl, value: Any): Int {
         val normalized = control.normalize(value) ?: throw IllegalArgumentException("Invalid $control=$value")
         // Exactly the multiplication performed by setAirConditionStateEx; no second scaling.
-        // H97C power/AC/AUTO/front defrost/recirculation are button pulses, not absolute bits.
+        // H97C power/AC/AUTO/front defrost/recirculation/SYNC are button pulses, not absolute bits.
         if (control in setOf(UltraHvacControl.POWER, UltraHvacControl.AC, UltraHvacControl.AUTO,
-                UltraHvacControl.RECIRCULATION, UltraHvacControl.FRONT_DEFROST)) return 1
+                UltraHvacControl.RECIRCULATION, UltraHvacControl.FRONT_DEFROST, UltraHvacControl.ZONES_SYNCED)) return 1
         if (control == UltraHvacControl.FAN) return VoyahHvacFan.wireValue(normalized as Long)
         return when (normalized) {
             is Boolean -> if (normalized) 1 else 0

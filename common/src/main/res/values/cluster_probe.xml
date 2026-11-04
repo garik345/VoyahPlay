@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_cluster_probe_title">Cluster map (experimental)</string>
-    <string name="settings_cluster_probe_description">Shows the map automatically while a route is active. Requires root helper 1.2.7. The manual test buttons below run for 60 seconds. A manual test pauses automatic display until the route ends.</string>
+    <string name="settings_cluster_probe_description">Shows the map automatically while a route is active. Requires root helper 1.2.15. The manual test buttons below run for 60 seconds. A manual test pauses automatic display until the route ends.</string>
     <string name="settings_cluster_probe_status">Check cluster display</string>
     <string name="settings_cluster_probe_grid">Show test grid</string>
     <string name="settings_cluster_probe_map">Show CarPlay map</string>

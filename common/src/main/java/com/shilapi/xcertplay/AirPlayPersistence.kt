@@ -809,6 +809,8 @@ object AirPlayPersistence {
     }
 
     fun loadClusterMapEnabled(context: Context): Boolean =
+        (com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled ||
+            com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.MAP)) &&
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLUSTER_MAP, false)
 
     fun loadAdbClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
@@ -837,6 +839,8 @@ object AirPlayPersistence {
     }
 
     fun saveClusterMapEnabled(context: Context, enabled: Boolean) {
+        if (enabled && !com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled &&
+            !com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.MAP)) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLUSTER_MAP, enabled).apply()
     }
 
@@ -1307,20 +1311,28 @@ object AirPlayPersistence {
     }
 
     fun loadHideTopBar(context: Context): Boolean =
+        (com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled ||
+            com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)) &&
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_HIDE_TOP_BAR, true)
 
     fun saveHideTopBar(context: Context, hide: Boolean) {
+        if (hide && !com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled &&
+            !com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_HIDE_TOP_BAR, hide)
             .apply()
     }
 
     fun loadHideBottomBar(context: Context): Boolean =
+        (com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled ||
+            com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)) &&
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_HIDE_BOTTOM_BAR, true)
 
     fun saveHideBottomBar(context: Context, hide: Boolean) {
+        if (hide && !com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled &&
+            !com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_HIDE_BOTTOM_BAR, hide)
             .apply()

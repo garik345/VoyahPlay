@@ -32,7 +32,7 @@ process_args() { printf '%s\\n' "$TARGET_NAME"; }
 awk() { if [ "$1" = '/^Uid:/ { print $2 }' ]; then echo "$TARGET_UID"; else command awk "$@"; fi; }
 agent_alive() { agent_system=$RECORDED_TARGET; [ "$ALIVE" = 1 ]; }
 stop_agent() { echo STOP_OWNED >> "$ROOT/calls"; }
-fullscreen_firmware() { [ "$FIRMWARE" = valid ]; }
+fullscreen_firmware() { fw_services=$SERVICES_HASH; fw_ui=$UI_HASH; [ "$FIRMWARE" = valid ]; }
 identity() { echo 12345; }
 nohup() { echo "INJECT:$*" >> "$ROOT/calls"; }
 ${code}
@@ -45,7 +45,9 @@ exit "$result"
   APK_HASH:'0430e677f8eabafd59876f56bc5835a06e626c2aa484b6f306c0a7b31b04d63d',
   INJECTOR_HASH:'0d99be0e44d4ca3449056fa0a0b868fca1cf66c8ad704508949945afc07706aa',
   TARGET_PID:'3456',TARGET_NAME:'com.qinggan.app.launcher',TARGET_UID:'1000',
-  RECORDED_TARGET:'3456',FIRMWARE:'valid',ALIVE:'0',BAD_ASSET:'0',...changes};
+  RECORDED_TARGET:'3456',FIRMWARE:'valid',ALIVE:'0',BAD_ASSET:'0',
+  SERVICES_HASH:'0faed7ebf1094c62a4f92b4bc533bbb3c08480a2cd847567cb1cff91b2d1d045',
+  UI_HASH:'28f5d93eaec22b755b339193a733bd0d4160c496cf301bcd2fcfb88c36ade162',...changes};
  const r=spawnSync(bash,['--noprofile','--norc','-s'],{input,encoding:'utf8',env,timeout:10000});
  assert(!r.error,r.error?.message);
  const calls=fs.existsSync(dir+'/calls')?fs.readFileSync(dir+'/calls','utf8'):'';
@@ -59,7 +61,7 @@ test('reviewed Launcher starts only the owned script in the verified Launcher pr
  assert(fs.existsSync(r.dir+'/dock-agent.pid'));
 });
 test('other Launcher sizes are optional and do not trigger hashing or injection',()=>{
- const r=run({APK_SIZE:'51888996'});assert.equal(r.status,0);assert.equal(r.calls,'');
+ const r=run({APK_SIZE:'51888995'});assert.equal(r.status,0);assert.equal(r.calls,'');
 });
 test('reviewed OTA7.2 Launcher is accepted while the same-size unknown build is refused',()=>{
  const r=run({APK_SIZE:'126653880',APK_HASH:'b3287150827e7fa51072bcbcba257539101cda8433c5f9d3a95f4ca905abd567'});
@@ -75,4 +77,13 @@ test('a changed APK, injector, firmware, target identity or private asset never 
 });
 test('a live owned agent in the same process is reused without hashing the large APK again',()=>{
  const r=run({ALIVE:'1'});assert.equal(r.status,0);assert(!r.calls.includes('SHA_LAUNCHER'));assert(!r.calls.includes('INJECT:'));
+});
+
+test('RU Launcher requires its reviewed hash and matching services/SystemUI pair',()=>{
+ const ru={APK_SIZE:'51888996',APK_HASH:'745db9f151f00677fd0f0de8faf6921d9bc48150387d32936ad482dc424b5394'};
+ const good=run(ru);assert.equal(good.status,0,good.stdout+good.stderr);assert(good.calls.includes('INJECT:'));
+ for(const change of [{APK_HASH:'unknown'},{SERVICES_HASH:'483fedea7707833454272f84a64692078996127d64abac63f13863b76246a579'},
+  {UI_HASH:'5d5f7498d92ee68e927bc0b891daedf15978d079b85a254399112bad98d2dd6b'}]) {
+  const bad=run({...ru,...change});assert.notEqual(bad.status,0);assert(!bad.calls.includes('INJECT:'));
+ }
 });

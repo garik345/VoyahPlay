@@ -53,9 +53,10 @@ Java.perform(function () {
                 else if (end <= now || end - now > 45000) return false;
             }
             if (token === null || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(token.toString()) ||
-                mode === null || !['grid', 'map', 'auto'].includes(mode.toString()) || end <= now || end - now > 60000) return false;
+                mode === null || !['grid', 'map', 'auto', 'navi-grid', 'navi-map', 'ar-grid', 'ar-map'].includes(mode.toString()) || end <= now || end - now > 60000) return false;
             const info = record.getDisplayContent().getDisplayInfo();
-            if (info.name.value.toString() !== 'Cluster-Media-Display' || info.ownerUid.value !== 1000 ||
+            const displayName = ['navi-grid', 'navi-map', 'ar-grid', 'ar-map'].includes(mode.toString()) ? 'Cluster-Navi-Display' : 'Cluster-Media-Display';
+            if (info.name.value.toString() !== displayName || info.ownerUid.value !== 1000 ||
                 info.ownerPackageName.value.toString() !== 'com.qinggan.cluster' ||
                 info.logicalWidth.value !== 1920 || info.logicalHeight.value !== 720 || (info.flags.value & 4) === 0) return false;
             // The verified Tweaks bridge assigns its shared empty Rect to display 5. Copy, never mutate that shared Rect.

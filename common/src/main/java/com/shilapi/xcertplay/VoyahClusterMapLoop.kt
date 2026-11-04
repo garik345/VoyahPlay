@@ -58,7 +58,13 @@ internal class VoyahClusterMapLoop(
                 } else {
                     val next = if (ok) Lease.parse(text, clock()) else null
                     if (next != null) { lease = next; failures = 0; nextAt = clock() + 15000 }
-                    else nextAt = clock() + retryDelay()
+                    else {
+                        val delay = retryDelay()
+                        // A busy bounds change must not make backoff skip the last renewal chance.
+                        // Never extend the lease locally; only the root reply authorizes it.
+                        val remaining = lease?.let { (it.deadline - clock() - 1000).coerceAtLeast(0) }
+                        nextAt = clock() + if (remaining == null) delay else minOf(delay, remaining)
+                    }
                 }
             }
         }

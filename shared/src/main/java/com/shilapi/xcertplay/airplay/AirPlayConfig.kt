@@ -40,6 +40,8 @@ data class AirPlayDisplayConfig(
     val useIphoneCornerMask: Boolean = false,
     /** When true, do not declare safeArea in viewAreas dictionary to avoid conflict with cornerMasks. */
     val mainDisplayDisableSafeArea: Boolean = (mainDisplayCornerMasks == true),
+    /** Keep the desired URL locally; let the physical output prepare its area before the first showUI. */
+    val deferInitialUi: Boolean = false,
 )
 
 /**

@@ -44,6 +44,8 @@ interface AirPlaySessionListener {
 
 /** Stream transport seam; media decode/render is supplied by a later layer. */
 interface AirPlayMediaHandler {
+    fun onModesChanged(session: AirPlaySession, params: Map<String, Any?>) {}
+    fun onNativeRadioSelected(session: AirPlaySession, selected: Boolean) {}
     fun onScreen(session: AirPlaySession, type: Int, stream: Map<String, Any?>): Int? = null
     fun onAudio(session: AirPlaySession, type: Int, stream: Map<String, Any?>): Map<String, Any?>? = null
     fun onDataStream(session: AirPlaySession, stream: Map<String, Any?>): Map<String, Any?>? = null
@@ -93,6 +95,8 @@ class AirPlaySession(
         private set
     private var clusterStreamSetups = 0
     @Volatile private var mainScreenToken: Any? = null
+    @Volatile private var mainSetupResponded: Any? = null
+    @Volatile private var clusterSetupResponded = 0
 
     private val closed = AtomicBoolean(false)
     internal val isClosed: Boolean get() = closed.get()
@@ -178,6 +182,14 @@ class AirPlaySession(
         synchronized(clusterCommandLock) {
             if (closed.get() || clusterStream <= 0) return false
             val content = synchronized(clusterContentLock) { clusterContent } ?: return false
+            if (!clusterUiActivated) {
+                synchronized(clusterContentLock) {
+                    val current = clusterContent ?: return false
+                    if (closed.get() || current.stream != content.stream) return false
+                    clusterContent = current.copy(shown = shown)
+                }
+                return true // Retain pause/resume intent without constructing a zero-sized scene.
+            }
             if (!shown) {
                 val sent = sendCommand(mapOf("type" to "stopUI",
                     "params" to mapOf("uuid" to displayIdentifier(111))))
@@ -196,11 +208,21 @@ class AirPlaySession(
     }
 
     private data class ClusterContent(val stream: Int, val requested: String?, val displayed: String?,
-        val shown: Boolean = true, val token: Any = Any())
+        val shown: Boolean = true, val token: Any = Any(), val activationPending: Boolean = true,
+        val preparedViewAreaFor: Any? = null)
     private val clusterContentLock = Any()
     private val clusterCommandLock = Any()
     @Volatile private var clusterContent: ClusterContent? = null
     private var requestedClusterUrl = config.cluster?.initialUrl // guarded by clusterContentLock
+    @Volatile private var clusterUiActivated = config.cluster?.deferInitialUi != true
+
+    internal fun clusterUiNeedsActivation(): Boolean = !closed.get() && clusterStream > 0 && !clusterUiActivated
+
+    /** Port/keys and SETUP replies are ready even when deferred content has not sent a video frame. */
+    internal fun clusterScreenReady(): Boolean {
+        val content = clusterContent ?: return false
+        return !closed.get() && content.stream == clusterStream && clusterActivationReady(content)
+    }
 
     /** Last delivered content for this stream. Pending selections never grant wheel zoom eligibility. */
     fun clusterUrl(): String? = clusterContentRoute()?.second
@@ -229,6 +251,68 @@ class AirPlaySession(
         }
     }
 
+    /** One empty-picture recovery of this cluster generation, without reconnecting the phone. */
+    internal fun reopenClusterUrl(url: String, isCurrent: () -> Boolean): Boolean = synchronized(clusterCommandLock) {
+        val before = synchronized(clusterContentLock) {
+            clusterContent?.takeIf { !closed.get() && it.stream == clusterStream && it.shown && clusterUiActivated }
+        } ?: return false
+        if (!isCurrent() || !setClusterUiShown(false) || !isCurrent()) return false
+        val stopped = synchronized(clusterContentLock) {
+            val current = clusterContent ?: return false
+            // A re-SETUP while stopUI was in flight must not reopen a replacement stream.
+            if (closed.get() || current.stream != before.stream || clusterStream != before.stream || current.shown) return false
+            requestedClusterUrl = url
+            current.copy(requested = url).also { clusterContent = it }
+        }
+        showClusterUrl(stopped, url)
+    }
+
+    internal fun needsInitialClusterViewArea(mainToken: Any): Boolean =
+        clusterUiNeedsActivation() && clusterScreenReady() &&
+            clusterContent?.let { it.shown && it.requested == CarPlayClusterDisplay.MAP_URL && it.preparedViewAreaFor !== mainToken } == true &&
+            (config.cluster?.viewAreas?.size ?: 1) <= 1
+
+    /** Prepare geometry while navigation is idle, leaving the scene unopened. */
+    internal fun prepareInitialClusterViewArea(mainToken: Any, isIdle: () -> Boolean) = synchronized(clusterCommandLock) {
+        val before = clusterContent ?: return@synchronized
+        if (!needsInitialClusterViewArea(mainToken) || !isIdle() ||
+            !sendCommand(AirPlayInfoPlist.viewAreaCommand(0, 1, displayIdentifier(111)))) return@synchronized
+        synchronized(clusterContentLock) {
+            if (!closed.get() && clusterContent === before && clusterStream == before.stream && mainScreenSessionToken() === mainToken) {
+                clusterContent = before.copy(preparedViewAreaFor = mainToken)
+                logDebug("Cluster map: view area prepared before navigation stream=${before.stream}")
+            }
+        }
+    }
+
+    /** Restore the area first; the caller lets its animation finish before resuming this scene. */
+    internal fun prepareClusterMapViewAreaRefresh(preparedFor: Any? = null, isCurrent: () -> Boolean): (() -> Boolean)? = synchronized(clusterCommandLock) {
+        val display = config.cluster ?: return null
+        // Do not reset a multi-area display whose live selection may differ from initialViewArea.
+        if ((display.viewAreas?.size ?: 1) > 1) return null
+        val before = clusterContent?.takeIf {
+            !closed.get() && it.stream == clusterStream && it.shown &&
+                it.requested == CarPlayClusterDisplay.MAP_URL
+        } ?: return null
+        if (!isCurrent()) return null
+        if ((preparedFor == null || before.preparedViewAreaFor !== preparedFor) &&
+            !sendCommand(AirPlayInfoPlist.viewAreaCommand(0, 1, displayIdentifier(111)))) return null
+        val current = clusterContent ?: return null
+        if (!isCurrent() || closed.get() || clusterStream != before.stream ||
+            current.stream != before.stream || !current.shown || current.token !== before.token ||
+            current.requested != before.requested) return null
+        val resume: () -> Boolean = {
+            synchronized(clusterCommandLock) finish@{
+                val latest = clusterContent ?: return@finish false
+                if (!isCurrent() || closed.get() || clusterStream != before.stream ||
+                    latest.stream != before.stream || !latest.shown || latest.token !== before.token ||
+                    latest.requested != before.requested) return@finish false
+                showClusterUrl(latest, CarPlayClusterDisplay.MAP_URL)
+            }
+        }
+        resume
+    }
+
     /** Seeds a retained controller selection even when this phone has not set up its cluster yet. */
     internal fun restoreClusterUrl(url: String, send: Boolean): Boolean = synchronized(clusterCommandLock) {
         val content = synchronized(clusterContentLock) {
@@ -236,7 +320,7 @@ class AirPlaySession(
             requestedClusterUrl = url
             clusterContent?.copy(requested = url)?.also { clusterContent = it }
         }
-        if (content == null || !send || (content.shown && content.displayed == url)) true
+        if (content == null || !send || !clusterUiActivated || (content.shown && content.displayed == url)) true
         else showClusterUrl(content, url)
     }
 
@@ -253,22 +337,44 @@ class AirPlaySession(
                 if (uiSent) clusterContent = current.copy(displayed = null, token = Any())
                 return false
             }
-            if (uiSent) clusterContent = current.copy(displayed = if (sent) url else null,
-                shown = true, token = Any())
+            if (uiSent) {
+                clusterUiActivated = true
+                clusterContent = current.copy(displayed = if (sent) url else null,
+                    shown = true, token = Any(), activationPending = !sent)
+            }
             sent
         }
     }
 
     private fun beginClusterContent() = synchronized(clusterContentLock) {
+        clusterSetupResponded = 0
         val stream = ++clusterStreamSetups
-        val initial = config.cluster?.initialUrl
+        val initial = config.cluster?.takeUnless { it.deferInitialUi }?.initialUrl
         clusterContent = ClusterContent(stream, requestedClusterUrl, initial)
         clusterStream = stream
     }
 
     private fun clearClusterContent() = synchronized(clusterContentLock) {
+        clusterSetupResponded = 0
         clusterStream = 0
         clusterContent = null
+    }
+
+    /** Retain an offered scene until both screen SETUP replies and the event channel are ready. */
+    internal fun activateSuggestedClusterUrl(url: String): Boolean = synchronized(clusterCommandLock) {
+        val pending = synchronized(clusterContentLock) {
+            val current = clusterContent ?: return false
+            if (closed.get() || !current.shown || current.stream != clusterStream) return false
+            requestedClusterUrl = url
+            current.copy(requested = url, activationPending = true).also { clusterContent = it }
+        }
+        if (!clusterUiActivated || !clusterActivationReady(pending)) false else showClusterUrl(pending, url)
+    }
+
+    private fun clusterActivationReady(content: ClusterContent): Boolean {
+        val main = mainScreenToken ?: return false
+        return mainSetupResponded === main && clusterSetupResponded == content.stream &&
+            eventSocket != null && eventCipher != null
     }
 
     // Re-SETUP starts at initialURL. Reapply the saved live selection only after SETUP was answered,
@@ -277,7 +383,13 @@ class AirPlaySession(
         synchronized(clusterCommandLock) {
             val content = clusterContent ?: return
             val requested = content.requested ?: return
-            if (content.shown && requested != content.displayed) showClusterUrl(content, requested)
+            // initialURL is an offer, not an explicit activation. Wait for both SETUP replies
+            // and the encrypted event channel, then activate the first stream as well as re-SETUP.
+            if (!clusterUiActivated || !clusterActivationReady(content)) return
+            if (content.shown && (content.activationPending || requested != content.displayed)) {
+                val sent = showClusterUrl(content, requested)
+                debugLog("airplay cluster activation stream=${content.stream} initial=${content.activationPending} sent=$sent")
+            }
         }
     }
 
@@ -308,6 +420,26 @@ class AirPlaySession(
     fun takeAudioForRadio(timeoutMillis: Long = 1_500): Boolean = radioAudioResource.takeForRadio(timeoutMillis)
 
     fun releaseRadioAudio() = radioAudioResource.releaseRadio()
+
+    @Volatile internal var nativeRadioSelected = false
+        private set
+    fun nativeRadioSelected(selected: Boolean) {
+        if (closed.get()) return
+        nativeRadioSelected = selected
+        media.onNativeRadioSelected(this, selected)
+    }
+    fun iphoneMediaPlayback(playing: Boolean, initial: Boolean) {
+        if (!closed.get()) protocolExtension?.onIphoneMediaPlayback(this, playing, initial)
+    }
+    private fun receiveModesChanged(params: Map<String, Any?>) {
+        radioAudioResource.modesChanged(params)
+        notifyModesChanged(params)
+    }
+    private fun notifyModesChanged(params: Map<String, Any?>) {
+        if (closed.get()) return
+        media.onModesChanged(this, params)
+        protocolExtension?.onModesChanged(this, params)
+    }
 
     /**
      * A message on a video in car remote control session, framed like the iPhone's own: POST /command
@@ -387,6 +519,13 @@ class AirPlaySession(
     fun sendTelephony(index: Int) {
         sendHidReport(AirPlayHid.TELEPHONY_HID_UID, AirPlayHid.telephonyReport(index))
         sendHidReport(AirPlayHid.TELEPHONY_HID_UID, AirPlayHid.telephonyReport(0))
+    }
+
+    /** Experimental UI-only request; this URL still needs visual confirmation on the iPhone. */
+    fun requestPhoneRecents(): Boolean {
+        if (closed.get() || mainScreenSessionToken() == null) return false
+        // Main application UI uses RequestUI; ShowUI + UUID selects an alternate-display scene.
+        return sendCommand(mapOf("type" to "requestUI", "params" to mapOf("url" to "mobilephone-recents://")))
     }
 
     fun invokeSiri() {
@@ -670,6 +809,10 @@ class AirPlaySession(
     }
 
     private fun notifySetupResponseSent() {
+        // This runs only after the control batch has been flushed. Event-channel readiness
+        // can arrive concurrently, but must not activate an as-yet unanswered screen SETUP.
+        mainSetupResponded = mainScreenToken
+        clusterSetupResponded = clusterStream
         runCatching { protocolExtension?.onSetupResponseSent(this) }
             .onFailure { debugLog("Protocol extension SETUP failed: ${it.message}") }
         try {
@@ -761,7 +904,10 @@ class AirPlaySession(
                         }
                         activeStreams.add(type)
                         if (type == STREAM_TYPE_ALT_SCREEN) beginClusterContent()
-                        else mainScreenToken = Any()
+                        else {
+                            mainSetupResponded = null
+                            mainScreenToken = Any()
+                        }
                         result.add(linkedMapOf("type" to type, "dataPort" to port))
                     }
                 }
@@ -829,7 +975,7 @@ class AirPlaySession(
         val type = string(body["type"])
         val params = asMap(body["params"]) ?: emptyMap()
         debugLog("airplay command type=$type keys=${params.keys.sorted()}")
-        if (type == "modesChanged") radioAudioResource.modesChanged(params)
+        if (type == "modesChanged") receiveModesChanged(params)
         val streamId = request.headers["x-apple-streamid"]?.toLongOrNull()
         val data = params["data"] as? ByteArray
         if (streamId != null && data != null) {
@@ -1022,6 +1168,21 @@ class AirPlaySession(
                     synchronized(eventWriteLock) {
                         output.write(cipher.encrypt(response))
                         output.flush()
+                    }
+                    // Suggestions also arrive on the event connection. Acknowledge before
+                    // dispatching; the controller queues any showUI outside this reader/lock.
+                    if (message.method == "POST" && message.path == "/command") {
+                        val body = runCatching { asMap(BplistCodec.decode(message.body)) }.getOrNull()
+                        if (body?.get("type") == "modesChanged") {
+                            val params = asMap(body["params"]) ?: emptyMap()
+                            runCatching { notifyModesChanged(params) }
+                                .onFailure { debugLog("AirPlay modes callback failed: ${it.javaClass.simpleName}") }
+                        }
+                        if (body?.get("type") == "suggestUI") {
+                            val params = asMap(body["params"]) ?: emptyMap()
+                            runCatching { listener.onCommand(this, "suggestUI", params) }
+                                .onFailure { debugLog("airplay cluster suggestion callback failed: ${it.javaClass.simpleName}") }
+                        }
                     }
                 }
             }

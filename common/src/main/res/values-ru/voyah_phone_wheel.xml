@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_voyah_phone_wheel">Кнопка трубки в CarPlay (экспериментально)</string>
+    <string name="settings_voyah_phone_wheel_description">Короткое нажатие открывает «Недавние» CarPlay при подключённом iPhone. Во время звонка и без подключения CarPlay кнопка работает штатно.</string>
+    <string name="settings_voyah_phone_wheel_permission">Разрешить</string>
+    <string name="settings_voyah_phone_wheel_permission_description">Для возврата из меню автомобиля разрешите VoyahPlay появляться поверх других приложений. До этого кнопка трубки в фоне работает штатно.</string>
+</resources>

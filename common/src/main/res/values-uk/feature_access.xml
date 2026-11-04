@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_helper_required">Установіть root-помічник VoyahPlay з інсталяційного комплекту, потім знову відкрийте налаштування.</string>
+    <string name="settings_fullscreen_required">Повний екран недоступний. Установіть сумісний root-помічник і міст Tweaks, перезавантажте мультимедіа та знову відкрийте налаштування.</string>
+    <string name="settings_map_required">Карта на панелі приладів недоступна. Установіть сумісний root-помічник і міст Tweaks, перезавантажте мультимедіа та відкрийте її медіакартку.</string>
+    <string name="settings_features_subtitle">Можливості CarPlay для вашого автомобіля</string>
+    <string name="settings_ultra_features_hint">Клімат і керування автомобілем. Застосовується після перепідключення CarPlay.</string>
+    <string name="settings_radio_feature_hint">Штатне радіо в CarPlay. Застосовується після перепідключення.</string>
+    <string name="settings_radio_labels_feature_hint">Назви станцій у штатному радіо. Застосовується одразу.</string>
+    <string name="settings_map_feature_hint">Карта під час навігації. Застосовується після перепідключення CarPlay.</string>
+    <string name="settings_split_feature_hint">Пристосовувати CarPlay до розділеного вікна. Застосовується після перепідключення.</string>
+</resources>

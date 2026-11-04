@@ -25,12 +25,17 @@ class VoyahUltraRadioAudioTest {
     private val rx = ByteArray(32) { it.toByte() }
     private val tx = ByteArray(32) { (it + 35).toByte() }
 
-    private class Source : UltraClimateSource {
+    private class Source(override val preferredMediaSource: UltraMediaSource = UltraMediaSource.RADIO) : UltraClimateSource {
+        val writes = java.util.concurrent.LinkedBlockingQueue<VoyahRadioOem.Command>()
+        val remembered = java.util.concurrent.CopyOnWriteArrayList<UltraMediaSource>()
+        override fun rememberMediaSource(value: UltraMediaSource) { remembered += value }
         @Volatile var calls = 0
         var confirm = true
         var echoPlayback = false
         private var listener: ((UltraClimateSample?) -> Unit)? = null
         private var radio = radio(false)
+        private var door: Boolean? = null
+        private var doorAt = 0L
         override val supportsRadio = true
         override fun start(onSample: (UltraClimateSample?) -> Unit) {
             listener = onSample
@@ -38,10 +43,13 @@ class VoyahUltraRadioAudioTest {
         }
         fun emit(value: UltraRadioSnapshot) {
             radio = value
-            listener?.invoke(UltraClimateSample(23.0, 1000, radio = value, radioSampledAtMillis = 1000))
+            listener?.invoke(UltraClimateSample(23.0, 1000, radio = value, radioSampledAtMillis = 1000,
+                driverDoorOpen = door, driverDoorSampledAtMillis = doorAt))
         }
+        fun driverDoor(open: Boolean, at: Long) { door = open; doorAt = at; emit(radio) }
         override fun writeRadio(request: UltraRadioRequest): UltraClimateWriteResult {
             calls++
+            writes.offer(request.command)
             if (echoPlayback && confirm) emit(radio.copy(state = radio.state?.copy(
                 playing = request.command != VoyahRadioOem.Command.PAUSE)))
             return UltraClimateWriteResult(confirm, "OEM readback")
@@ -56,7 +64,7 @@ class VoyahUltraRadioAudioTest {
         }
     }
 
-    private inner class Peer : Closeable {
+    private inner class Peer(private val mediaHandler: AirPlayMediaHandler = object : AirPlayMediaHandler {}) : Closeable {
         val phone: Socket
         private val event: Socket
         private val cipher = ControlCipher(tx, rx)
@@ -64,7 +72,7 @@ class VoyahUltraRadioAudioTest {
         private var plain = ByteArray(0)
         val session = AirPlaySession(Socket(),
             AirPlayConfig("test", "02:00:00:00:00:01", "02:00:00:00:00:02", "950.7.1", AirPlayDisplayConfig(1920,720)),
-            AirPlayIdentity.generate(), PairingStore(), null, object : AirPlaySessionListener {}, object : AirPlayMediaHandler {})
+            AirPlayIdentity.generate(), PairingStore(), null, object : AirPlaySessionListener {}, mediaHandler)
         private val reader: Thread
         init {
             event = ServerSocket(0, 1, address).use { server ->
@@ -110,6 +118,33 @@ class VoyahUltraRadioAudioTest {
     }
     private fun receive(phone: RcsChannel) = CarAccessoryMessages.reader(phone.receiveNext(3000)!!.body)
     private fun play(phone: RcsChannel) = phone.send(CarAccessoryMessages.controlRequest(0, 1, mapOf(4360L to emptyMap<String,Any?>())).asRcsMessage())
+
+    @Test fun driverDoorPausesNativeRadioAndPublishesPausedStatusWithoutSelectingIphone() {
+        val source = Source().apply { echoPlayback = true }
+        val now = java.util.concurrent.atomic.AtomicLong(1000)
+        val p = VoyahUltraProtocol({ source }, now::get, {})
+        try { Peer().use { peer ->
+            p.onFeaturesNegotiated(listOf("vehicleStateProtocol")); p.onSetupResponseSent(peer.session)
+            source.driverDoor(false, now.get())
+            connect(p).use { phone ->
+                play(phone); peer.answer(peer.receive(), true)
+                assertTrue(receive(phone).errors().isEmpty())
+                assertEquals(VoyahRadioOem.Command.PLAY, source.writes.poll(2, TimeUnit.SECONDS))
+                phone.send(CarAccessoryMessages.registerRequest(0, 2, CafRegistration.Identifiers(listOf(4359L))).asRcsMessage())
+                assertEquals(1L, receive(phone).valuesMap()[4359L])
+                source.driverDoor(true, now.incrementAndGet())
+                assertEquals(VoyahRadioOem.Command.PAUSE, source.writes.poll(2, TimeUnit.SECONDS))
+                assertEquals(0L, receive(phone).valuesMap()[4359L])
+                source.driverDoor(false, now.incrementAndGet())
+                assertNull(source.writes.poll(150, TimeUnit.MILLISECONDS))
+                phone.send(CarAccessoryMessages.readRequest(0, 3, listOf(4354L)).asRcsMessage())
+                assertEquals(VoyahRadioDescription.SOURCE, receive(phone).valuesMap()[4354L])
+                assertTrue(source.remembered.isEmpty())
+                peer.phone.soTimeout = 150
+                assertThrows(java.net.SocketTimeoutException::class.java) { peer.receive() }
+            }
+        } } finally { p.close() }
+    }
 
     @Test fun cafPlayWaitsForAnEncryptedOwnershipGrantBeforeCallingOemRadio() {
         val source = Source()
@@ -167,6 +202,47 @@ class VoyahUltraRadioAudioTest {
         } } finally { p.close() }
     }
 
+    @Test fun rememberedIphonePlaybackStopsABootRadioWithoutTakingMainAudioOrAnnouncingItAsNowPlaying() {
+        val source = Source(UltraMediaSource.CARPLAY).apply { echoPlayback = true; emit(Source.radio(true)) }
+        val p = VoyahUltraProtocol({ source }, { 1000L }, {})
+        try { Peer().use { peer ->
+            p.onFeaturesNegotiated(listOf("vehicleStateProtocol")); p.onSetupResponseSent(peer.session)
+            assertEquals(VoyahRadioOem.Command.PAUSE, source.writes.poll(2, TimeUnit.SECONDS))
+            connect(p).use { phone ->
+                phone.send(CarAccessoryMessages.readRequest(0, 1, listOf(4098L, 4103L, 4354L)).asRcsMessage())
+                val values = receive(phone).valuesMap()
+                assertEquals(VoyahRadioDescription.SOURCE, values[4098L])
+                assertEquals("", values[4354L]); assertFalse((values[4103L] as List<*>).isEmpty())
+                assertTrue(source.remembered.isEmpty())
+                peer.phone.soTimeout = 100
+                assertThrows(java.net.SocketTimeoutException::class.java) { peer.receive() }
+            }
+        } } finally { p.close() }
+    }
+
+    @Test fun changingFromRadioToIphoneUpdatesCafAndRemembersOnlyGenuineMediaPlayback() {
+        val source = Source().apply { echoPlayback = true; emit(Source.radio(true)) }
+        val p = VoyahUltraProtocol({ source }, { 1000L }, {})
+        try { Peer().use { peer ->
+            p.onFeaturesNegotiated(listOf("vehicleStateProtocol")); p.onSetupResponseSent(peer.session)
+            peer.answer(peer.receive(), true)
+            connect(p).use { phone ->
+                phone.send(CarAccessoryMessages.registerRequest(0, 1, CafRegistration.Identifiers(listOf(4354L))).asRcsMessage())
+                assertEquals(VoyahRadioDescription.SOURCE, receive(phone).valuesMap()[4354L])
+                p.onIphoneMediaPlayback(peer.session, true, initial = true)
+                p.onModesChanged(peer.session, mapOf("appStates" to listOf(
+                    mapOf("appStateID" to 1, "entity" to 1, "speechMode" to 2))))
+                p.onModesChanged(peer.session, mapOf("appStates" to listOf(
+                    mapOf("appStateID" to 2, "entity" to 1))))
+                assertTrue(source.remembered.isEmpty()); assertNull(source.writes.poll(100, TimeUnit.MILLISECONDS))
+                p.onIphoneMediaPlayback(peer.session, true, initial = false)
+                assertEquals(VoyahRadioOem.Command.PAUSE, source.writes.poll(2, TimeUnit.SECONDS))
+                assertEquals("", receive(phone).valuesMap()[4354L])
+                assertEquals(listOf(UltraMediaSource.CARPLAY), source.remembered)
+            }
+        } } finally { p.close() }
+    }
+
     @Test fun modesChangedOnTheEventChannelCompletesARequestAndIsAcknowledged() {
         Peer().use { peer ->
             val task = FutureTask { peer.session.takeAudioForRadio() }
@@ -178,6 +254,20 @@ class VoyahUltraRadioAudioTest {
             peer.send(header.toByteArray() + body)
             assertTrue(task.get(2, TimeUnit.SECONDS))
             val ack = peer.receive(); assertEquals("RTSP/1.0", ack.method); assertEquals("71", ack.headers["cseq"])
+        }
+    }
+
+    @Test fun speechModesOnTheEncryptedEventChannelAreAcknowledgedAndForwardedToTheMediaSink() {
+        val delivered = java.util.concurrent.LinkedBlockingQueue<Map<String, Any?>>()
+        Peer(object : AirPlayMediaHandler {
+            override fun onModesChanged(session: AirPlaySession, params: Map<String, Any?>) { delivered.offer(params) }
+        }).use { peer ->
+            val body = BplistCodec.encode(mapOf("type" to "modesChanged", "params" to mapOf("appStates" to
+                listOf(mapOf("appStateID" to 1, "entity" to 1, "speechMode" to 2)))))
+            peer.send("POST /command RTSP/1.0\r\nCSeq: 81\r\nContent-Length: ${body.size}\r\n\r\n".toByteArray() + body)
+            val ack = peer.receive(); assertEquals("81", ack.headers["cseq"])
+            val modes = delivered.poll(1, TimeUnit.SECONDS) ?: throw AssertionError("No speech modes")
+            assertEquals(2L, ((modes["appStates"] as List<*>).single() as Map<*, *>)["speechMode"])
         }
     }
 

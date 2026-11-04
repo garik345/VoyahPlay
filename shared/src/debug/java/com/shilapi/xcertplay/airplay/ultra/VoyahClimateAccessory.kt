@@ -10,7 +10,7 @@ data class UltraClimateSample(
     val comfortSampledAtMillis: Long = sampledAtMillis,
     val hvacValues: Map<UltraHvacControl, Any?> = emptyMap(),
     val hvacSampledAtMillis: Long = sampledAtMillis,
-    /** Read-only cache fields (cabin sensor, SYNC, MAX states); never written by this pilot. */
+    /** Read-only cache fields (cabin sensor, MAX states); never written by this pilot. */
     val readings: Map<UltraClimateReading, Any?> = emptyMap(),
     /** Tires, fuel, odometer, range and volume; null until the car and Android reported them. */
     val vehicle: UltraVehicleReadings? = null,
@@ -26,13 +26,15 @@ data class UltraClimateSample(
     val volumeSampledAtMillis: Long = vehicleSampledAtMillis,
     val audioChannels: Map<UltraAudioChannel, Int> = emptyMap(),
     val audioChannelsSampledAtMillis: Long = volumeSampledAtMillis,
+    /** Front-left door from the verified CAN cache; independent of audio/RDS callbacks. */
+    val driverDoorOpen: Boolean? = null,
+    val driverDoorSampledAtMillis: Long = 0,
 )
-/** Real TX30 cache readings the phone needs to draw the Climate app; there is no command path for them. */
+/** Real TX30 cache readings with no vehicle command path. */
 enum class UltraClimateReading(val iid: Long, val type: Long, val format: CafCharacteristicFormat) {
     CABIN_TEMPERATURE(16, 0x31000019, CafCharacteristicFormat.FLOAT),
     MAX_AC(43, 0x31000022, CafCharacteristicFormat.BOOL),
     MAX_DEFROST(44, 0x31000029, CafCharacteristicFormat.BOOL),
-    ZONES_SYNCED(96, 0x30000002, CafCharacteristicFormat.BOOL),
     RECIRCULATION_AUTO(72, 0x3000005F, CafCharacteristicFormat.BOOL);
     fun normalize(value: Any?): Any? = when (format) {
         CafCharacteristicFormat.BOOL -> when ((value as? Number)?.toDouble() ?: (value as? Boolean)?.let { if (it) 1.0 else 0.0 }) {
@@ -61,7 +63,8 @@ enum class UltraHvacControl(val iid: Long, val format: CafCharacteristicFormat) 
     DRIVER_TARGET(11, CafCharacteristicFormat.FLOAT), PASSENGER_TARGET(21, CafCharacteristicFormat.FLOAT),
     POWER(41, CafCharacteristicFormat.BOOL), AC(42, CafCharacteristicFormat.BOOL),
     FAN(51, CafCharacteristicFormat.UINT8), AUTO(61, CafCharacteristicFormat.BOOL), RECIRCULATION(71, CafCharacteristicFormat.BOOL),
-    FRONT_DEFROST(81, CafCharacteristicFormat.UINT8), REAR_DEFROST(91, CafCharacteristicFormat.UINT8);
+    FRONT_DEFROST(81, CafCharacteristicFormat.UINT8), REAR_DEFROST(91, CafCharacteristicFormat.UINT8),
+    ZONES_SYNCED(96, CafCharacteristicFormat.BOOL);
     fun normalize(value: Any?): Any? = when (format) {
         CafCharacteristicFormat.BOOL -> value as? Boolean
         CafCharacteristicFormat.FLOAT -> (value as? Number)?.toDouble()?.takeIf {
@@ -109,6 +112,8 @@ internal class VoyahClimateAccessory(
     private val audioRanges: Map<UltraAudioChannel, IntRange> = emptyMap(),
     private val audioWriter: ((UltraAudioChannel, Int) -> UltraClimateWriteResult)? = null,
     private val ringtoneLabel: String = "Ringtone",
+    private val radioSelected: () -> Boolean = { true },
+    private val audioChannelSample: () -> UltraAudioChannelSample? = { null },
 ) {
     init { require(volumeRange.first in 0..255 && volumeRange.last in volumeRange.first..255) }
     /** Values the phone wrote successfully on this stream: confirmed by one update even if unchanged. */
@@ -145,7 +150,7 @@ internal class VoyahClimateAccessory(
             // the manual request only: automatic policy does not prove the flap is closed.
             service(70, 0x11000011, listOf(hvac(UltraHvacControl.RECIRCULATION, 0x30000002))),
             service(60, 0x11000008, listOf(hvac(UltraHvacControl.AUTO, 0x30000002))),
-            service(95, 0x11000012, listOf(reading(UltraClimateReading.ZONES_SYNCED, sharedWritable), layout(97, "seat_front"))),
+            service(95, 0x11000012, listOf(hvac(UltraHvacControl.ZONES_SYNCED, 0x30000002), layout(97, "seat_front"))),
             defrost(80, UltraHvacControl.FRONT_DEFROST, "windshield_front", 1),
             defrost(90, UltraHvacControl.REAR_DEFROST, "windshield_rear", 2))
         supportedControls.filter { it.isWheel }.forEach { climate.add(comfort(it)) }
@@ -234,8 +239,6 @@ internal class VoyahClimateAccessory(
      */
     private fun cabinTemperature(zone: UltraHvacControl): Any? =
         reading(UltraClimateReading.CABIN_TEMPERATURE) ?: current(zone)
-    private fun reading(reading: UltraClimateReading, writable: Boolean) =
-        characteristic(reading.iid, reading.type, reading.format, reading(reading), writable)
     private fun reading(reading: UltraClimateReading): Any? {
         val s = sample() ?: return null
         return if (fresh(s.hvacSampledAtMillis)) reading.normalize(s.readings[reading]) else null
@@ -372,6 +375,13 @@ internal class VoyahClimateAccessory(
     }
     private fun integerLevel(value: Any?, max: Int) = (value as? Number)?.toDouble()?.takeIf {
         it.isFinite() && it in 0.0..max.toDouble() && it == kotlin.math.floor(it) }?.toInt()
+    /** Refresh actual state after a busy reply, even if unchanged; never echo an unconfirmed wish. */
+    fun refresh(ids: Collection<Long>): CafRcsFrame? {
+        val current = values(ids.filter { it in knownIds && it in subscriptions }).filterValues { it != null }
+        if (current.isEmpty()) return null
+        lastSent = lastSent + current
+        return CarAccessoryMessages.updateNotify(PLUGIN_ID, current)
+    }
     fun changed(): CafRcsFrame? {
         // The phone waits 0.5 s for an update confirming each value it wrote and otherwise reverts
         // the write ("echo timeout", iPhone log 22.10.2026). Every write of a followed route value
@@ -408,9 +418,14 @@ internal class VoyahClimateAccessory(
             if (c == UltraVehicleControl.LIGHT_MODE) s.lightingSampledAtMillis else s.vehicleControlsSampledAtMillis) }.orEmpty()
         return current + UltraVehicleControl.entries.filter { it.isButton }.associateWith { appActions[it] ?: 0 }
     }
-    private fun audioChannels(): Map<UltraAudioChannel, Int> =
-        sample()?.takeIf { fresh(it.audioChannelsSampledAtMillis) }?.audioChannels.orEmpty()
+    private fun audioChannels(): Map<UltraAudioChannel, Int> {
+        // A write must echo the confirmed readback even if the main-thread sample has not arrived.
+        val current = audioChannelSample()
+        if (current != null) return current.values.takeIf { fresh(current.sampledAtMillis) }.orEmpty()
+        return sample()?.takeIf { fresh(it.audioChannelsSampledAtMillis) }?.audioChannels.orEmpty()
+    }
     private fun radio(): UltraRadioSnapshot? = sample()?.takeIf { fresh(it.radioSampledAtMillis) }?.radio
+        ?.let { it.copy(selected = radioSelected()) }
     private fun current(control: UltraHvacControl): Any? {
         val s = sample() ?: return null
         if (control == UltraHvacControl.DRIVER_TARGET && control !in s.hvacValues)
@@ -489,6 +504,6 @@ internal class VoyahClimateAccessory(
             1282L to "VoyahPlayVersion", 1283L to "VoyahPlay", 1284L to VoyahUltraProtocol.WIRE_REV, 1285L to 0L,
             1286L to "info.circle", 1287L to 0L, 1288L to "VoyahVersion", 1298L to "VoyahVersion", 1299L to 2L, 1300L to "VoyahPlay")
         private val FIXED_IDS = setOf(14L, 15L, 24L, 25L, UltraClimateReading.PASSENGER_CABIN_IID, 52L, 53L, 54L, 82L, 83L, 92L, 93L, 97L, 102L)
-        private val PUBLISHED_READINGS = setOf(UltraClimateReading.CABIN_TEMPERATURE, UltraClimateReading.ZONES_SYNCED)
+        private val PUBLISHED_READINGS = setOf(UltraClimateReading.CABIN_TEMPERATURE)
     }
 }

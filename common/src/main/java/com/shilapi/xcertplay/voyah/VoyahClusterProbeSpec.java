@@ -6,16 +6,25 @@ import java.util.regex.*;
 /** Measured OEM media card from the local VoyahTune source and this car's display report. */
 public final class VoyahClusterProbeSpec {
     public static final String DISPLAY = "Cluster-Media-Display";
+    public static final String NAVI_DISPLAY = "Cluster-Navi-Display";
     public static final String ACTIVITY = "com.shilapi.xcertplay.VoyahClusterProbeActivity";
     public static final String TOKEN = "voyah_probe_token", MODE = "voyah_probe_mode", DEADLINE = "voyah_probe_deadline";
     public static final int LEFT = 66, TOP = 200, WIDTH = 574, HEIGHT = 464;
     public static final long DURATION_MS = 60000;
     public static final long AUTO_LEASE_MS = 45000;
     private VoyahClusterProbeSpec() {}
+    public static boolean ar(String mode) { return "ar-grid".equals(mode) || "ar-map".equals(mode); }
+    public static boolean navi(String mode) { return "navi-grid".equals(mode) || "navi-map".equals(mode) || ar(mode); }
+    public static boolean grid(String mode) { return "grid".equals(mode) || "navi-grid".equals(mode) || "ar-grid".equals(mode); }
+    public static int nativeMode(String mode) { return ar(mode) ? 3 : 2; }
+    public static String displayName(String mode) { return navi(mode) ? NAVI_DISPLAY : DISPLAY; }
 
     public static Integer targetDisplay(String dump) {
+        return targetDisplay(dump, "grid");
+    }
+    public static Integer targetDisplay(String dump, String mode) {
         Set<Integer> matches = new HashSet<>();
-        Pattern record = Pattern.compile("^\\s*m(?:Base)?DisplayInfo=DisplayInfo\\{\"Cluster-Media-Display\", displayId (\\d+),.*");
+        Pattern record = Pattern.compile("^\\s*m(?:Base)?DisplayInfo=DisplayInfo\\{\"" + Pattern.quote(displayName(mode)) + "\", displayId (\\d+),.*");
         for (String line : dump.split("\\r?\\n")) {
             Matcher m = record.matcher(line);
             if (!m.matches() || !line.contains("FLAG_PRIVATE,") || !line.contains("real 1920 x 720,")
@@ -30,7 +39,7 @@ public final class VoyahClusterProbeSpec {
 
     public static boolean validLease(String token, String mode, int display, long deadline, long now) {
         return token != null && token.matches("[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}")
-                && ("grid".equals(mode) || "map".equals(mode) || "auto".equals(mode)) && display > 0
+                && ("grid".equals(mode) || "map".equals(mode) || "auto".equals(mode) || navi(mode)) && display > 0
                 && deadline > now && deadline - now <= ("auto".equals(mode) ? AUTO_LEASE_MS : DURATION_MS);
     }
 

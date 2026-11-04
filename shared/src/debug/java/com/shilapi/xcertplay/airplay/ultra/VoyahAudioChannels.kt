@@ -8,6 +8,8 @@ enum class UltraAudioChannel(val serviceIid: Long, val cafType: Long, val oemStr
     val valueIid get() = serviceIid + 1
 }
 
+data class UltraAudioChannelSample(val values: Map<UltraAudioChannel, Int>, val sampledAtMillis: Long)
+
 internal object VoyahAudioChannels {
     fun ids(ranges: Map<UltraAudioChannel, IntRange>) = ranges.keys.flatMap { c ->
         (1L..if (c == UltraAudioChannel.RINGTONE) 3L else 2L).map { c.serviceIid + it }

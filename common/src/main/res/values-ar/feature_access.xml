@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_helper_required">ثبّت مساعد الروت لـ VoyahPlay من حزمة التثبيت، ثم أعد فتح الإعدادات.</string>
+    <string name="settings_fullscreen_required">ملء الشاشة غير متاح. ثبّت مساعد الروت وجسر Tweaks المتوافقين، ثم أعد تشغيل وحدة الوسائط وافتح الإعدادات مجددًا.</string>
+    <string name="settings_map_required">خريطة لوحة العدادات غير متاحة. ثبّت مساعد الروت وجسر Tweaks المتوافقين، ثم أعد تشغيل وحدة الوسائط وافتح بطاقة الوسائط.</string>
+    <string name="settings_features_subtitle">ميزات CarPlay لسيارتك</string>
+    <string name="settings_ultra_features_hint">المناخ والتحكم بالسيارة. يسري بعد إعادة توصيل CarPlay.</string>
+    <string name="settings_radio_feature_hint">راديو السيارة في CarPlay. يسري بعد إعادة الاتصال.</string>
+    <string name="settings_radio_labels_feature_hint">أسماء المحطات في راديو السيارة. يسري فورًا.</string>
+    <string name="settings_map_feature_hint">الخريطة أثناء الملاحة. يسري بعد إعادة توصيل CarPlay.</string>
+    <string name="settings_split_feature_hint">ملاءمة CarPlay مع النافذة المقسومة. يسري بعد إعادة الاتصال.</string>
+</resources>

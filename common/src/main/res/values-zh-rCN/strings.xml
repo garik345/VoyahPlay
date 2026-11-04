@@ -923,4 +923,9 @@
     <string name="carplay_voyahplay_settings">VoyahPlay设置</string>
     <string name="voyah_waiting_for_car_hotspot">正在等待车载热点。连接将自动恢复。</string>
     <string name="voyah_wireless_retry_later">VoyahPlay将在等待片刻后自动重试。</string>
+    <string name="settings_cluster_probe_navi_grid">NAVI：显示测试网格60秒</string>
+    <string name="settings_cluster_probe_navi_map">NAVI：显示CarPlay地图60秒</string>
+    <string name="settings_cluster_probe_navi_description">使用独立按钮测试NAVI_FULL（模式2）和AR（模式3）。需要root助手1.2.15。按下后立即开始，1分钟后或停止时恢复仪表盘原来的模式。显示地图前，请启用CarPlay地图流并重新连接iPhone。</string>
+    <string name="settings_cluster_probe_ar_grid">AR：显示测试网格60秒</string>
+    <string name="settings_cluster_probe_ar_map">AR：显示CarPlay地图60秒</string>
 </resources>

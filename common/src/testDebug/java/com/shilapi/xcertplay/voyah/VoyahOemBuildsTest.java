@@ -4,6 +4,12 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class VoyahOemBuildsTest {
+    @Test public void reviewedPiBuildsHaveNoRadioEvenWhenAnOemAppStubIsInstalled() {
+        assertFalse(VoyahOemBuilds.hasRadio("74d7de6e3d23a05e6519bce57a693dc3517177b885ad56c9be85a73ac54ea952"));
+        assertFalse(VoyahOemBuilds.hasRadio("6fb0829a3f6479974256d2f55fcf26277ba0801cf662f6e1bb0539d078281267"));
+        assertTrue(VoyahOemBuilds.hasRadio("96ac5182e795ad70c43c78f26b9cf29e76b59db67c2d5c09216ba1d8425c427c"));
+        assertFalse(VoyahOemBuilds.hasRadio("unknown"));
+    }
     private static final String CAN = "com.qinggan.canbus.service";
     private static final String SIGNAL = "com.qinggan.carsignal.service";
     private static final String PI_CAN = "74d7de6e3d23a05e6519bce57a693dc3517177b885ad56c9be85a73ac54ea952";

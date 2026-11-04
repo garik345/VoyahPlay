@@ -14,7 +14,7 @@ for(const name of ['AdbWinApi.dll','AdbWinUsbApi.dll']) fs.writeFileSync(path.jo
 const data=Buffer.from([0,255,254,13,10,0,65,128,1,2,13,10,0,90]);
 const remoteFiles=new Map();
 for(const name of ['QGAPI.jar','QGVehicle.jar','services.jar','framework.jar','QGMOD.jar','ActivityExt.jar','car-frameworks-service.jar']) remoteFiles.set('/system/framework/'+name,data);
-for(const name of ['ss11.bin','ss9.bin','load.bin','frida-inject']) remoteFiles.set('/data/local/tmp/'+name,data);
+for(const name of ['ss11.bin','ss9.bin','load.bin','keymanager.bin','frida-inject']) remoteFiles.set('/data/local/tmp/'+name,data);
 remoteFiles.set('/system/etc/init.logcat.sh',Buffer.from('#!/system/bin/sh\nlogcat\n'));
 const packages={
  'com.qinggan.canbus.service':['/system/priv-app/CanBus/base.apk','/system/priv-app/CanBus/split_config.apk'],
@@ -24,7 +24,9 @@ const packages={
  'com.qinggan.QGBus':['/system/app/QGBus/base.apk'],
  'com.qinggan.cluster':['/system/app/Cluster/base.apk'],
  'com.qinggan.app.vehicle':['/system/priv-app/Vehicle/base.apk'],
- 'com.pateo.rdsapp':['/vendor/app/rdsapp/base.apk']
+ 'com.pateo.rdsapp':['/vendor/app/rdsapp/base.apk'],
+ 'com.qinggan.keymanager.service':['/system/app/KeyManager/base.apk'],
+ 'com.qinggan.bluetoothphone':['/system/app/BluetoothPhone/base.apk']
 };
 for(const paths of Object.values(packages)) for(const p of paths) remoteFiles.set(p,data);
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -82,17 +84,33 @@ class FakeAdb {
   }
   if(command.StartsWith("pm path ")) {
    string name=args[at+2]; if(!packages.ContainsKey(name)) return 1;
+   if(scenario=="NoKeyManager" && name=="com.qinggan.keymanager.service") return 1;
    if(scenario=="UnsafePath" && name=="com.qinggan.app.launcher") {Console.WriteLine("package:/system/app/../../data/private.apk");Console.WriteLine("package:/data/app/evil;id.apk");return 0;}
    string[] row=packages[name];for(int i=1;i<row.Length;i++) Console.WriteLine("package:"+row[i]);return 0;
   }
   if(command.StartsWith("dumpsys package ")) {Console.WriteLine(" versionCode=1208 minSdk=28\n versionName=fixture\n android.permission.WRITE_CANBUS: granted=true\n imei=123456");return 0;}
   if(command=="dumpsys window windows") {Console.WriteLine(" mCurrentFocus=Window{abc u0 com.qinggan.app.vehicle/Climate}\n mFrame=[0,0][1920,720]\n ssid=PRIVATE_NETWORK");return 0;}
-  if(args[at]=="logcat") {Console.WriteLine("VoyahDockVisibility: visible=false 192.168.1.11 11:22:33:44:55:66\nssid=PRIVATE_NETWORK");return 0;}
+  if(args[at]=="logcat") {
+   if(command.Contains("KeyManager:V")) {
+    if(scenario=="NoKeyManager") return 0;
+    int polls=0; foreach(string line in File.ReadAllLines(Environment.GetEnvironmentVariable("VOYAH_TEST_LOG"))) if(line.Contains("\tKeyManager:V")) polls++;
+    Console.WriteLine("11-02 10:00:00.000 123 456 D KeyManager: Key KEYCODE_PHONE, Action ACTION_UP");
+    if(polls>1) {
+     Console.WriteLine("11-02 10:00:01.000 123 456 D KeyManager: onKeyManagerEvent() : Key KEYCODE_PHONE, Action ACTION_DOWN contact=PRIVATE_CONTACT number=+79995550123");
+     Console.WriteLine("11-02 10:00:01.050 123 456 D KeyManager: event=Code:KEYCODE_PHONE-Action:ACTION_SHORT-Data:PRIVATE_CONTACT");
+     Console.WriteLine("11-02 10:00:01.100 123 456 D KeyManagerReader: keyCode=128, action=65536 caller=PRIVATE_CONTACT");
+     Console.WriteLine("11-02 10:00:02.000 123 456 D KeyManagerService: caller=PRIVATE_CONTACT number=+79995550123");
+    }
+    return 0;
+   }
+   Console.WriteLine("VoyahDockVisibility: visible=false 192.168.1.11 11:22:33:44:55:66\nssid=PRIVATE_NETWORK");return 0;
+  }
   if(args[at]=="settings") {Console.WriteLine("null");return 0;}
   if(args[at]=="run-as" || args[at]=="tail") {Console.Error.WriteLine("not installed");return 1;}
   string remote=args[args.Length-1];
   if(!files.ContainsKey(remote)) return 1;
   if(args[at]=="sha256sum") {
+   if(scenario=="NoKeyManager" && remote.EndsWith("keymanager.bin")) return 1;
    if(scenario=="Missing" && remote.EndsWith("QGVehicle.jar")) return 1;
    string hash=files[remote][2];
    if(remote.EndsWith("frida-inject") && scenario!="NewInjector") hash="0d99be0e44d4ca3449056fa0a0b868fca1cf66c8ad704508949945afc07706aa";
@@ -115,6 +133,7 @@ function run(scenario, options={}) {
  const args=['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(fixture,options.launcher?'start-voyah-compatibility.ps1':'collect-voyah-compatibility.ps1'),'-OutputDirectory',out,'-TraceSeconds',String(options.trace||0)];
  if(!options.launcher) args.push('-Adb',path.join(fixture,'adb/adb.exe'));
  if(options.serial) args.push('-Serial',options.serial);
+ if(options.wheel) args.push('-WheelPhone');
  const r=spawnSync('powershell.exe',args,{encoding:'utf8',input:options.input||'',timeout:90000,env:{...process.env,VOYAH_TEST_LOG:log,VOYAH_TEST_SCENARIO:scenario,VOYAH_TEST_FILES:fixture}});
  assert(!r.error,r.error?.message);
  const dirs=fs.readdirSync(out).filter(n=>n.startsWith('Voyah-compatibility-') && !n.endsWith('.zip'));
@@ -184,4 +203,33 @@ test('no device, unauthorized and cancelled choice perform no vehicle reads',()=
   const r=run(scenario,{launcher:true,input});assert.notEqual(r.status,0);assert(!r.capture);
   assert(r.calls.every(a=>a[0]==='devices'));
  }
+});
+test('phone capture keeps new event fields only, collects the actual key service and does not change input routing',()=>{
+ const r=run('Ready',{wheel:true,launcher:true,trace:2});good(r);
+ assert.equal(r.summary.wheelPhone,true);assert.equal(r.summary.phoneEventCount,3);
+ assert.deepEqual(fs.readFileSync(path.join(r.capture,'apks/com.qinggan.keymanager.service-0.apk')),data);
+ assert.deepEqual(fs.readFileSync(path.join(r.capture,'apks/com.qinggan.bluetoothphone-0.apk')),data);
+ assert.deepEqual(fs.readFileSync(path.join(r.capture,'tweaks/keymanager.bin')),data);
+ const events=fs.readFileSync(path.join(r.capture,'wheel-events.txt'),'utf8');
+ assert(events.includes('key=KEYCODE_PHONE action=ACTION_DOWN'));
+ assert(events.includes('key=KEYCODE_PHONE action=ACTION_SHORT'));
+ assert(events.includes('key=128 action=65536'));
+ assert(!events.includes('10:00:00.000')); // the old ring-buffer event is not a new press
+ for(const name of fs.readdirSync(r.capture).filter(n=>/\.(txt|json)$/.test(n))) {
+  const text=fs.readFileSync(path.join(r.capture,name),'utf8');
+  assert(!text.includes('PRIVATE_CONTACT'),name);assert(!text.includes('+79995550123'),name);
+ }
+ assert(!fs.existsSync(path.join(r.capture,'windows-before.txt')));
+ assert(!fs.existsSync(path.join(r.capture,'apks/com.pateo.rdsapp-0.apk')));
+ assert(!r.calls.some(a=>a.includes('push') || a.includes('install') || a.includes('input') || a.includes('setprop') || a.includes('call')));
+ assert(!r.calls.some(a=>a.includes('logcat') && a.includes('-c')));
+ assert(!r.calls.some(a=>a.includes('content') || a.some(v=>/contacts|call_log|databases/.test(v))));
+});
+test('missing phone-key logs and optional key files are reported without pretending that the key was observed',()=>{
+ const r=run('NoKeyManager',{wheel:true,trace:1});good(r);
+ assert.equal(r.summary.phoneEventCount,0);
+ assert(r.summary.unavailable.some(s=>s.includes('com.qinggan.keymanager.service')));
+ assert(r.summary.unavailable.some(s=>s.includes('keymanager.bin')));
+ assert(fs.readFileSync(path.join(r.capture,'report.txt'),'utf8').includes('NO_OBSERVABLE_EVENTS'));
+ assert(fs.existsSync(path.join(r.capture,'framework/QGAPI.jar')));
 });

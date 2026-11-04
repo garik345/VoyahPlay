@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_voyah_phone_wheel">Phone button in CarPlay (experimental)</string>
+    <string name="settings_voyah_phone_wheel_description">A short press opens CarPlay Recents while connected. During a call or when CarPlay is disconnected, the button works as usual.</string>
+    <string name="settings_voyah_phone_wheel_permission">Allow</string>
+    <string name="settings_voyah_phone_wheel_permission_description">To return from the car menu, allow VoyahPlay to display over other apps. Until then, the phone button works as usual when VoyahPlay is in the background.</string>
+</resources>

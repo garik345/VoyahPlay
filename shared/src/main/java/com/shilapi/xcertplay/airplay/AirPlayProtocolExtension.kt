@@ -13,6 +13,8 @@ interface AirPlayProtocolExtension {
     fun onFeaturesNegotiated(features: List<String>) {}
     fun openDataStream(session: AirPlaySession, stream: Map<String, Any?>): Map<String, Any?>? = null
     fun onSetupResponseSent(session: AirPlaySession) {}
+    fun onModesChanged(session: AirPlaySession, params: Map<String, Any?>) {}
+    fun onIphoneMediaPlayback(session: AirPlaySession, playing: Boolean, initial: Boolean) {}
     fun mediaTeardownTypes(body: Map<String, Any?>?, original: List<Int>?): List<Int>? = original
     fun onTeardown(session: AirPlaySession, body: Map<String, Any?>?) {}
     fun onSessionClosed(session: AirPlaySession) {}

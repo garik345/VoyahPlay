@@ -14,7 +14,7 @@ data class UltraRadioStation(val id: String, val title: String, val shortName: S
 }
 
 data class UltraRadioSnapshot(val connected: Boolean = false, val state: VoyahRadioOem.State? = null,
-    val stations: List<UltraRadioStation> = emptyList()) {
+    val stations: List<UltraRadioStation> = emptyList(), val selected: Boolean = true) {
     val currentId: String? get() = state?.let { s ->
         if (s.band != null && s.frequencyHz != null) "${s.band.name}:${s.rawFrequency}" else null
     }
@@ -92,7 +92,8 @@ internal object VoyahRadioDescription {
     fun value(iid: Long, radio: UltraRadioSnapshot?): Any? {
         val live = radio?.takeIf { it.connected }
         return when (iid) {
-            4098L, NOW_SOURCE -> SOURCE
+            4098L -> SOURCE
+            NOW_SOURCE -> if (live?.selected == true) SOURCE else ""
             4101L -> "FM / AM"
             DISABLED -> live?.items().isNullOrEmpty()
             CURRENT -> live?.currentId ?: ""
@@ -103,10 +104,10 @@ internal object VoyahRadioDescription {
             // The phone already displays the current MediaItem's frequency + PS name as
             // its heading. Repeating them here produces three duplicate lines.
             TITLE -> if (live?.currentId == null) live?.state?.title ?: "" else ""
-            ARTIST -> live?.state?.radioText ?: ""
+            ARTIST -> live?.takeIf { it.selected }?.state?.radioText ?: ""
             ALBUM -> ""
             ARTWORK -> EMPTY_ARTWORK
-            PLAYBACK -> live?.state?.playing?.let { if (it) 1L else 0L }
+            PLAYBACK -> if (live?.selected == false) 0L else live?.state?.playing?.let { if (it) 1L else 0L }
             else -> null
         }
     }

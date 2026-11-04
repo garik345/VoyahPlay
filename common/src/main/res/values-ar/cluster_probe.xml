@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_cluster_probe_title">خريطة لوحة العدادات (تجريبي)</string>
-    <string name="settings_cluster_probe_description">تظهر الخريطة تلقائياً أثناء المسار النشط. يتطلب مساعد root الإصدار 1.2.7. تعمل أزرار الاختبار اليدوي أدناه لمدة 60 ثانية. يوقف الاختبار اليدوي العرض التلقائي حتى نهاية المسار.</string>
+    <string name="settings_cluster_probe_description">تظهر الخريطة تلقائياً أثناء المسار النشط. يتطلب مساعد root الإصدار 1.2.15. تعمل أزرار الاختبار اليدوي أدناه لمدة 60 ثانية. يوقف الاختبار اليدوي العرض التلقائي حتى نهاية المسار.</string>
     <string name="settings_cluster_probe_status">فحص شاشة لوحة العدادات</string>
     <string name="settings_cluster_probe_grid">عرض شبكة الاختبار</string>
     <string name="settings_cluster_probe_map">عرض خريطة CarPlay</string>

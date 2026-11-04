@@ -140,12 +140,7 @@ public final class VoyahRootHelper {
                 throw new SecurityException("Current package UID does not authorize this action");
             }
             RootProcess.Result result;
-            boolean changes = request.action == RootHelperProtocol.Action.BOOT_POLICY ||
-                    request.action == RootHelperProtocol.Action.STOP || request.action == RootHelperProtocol.Action.TWEAKS_POLICY ||
-                    request.action == RootHelperProtocol.Action.TOP_POLICY || request.action == RootHelperProtocol.Action.RADIO_POLICY
-                    || request.action == RootHelperProtocol.Action.CLUSTER_GRID || request.action == RootHelperProtocol.Action.CLUSTER_MAP
-                    || request.action == RootHelperProtocol.Action.CLUSTER_STOP || request.action == RootHelperProtocol.Action.CLUSTER_AUTO_TICK
-                    || request.action == RootHelperProtocol.Action.CLUSTER_AUTO_STOP;
+            boolean changes = changesState(request.action);
             boolean locked = !changes || mutations.tryLock();
             if (!locked) {
                 result = new RootProcess.Result(1, false, "HELPER_BUSY: another helper change is running\n");
@@ -166,6 +161,11 @@ public final class VoyahRootHelper {
                         case CLUSTER_STATUS: result = ClusterProbeRoot.status(); break;
                         case CLUSTER_GRID: result = ClusterProbeRoot.start("grid"); break;
                         case CLUSTER_MAP: result = ClusterProbeRoot.start("map"); break;
+                        case CLUSTER_NAVI_GRID: result = ClusterProbeRoot.start("navi-grid"); break;
+                        case CLUSTER_NAVI_MAP: result = ClusterProbeRoot.start("navi-map"); break;
+                        case CLUSTER_NAVI_READY: result = ClusterProbeRoot.naviReady(); break;
+                        case CLUSTER_AR_GRID: result = ClusterProbeRoot.start("ar-grid"); break;
+                        case CLUSTER_AR_MAP: result = ClusterProbeRoot.start("ar-map"); break;
                         case CLUSTER_STOP: result = ClusterProbeRoot.stop(); break;
                         case CLUSTER_AUTO_TICK: result = ClusterProbeRoot.autoTick(); break;
                         case CLUSTER_AUTO_STOP: result = ClusterProbeRoot.stopAuto(); break;
@@ -189,6 +189,16 @@ public final class VoyahRootHelper {
             System.err.println("REQUEST_REJECTED " + error.getClass().getSimpleName() + ": " + error.getMessage());
         } finally {
             if (stopAfterReply) closeListener();
+        }
+    }
+
+    static boolean changesState(RootHelperProtocol.Action action) {
+        switch (action) {
+            case BOOT_POLICY: case STOP: case TWEAKS_POLICY: case TOP_POLICY: case RADIO_POLICY:
+            case CLUSTER_GRID: case CLUSTER_MAP: case CLUSTER_STOP: case CLUSTER_AUTO_TICK: case CLUSTER_AUTO_STOP:
+            case CLUSTER_NAVI_GRID: case CLUSTER_NAVI_MAP: case CLUSTER_NAVI_READY: case CLUSTER_AR_GRID: case CLUSTER_AR_MAP:
+                return true;
+            default: return false;
         }
     }
 }

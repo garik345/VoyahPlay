@@ -56,6 +56,12 @@ internal class VoyahClusterMediaReady(
     }
 
     companion object {
+        fun createNavi(context: Context, current: () -> Boolean, report: (String) -> Unit) =
+            VoyahClusterMediaReady(SystemClock::elapsedRealtime, current,
+                { permit, done ->
+                    if (permit.get()) com.shilapi.xcertplay.voyah.root.VoyahRootModule.clusterNaviReady(context.applicationContext) { ok, text -> done(ok, text) }
+                    else done(false, "cancelled")
+                }, report)
         fun create(context: Context, current: () -> Boolean, report: (String) -> Unit) =
             VoyahClusterMediaReady(SystemClock::elapsedRealtime, current,
                 { permit, done -> VoyahClusterMediaReadyBinder.send(context.applicationContext, permit, done) }, report)

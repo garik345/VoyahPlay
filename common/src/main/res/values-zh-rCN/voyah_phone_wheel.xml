@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_voyah_phone_wheel">CarPlay电话按键（实验性）</string>
+    <string name="settings_voyah_phone_wheel_description">连接时短按可打开CarPlay的最近通话。通话中或CarPlay未连接时，按键保持正常功能。</string>
+    <string name="settings_voyah_phone_wheel_permission">允许</string>
+    <string name="settings_voyah_phone_wheel_permission_description">要从车辆菜单返回，请允许VoyahPlay显示在其他应用上层。在获得权限之前，VoyahPlay在后台时电话按键保持正常功能。</string>
+</resources>

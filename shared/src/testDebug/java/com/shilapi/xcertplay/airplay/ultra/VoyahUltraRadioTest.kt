@@ -5,6 +5,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VoyahUltraRadioTest {
+    @Test fun selectingIphoneClearsOnlyNowPlayingWhileKeepingTheRadioBrowserAvailable() {
+        sample = sample.copy(radio = radio.copy(state = radio.state!!.copy(radioText = "Artist - Song")))
+        var selected = true
+        val a = VoyahClimateAccessory({ sample }, { now }, radioSupported = true, radioSelected = { selected })
+        val ids = listOf(4098L, 4102L, 4103L, 4354L, 4356L, 4359L)
+        val first = reader(a.handle(reader(CarAccessoryMessages.registerRequest(0, 1, CafRegistration.Identifiers(ids))))!!)
+        assertEquals(VoyahRadioDescription.SOURCE, first.valuesMap()[4354L])
+        selected = false
+        val update = reader(a.changed()!!).valuesMap()
+        assertEquals("", update[4354L]); assertEquals("", update[4356L]); assertEquals(0L, update[4359L])
+        assertFalse(update.containsKey(4098L)); assertFalse(update.containsKey(4103L))
+        val read = reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 2, ids)))!!)
+        assertEquals(VoyahRadioDescription.SOURCE, read.valuesMap()[4098L])
+        assertEquals("", read.valuesMap()[4354L]); assertTrue(read.errors().isEmpty())
+        assertFalse((read.valuesMap()[4103L] as List<*>).isEmpty())
+        selected = true
+        assertEquals(VoyahRadioDescription.SOURCE, reader(a.changed()!!).valuesMap()[4354L])
+    }
     private var now = 1_000L
     private val station = VoyahRadioOem.station("10170", "FM 101.7 MHz", "RDS Name", 3)!!
     private var radio = UltraRadioSnapshot(true, VoyahRadioOem.decode(mapOf(

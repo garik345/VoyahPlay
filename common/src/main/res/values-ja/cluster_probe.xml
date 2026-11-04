@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_cluster_probe_title">メーターパネルの地図（実験的機能）</string>
-    <string name="settings_cluster_probe_description">ルート案内中に地図を自動表示します。rootヘルパー1.2.7が必要です。下の手動テストは60秒間実行されます。 手動テスト中はルート終了まで自動表示を休止します。</string>
+    <string name="settings_cluster_probe_description">ルート案内中に地図を自動表示します。rootヘルパー1.2.15が必要です。下の手動テストは60秒間実行されます。 手動テスト中はルート終了まで自動表示を休止します。</string>
     <string name="settings_cluster_probe_status">メーターパネル画面を確認</string>
     <string name="settings_cluster_probe_grid">テストグリッドを表示</string>
     <string name="settings_cluster_probe_map">CarPlayの地図を表示</string>

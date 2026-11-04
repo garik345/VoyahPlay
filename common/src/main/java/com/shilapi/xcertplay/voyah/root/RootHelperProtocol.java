@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 final class RootHelperProtocol {
     static final int MAGIC = 0x56525031; // VRP1
     static final int MAX_OUTPUT = 65536;
-    static final String VERSION = "1.2.10";
+    static final String VERSION = "1.2.16";
     static final String PACKAGE = "com.shilapi.xcertplay";
     static final String DIRECTORY = "/data/local/voyahplay-root-helper";
     static final String APK = DIRECTORY + "/app.apk";
@@ -16,7 +16,8 @@ final class RootHelperProtocol {
 
     // Append only: preserve installed helper action ordinals.
     enum Action { ROOT, STATUS, INSTALL, ENABLE, DISABLE, REMOVE, POLICY, INFO, STOP, TWEAKS_STATUS, TWEAKS_POLICY, BOOT_STATUS, BOOT_POLICY, TOP_POLICY, RADIO_STATUS, RADIO_POLICY,
-        CLUSTER_STATUS, CLUSTER_GRID, CLUSTER_MAP, CLUSTER_STOP, CLUSTER_AUTO_TICK, CLUSTER_AUTO_STOP }
+        CLUSTER_STATUS, CLUSTER_GRID, CLUSTER_MAP, CLUSTER_STOP, CLUSTER_AUTO_TICK, CLUSTER_AUTO_STOP, CLUSTER_NAVI_GRID, CLUSTER_NAVI_MAP, CLUSTER_NAVI_READY,
+        CLUSTER_AR_GRID, CLUSTER_AR_MAP }
 
     static boolean authorized(int peer, int owner, int currentPackageUid, Action action) {
         if (peer == 0) return action == Action.INFO || action == Action.STOP;
@@ -25,7 +26,9 @@ final class RootHelperProtocol {
                 || action == Action.BOOT_STATUS || action == Action.BOOT_POLICY || action == Action.TOP_POLICY
                 || action == Action.RADIO_STATUS || action == Action.RADIO_POLICY
                 || action == Action.CLUSTER_STATUS || action == Action.CLUSTER_GRID || action == Action.CLUSTER_MAP || action == Action.CLUSTER_STOP
-                || action == Action.CLUSTER_AUTO_TICK || action == Action.CLUSTER_AUTO_STOP);
+                || action == Action.CLUSTER_AUTO_TICK || action == Action.CLUSTER_AUTO_STOP
+                || action == Action.CLUSTER_NAVI_GRID || action == Action.CLUSTER_NAVI_MAP || action == Action.CLUSTER_NAVI_READY
+                || action == Action.CLUSTER_AR_GRID || action == Action.CLUSTER_AR_MAP);
     }
 
     static String socketName(int uid) {

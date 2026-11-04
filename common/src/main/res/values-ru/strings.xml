@@ -867,4 +867,9 @@
     <string name="first_tcp_timeout">iPhone не успел подключиться к CarPlay</string>
     <string name="wireless_startup_retries_exhausted">Автоматические попытки остановлены. Проверьте подключение и повторите попытку.</string>
     <string name="retry_carplay_connection">Повторить подключение</string>
+    <string name="settings_cluster_probe_navi_grid">NAVI: тестовая сетка на 60 секунд</string>
+    <string name="settings_cluster_probe_navi_map">NAVI: карта CarPlay на 60 секунд</string>
+    <string name="settings_cluster_probe_navi_description">Отдельные кнопки проверяют NAVI_FULL (режим 2) и AR (режим 3). Нужен root-помощник 1.2.15. Тест запускается сразу; через минуту или по кнопке «Остановить» возвращает исходный режим приборки. Для карты включите поток карты CarPlay и переподключите iPhone.</string>
+    <string name="settings_cluster_probe_ar_grid">AR: тестовая сетка на 60 секунд</string>
+    <string name="settings_cluster_probe_ar_map">AR: карта CarPlay на 60 секунд</string>
 </resources>

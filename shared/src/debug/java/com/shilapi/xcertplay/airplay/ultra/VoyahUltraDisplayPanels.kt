@@ -17,10 +17,13 @@ internal object VoyahUltraDisplayPanels {
         val panels = screens.map { screen ->
             val uuid = screen["uuid"] as String
             val cluster = (screen["type"] as? Number)?.toInt() == 111
-            val instruments = cluster && (!themed || uuid == "Cluster_Display")
+            // Navigation remains an instrument display even when its UUID is separate from
+            // the catalog's Cluster_Display plug-in. The plug-in must not own stream 111.
+            val instruments = cluster
+            val themePlugin = themed && cluster && uuid == "Cluster_Display"
             val uid = if (themed) uuid else "$uuid-panel"
             panel(screen, uid, listOf(uuid), instruments).apply {
-                if (themed && instruments) put("displayPlugins", listOf(mapOf("uid" to uid, "videoStreams" to listOf(uuid))))
+                if (themePlugin) put("displayPlugins", listOf(mapOf("uid" to uid, "videoStreams" to listOf(uuid))))
             }
         }.toMutableList()
         if (virtualCluster && screens.isNotEmpty() && !(themed && screens.any { it["uuid"] == "Cluster_Display" })) {

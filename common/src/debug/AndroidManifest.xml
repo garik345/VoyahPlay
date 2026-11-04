@@ -2,5 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <queries>
         <package android:name="com.pateo.rdsapp" />
+        <package android:name="com.qinggan.keymanager.service" />
     </queries>
+    <application>
+        <!-- Bounded developer test, callable by ADB/root, never by an ordinary installed app. -->
+        <receiver android:name="com.shilapi.xcertplay.VoyahPhoneKeyProbeReceiver"
+            android:exported="true" android:permission="android.permission.DUMP" />
+    </application>
 </manifest>

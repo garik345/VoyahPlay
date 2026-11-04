@@ -104,6 +104,26 @@ class AndroidMediaSinkCodecDetachTest {
         Thread.setDefaultUncaughtExceptionHandler(previousHandler)
     }
 
+    @Test fun refreshReachesTheConfiguredClusterMirrorWhenThePrimaryDecoderHasNoSurface() {
+        val sink = AndroidMediaSink(surface = null).also { sinks += it }
+        val initial = CountDownLatch(1)
+        sink.setVideoRecoveryHandler(111) { initial.countDown() }
+        sink.setMirrorSurface(111, "cluster", newSurface())
+        sink.onVideoConfig(111, avcC)
+        assertTrue(barrier(sink))
+        assertTrue(initial.await(5, TimeUnit.SECONDS))
+        sink.field<java.util.concurrent.ExecutorService>("recoveryExecutor").submit {}.get(5, TimeUnit.SECONDS)
+        val refreshed = CountDownLatch(1)
+        sink.setVideoRecoveryHandler(111) { refreshed.countDown() }
+
+        sink.refreshPicture(110) // A main-screen refresh must not request a cluster keyframe.
+        assertTrue(barrier(sink))
+        assertEquals(1L, refreshed.count)
+        sink.refreshPicture(111)
+        assertTrue("the mirror requests its own new keyframe", refreshed.await(5, TimeUnit.SECONDS))
+        assertTrue("refresh does not create the absent main decoder", 110 !in decoders(sink))
+    }
+
     @Test fun smoothVideoParksTheMainDecoderOnAConsumerDrainedOffTheMainThread() {
         val a = newSurface()
         val sink = configuredSink(a)

@@ -11,6 +11,7 @@ const fixture = path.join(root, 'build', `root-helper-portable-tests-${process.p
 fs.mkdirSync(path.join(fixture, 'adb'), {recursive: true});
 for (const name of ['start-root-helper.ps1', 'root-helper.ps1', 'root-helper-bootstrap.sh'])
     fs.copyFileSync(path.join(root, 'scripts/root-module', name), path.join(fixture, name));
+fs.copyFileSync(path.join(root,'common/src/main/assets/voyah-helper/runtime.sh'),path.join(fixture,'helper-quiesce.sh'));
 for (const name of ['prepare-pi-fullscreen.ps1','pi-tweaks-bridge.sh'])
     fs.copyFileSync(path.join(root,'scripts/root-module',name),path.join(fixture,name));
 fs.mkdirSync(path.join(fixture,'pi-bridge'));
@@ -62,10 +63,10 @@ class FakeAdb {
             if(args[7]=="install" || args[7]=="restore") Console.WriteLine("REBOOT_REQUIRED=1");
             return 0;
         }
-        if(args.Length==8 && args[2]=="shell" && args[3]=="su" && args[4]=="0" && args[5]=="sh") {
+        if((args.Length==8 || args.Length==10) && args[2]=="shell" && args[3]=="su" && args[4]=="0" && args[5]=="sh") {
             if(!args[6].StartsWith("/data/local/tmp/voyahplay-helper-")) return 82;
             if(scenario=="InstallFailure" && args[7]=="install") { Console.WriteLine("ERROR fixture install failure"); return 1; }
-            Console.WriteLine("HELPER_VERSION="+(scenario=="OldHelper"?"1.2.6":"1.2.10"));
+            Console.WriteLine("HELPER_VERSION="+(scenario=="OldHelper"?"1.2.6":"1.2.16"));
             Console.WriteLine("HELPER_READY=1");
             Console.WriteLine("CAPABILITIES=TWEAKS_BOUNDS_1_1");
             Console.WriteLine("BOOT_MOUNT_READ_ONLY="+(scenario=="Reboot"?"0":"1"));
@@ -106,7 +107,7 @@ test('single device installs then verifies using the real installer, outside the
     assert.equal(r.status, 0, r.output);
     assert.deepEqual(operations(r), ['install', 'status']);
     assert(r.calls.slice(1).every(a => a[0]==='-s' && a[1]==='CAR-ONE'));
-    assert(r.output.includes('Root helper 1.2.10 установлен, состояние проверено.'));
+    assert(r.output.includes('Root helper 1.2.16 установлен, состояние проверено.'));
     assert(fs.existsSync(path.join(fixture, 'build/voyah-root-helper')));
 });
 test('STATUS checks without installing or requiring an app still installed', () => {

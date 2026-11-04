@@ -1,6 +1,6 @@
 ﻿# Portable Windows launcher. Save with UTF-8 BOM for Windows PowerShell 5.1.
 [CmdletBinding()]
-param([string]$Serial, [string]$OutputDirectory, [ValidateRange(0,60)][int]$TraceSeconds = 20)
+param([string]$Serial, [string]$OutputDirectory, [ValidateRange(0,60)][int]$TraceSeconds = 20, [switch]$WheelPhone)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -10,9 +10,16 @@ if (Get-Variable PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyCo
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 
 try {
+    if ($WheelPhone) {
+        Write-Host 'VoyahPlay: запись кнопки трубки на руле' -ForegroundColor Cyan
+        Write-Host 'Оставьте CarPlay открытым. Активного звонка быть не должно.
+Когда появится строка «Запись кнопки трубки», нажмите трубку дважды с паузой 3 секунды.
+Не нажимайте кнопку до появления этой строки.'
+    } else {
     Write-Host 'VoyahPlay: проверка прошивки ПИ, климата и полного экрана' -ForegroundColor Cyan
     Write-Host 'Откройте VoyahPlay, если он установлен. Сбор работает и без него.
 Первые 20 секунд предназначены для проверки всплывающих окон громкости и климата.'
+    }
     Write-Host ''
     $adbPath = Join-Path $PSScriptRoot 'adb\adb.exe'
     $collector = Join-Path $PSScriptRoot 'collect-voyah-compatibility.ps1'
@@ -65,11 +72,16 @@ try {
         throw 'Выбранное устройство offline. Восстановите соединение и запустите START.cmd ещё раз.'
     }
     Write-Host ('Сбор с устройства: ' + $chosen.Serial)
-    Write-Host 'Будут прочитаны OEM-службы, SDK, Launcher, SystemUI и Tweaks.
+    if ($WheelPhone) {
+        Write-Host 'Будут прочитаны сервис кнопок, Bluetooth Phone, QGAPI и обработчик Tweaks.'
+    } else {
+        Write-Host 'Будут прочитаны OEM-службы, SDK, Launcher, SystemUI и Tweaks.'
+    }
+    Write-Host '
 Для полного отчёта нужен существующий root (su 0); без него получится частичный.
 Сборщик ничего не устанавливает и не меняет настройки автомобиля.'
     Write-Host ''
-    $result = & $collector -Adb $adbPath -Serial $chosen.Serial -OutputDirectory $OutputDirectory -TraceSeconds $TraceSeconds
+    $result = & $collector -Adb $adbPath -Serial $chosen.Serial -OutputDirectory $OutputDirectory -TraceSeconds $TraceSeconds -WheelPhone:$WheelPhone
     Write-Host ''
     if ($result.Missing.Count -gt 0) { Write-Host 'Некоторые компоненты отсутствуют или недоступны. Пришлите готовый ZIP — список сохранён в report.txt и summary.json.' -ForegroundColor Yellow }
     else { Write-Host 'Сбор завершён. Пришлите Voyah-compatibility-....zip с рабочего стола.' -ForegroundColor Green }

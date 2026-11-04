@@ -966,4 +966,9 @@
     <string name="carplay_voyahplay_settings">VoyahPlay settings</string>
     <string name="voyah_waiting_for_car_hotspot">Waiting for the car hotspot. Connection will resume automatically.</string>
     <string name="voyah_wireless_retry_later">VoyahPlay will retry automatically after a pause.</string>
+    <string name="settings_cluster_probe_navi_grid">NAVI: test grid for 60 seconds</string>
+    <string name="settings_cluster_probe_navi_map">NAVI: CarPlay map for 60 seconds</string>
+    <string name="settings_cluster_probe_navi_description">Tests NAVI_FULL (mode 2) or AR (mode 3) using separate buttons. Requires root helper 1.2.15. Starts immediately and restores the original cluster mode after one minute or Stop. For the map, enable the CarPlay map stream and reconnect iPhone first.</string>
+    <string name="settings_cluster_probe_ar_grid">AR: test grid for 60 seconds</string>
+    <string name="settings_cluster_probe_ar_map">AR: CarPlay map for 60 seconds</string>
 </resources>

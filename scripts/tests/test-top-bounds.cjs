@@ -111,6 +111,14 @@ test('invalid, expired or excessive probe intents never grant a bounds correctio
     for (const options of [{token:null}, {token:'bad'}, {probeMode:'other'}, {deadline:10000}, {deadline:70001}])
         assert.equal(fixture().invoke({...probe, ...options}).result, undefined, JSON.stringify(options));
 });
+test('NAVI correction requires a fixed NAVI mode on its exact private OEM display', () => {
+    for (const probeMode of ['navi-grid','navi-map','ar-grid','ar-map']) {
+        const navi = {...probe, probeMode, display:6, displayName:'Cluster-Navi-Display'};
+        assert.equal(fixture().invoke(navi).result.right.value, 1920);
+        for (const change of [{displayName:'Cluster-Media-Display'}, {owner:10001}, {probeMode:'auto'}, {probeMode:'ar-auto'}, {probeMode:'grid'}, {display:0}, {caller:10001}])
+            assert.equal(fixture().invoke({...navi, ...change}).result, undefined);
+    }
+});
 test('probe correction preserves the bridge boot/license/freshness gate but needs no driver width lease', () => {
     const off = fixture(); off.values.delete('voyahplay_top_bounds_lease'); off.baseChange({lease_active:false}); off.poll();
     assert.equal(off.invoke(probe).result.right.value, 1920);

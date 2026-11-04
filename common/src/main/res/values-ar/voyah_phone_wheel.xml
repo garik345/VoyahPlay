@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_voyah_phone_wheel">زر الهاتف في CarPlay (تجريبي)</string>
+    <string name="settings_voyah_phone_wheel_description">الضغطة القصيرة تفتح المكالمات الأخيرة في CarPlay عند الاتصال. أثناء المكالمة أو عند فصل CarPlay، يعمل الزر كالمعتاد.</string>
+    <string name="settings_voyah_phone_wheel_permission">السماح</string>
+    <string name="settings_voyah_phone_wheel_permission_description">للعودة من قائمة السيارة، اسمح لـ VoyahPlay بالظهور فوق التطبيقات الأخرى. حتى ذلك الحين، يعمل زر الهاتف كالمعتاد عندما يكون VoyahPlay في الخلفية.</string>
+</resources>

@@ -1,4 +1,4 @@
-﻿# PowerShell 5.1+. Root helper 1.2.10 with optional OEM-radio labels.
+﻿# PowerShell 5.1+. Root helper 1.2.16 with optional OEM-radio labels.
 [CmdletBinding()]
 param(
     [ValidateSet('Install','Start','Status','Stop','EnableAutoStart','DisableAutoStart','RemoveAutoStart')][string]$Mode = 'Status',
@@ -27,7 +27,7 @@ $reportDirectory = Join-Path $ProjectRoot ('build/voyah-root-helper/' + $runName
 [void][System.IO.Directory]::CreateDirectory($reportDirectory)
 $script:Report = Join-Path $reportDirectory 'report.txt'
 $utf8 = [System.Text.UTF8Encoding]::new($false)
-[System.IO.File]::WriteAllText($script:Report, "VoyahPlay root helper 1.2.10`nMode: $Mode`nTime: $(Get-Date -Format o)`n", $utf8)
+[System.IO.File]::WriteAllText($script:Report, "VoyahPlay root helper 1.2.16`nMode: $Mode`nTime: $(Get-Date -Format o)`n", $utf8)
 function Log-Line([string]$Line) {
     Write-Host $Line
     [System.IO.File]::AppendAllText($script:Report, $Line + "`n", [System.Text.UTF8Encoding]::new($false))
@@ -46,8 +46,10 @@ function Invoke-HelperAdb {
     return ($lines -join "`n")
 }
 $remote = '/data/local/tmp/voyahplay-helper-' + [guid]::NewGuid().ToString('N') + '.sh'
+$remoteQuiesce=$remote.Replace('.sh','-quiesce.sh')
 $local = Join-Path $reportDirectory 'bootstrap.sh'
 $pushed = $false
+$quiescePushed=$false
 try {
     [void](Invoke-HelperAdb -Arguments @('get-state'))
     $identity = Invoke-HelperAdb -Arguments @('shell','su','0','id')
@@ -55,7 +57,22 @@ try {
     $content = [System.IO.File]::ReadAllText($bootstrapPath).Replace("`r`n","`n").Replace("`r","`n")
     [System.IO.File]::WriteAllText($local, $content, $utf8)
     [void](Invoke-HelperAdb -Arguments @('push',$local,$remote)); $pushed = $true
-    $result = Invoke-HelperAdb -Arguments @('shell','su','0','sh',$remote,$Mode.ToLowerInvariant())
+    $arguments=@('shell','su','0','sh',$remote,$Mode.ToLowerInvariant())
+    if($Mode -in @('Install','Stop')) {
+        $shutdownPath=Join-Path $PSScriptRoot 'helper-quiesce.sh'
+        if(-not(Test-Path -LiteralPath $shutdownPath -PathType Leaf)) {
+            $shutdownPath=Join-Path $ProjectRoot 'common/src/main/assets/voyah-helper/runtime.sh'
+        }
+        if(-not(Test-Path -LiteralPath $shutdownPath -PathType Leaf)) {throw 'Missing helper-quiesce.sh. Extract the complete installer.'}
+        $shutdownBytes=[IO.File]::ReadAllBytes($shutdownPath)
+        $digest=[Security.Cryptography.SHA256]::Create()
+        try {$shutdownSha=([BitConverter]::ToString($digest.ComputeHash($shutdownBytes))).Replace('-','').ToLowerInvariant()}
+        finally {$digest.Dispose()}
+        $quiescePushed=$true
+        [void](Invoke-HelperAdb -Arguments @('push',$shutdownPath,$remoteQuiesce))
+        $arguments+=@($remoteQuiesce,$shutdownSha)
+    }
+    $result = Invoke-HelperAdb -Arguments $arguments
     $expected = switch ($Mode) {
         'Stop' { 'HELPER_STOPPED=1' }
         'RemoveAutoStart' { 'AUTOSTART_REMOVED=1' }
@@ -64,8 +81,8 @@ try {
         default { 'HELPER_READY=1' }
     }
     if (-not $result.Contains($expected)) { throw "Helper result not confirmed: expected $expected" }
-    if ($Mode -in @('Install','Start','Status') -and (-not $result.Contains('CAPABILITIES=TWEAKS_BOUNDS_1_1') -or $result -notmatch '(?m)^HELPER_VERSION=1\.2\.10\r?$')) {
-        throw 'Expected root helper 1.2.10. Build and install automotive from the same source update, then run -Mode Install.'
+    if ($Mode -in @('Install','Start','Status') -and (-not $result.Contains('CAPABILITIES=TWEAKS_BOUNDS_1_1') -or $result -notmatch '(?m)^HELPER_VERSION=1\.2\.16\r?$')) {
+        throw 'Expected root helper 1.2.16. Build and install automotive from the same source update, then run -Mode Install.'
     }
     if ($Mode -eq 'Stop') { Log-Line 'DONE. Root helper stopped.' }
     elseif ($result -match '(?m)^REBOOT_REQUIRED=1\r?$' -or ($Mode -eq 'Install' -and $result -match '(?m)^BOOT_MOUNT_READ_ONLY=0\r?$')) {
@@ -78,6 +95,7 @@ finally {
         try { [void](Invoke-HelperAdb -Arguments @('shell','rm','-f',$remote) -AllowFailure) }
         catch { Log-Line ('Temporary cleanup failed: ' + $_.Exception.Message) }
     }
+    if($quiescePushed) {try { [void](Invoke-HelperAdb -Arguments @('shell','rm','-f',$remoteQuiesce) -AllowFailure) } catch {}}
     if (Test-Path -LiteralPath $local) {
         try { Remove-Item -LiteralPath $local -Force }
         catch { Log-Line ('Temporary local cleanup failed: ' + $_.Exception.Message) }

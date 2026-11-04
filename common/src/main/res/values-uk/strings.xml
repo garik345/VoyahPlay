@@ -875,4 +875,9 @@
     <string name="carplay_voyahplay_settings">Налаштування VoyahPlay</string>
     <string name="voyah_waiting_for_car_hotspot">Очікування точки доступу автомобіля. Підключення продовжиться автоматично.</string>
     <string name="voyah_wireless_retry_later">VoyahPlay автоматично повторить спробу після паузи.</string>
+    <string name="settings_cluster_probe_navi_grid">NAVI: тестова сітка на 60 секунд</string>
+    <string name="settings_cluster_probe_navi_map">NAVI: карта CarPlay на 60 секунд</string>
+    <string name="settings_cluster_probe_navi_description">Окремі кнопки перевіряють NAVI_FULL (режим 2) і AR (режим 3). Потрібен root-помічник 1.2.15. Тест запускається одразу й повертає початковий режим панелі приладів через хвилину або після зупинки. Для карти ввімкніть потік карти CarPlay і перепідключіть iPhone.</string>
+    <string name="settings_cluster_probe_ar_grid">AR: тестова сітка на 60 секунд</string>
+    <string name="settings_cluster_probe_ar_map">AR: карта CarPlay на 60 секунд</string>
 </resources>

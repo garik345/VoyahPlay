@@ -30,7 +30,14 @@ internal object VoyahClusterProbeSettings {
             "\nPROBE_MAP_FRAMES=${if (matches) prefs.getLong("frames", 0) else 0}\nPROBE_LAST_FRAMES=${prefs.getLong("frames", 0)}" +
             "\nPROBE_WINDOW_WIDTH=${prefs.getInt("windowWidth", 0)}\nPROBE_WINDOW_HEIGHT=${prefs.getInt("windowHeight", 0)}" +
             "\nPROBE_LAST_MAP_REQUEST_ACCEPTED=${prefs.getBoolean("mapRequestAccepted", false)}" +
+            "\nPROBE_MAP_HAS_PICTURE=${matches && prefs.getBoolean("mapHasPicture", false)}" +
+            "\nPROBE_LAST_MAP_REQUEST_PENDING=${prefs.getBoolean("mapRequestPending", false)}" +
+            "\nPROBE_LAST_MAP_REQUEST_REOPEN=${prefs.getBoolean("mapLastRequestReopen", false)}" +
+            "\nPROBE_LAST_RECOVERY_ATTEMPTS=${prefs.getInt("pictureRecoveryAttempts", 0)}" +
+            "\nPROBE_LAST_MAIN_HOST_VISIBLE=${prefs.getBoolean("mainHostVisible", false)}" +
+            "\nPROBE_LAST_MAIN_HOST_VISIBILITY_VERSION=${prefs.getLong("mainHostVisibilityVersion", 0)}" +
             "\nPROBE_MEDIA_READY=${prefs.getBoolean("mediaReady", false)}" +
+            "\nPROBE_READINESS_CATEGORY=${prefs.getString("readinessCategory", "MEDIA")}" +
             "\nPROBE_MEDIA_READY_REPORT=${prefs.getString("mediaReadyReport", "none")}" +
             "\nPROBE_LAST_SAMPLED_PIXELS=${prefs.getInt("sampledPixels", 0)}\nPROBE_LAST_OPAQUE_PIXELS=${prefs.getInt("opaquePixels", 0)}" +
             "\nPROBE_LAST_NONBLACK_PIXELS=${prefs.getInt("nonBlackPixels", 0)}\nPROBE_LAST_DISTINCT_COLORS=${prefs.getInt("distinctColors", 0)}" +
@@ -44,7 +51,8 @@ internal object VoyahClusterProbeSettings {
     }
 
     fun run(activity: Activity, action: VoyahRootModule.ClusterProbeAction) {
-        if (action == VoyahRootModule.ClusterProbeAction.MAP && !mapReady(activity)) {
+        if ((action == VoyahRootModule.ClusterProbeAction.MAP || action == VoyahRootModule.ClusterProbeAction.NAVI_MAP ||
+                action == VoyahRootModule.ClusterProbeAction.AR_MAP) && !mapReady(activity)) {
             AlertDialog.Builder(activity).setTitle(R.string.settings_cluster_probe_title)
                 .setMessage(activity.getString(R.string.settings_cluster_probe_map_help,
                     activity.getString(R.string.carplay_map_on_instrument_cluster_experimental)))

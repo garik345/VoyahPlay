@@ -21,6 +21,11 @@ public final class VoyahValues {
     public Map<String, Number> odometerValues() { return odometer; }
     /** OEM TPMSInfo fields as read (pressures in bar); empty when unavailable. */
     public Map<String, Number> tireValues() { return tires; }
+    /** DoorStatus.fLDoor: 0 closed, 1 open; unsupported/missing states stay unknown. */
+    public Boolean driverDoorOpen() {
+        if (doors == null || doors.length == 0) return null;
+        return doors[0] == 0 ? Boolean.FALSE : doors[0] == 1 ? Boolean.TRUE : null;
+    }
 
     public VoyahValues(float battery, float fuel, float left, float right, int fan, long time) {
         this(battery, fuel, left, right, fan, time, null, null);

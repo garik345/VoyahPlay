@@ -9,6 +9,18 @@ class CarPlayPlaybackStatusTest {
     private fun update(block: com.shilapi.xcertplay.iap2.body.Iap2BodyBuilder.() -> Unit) =
         Iap2Messages.buildRaw(CarPlayPlaybackStatus.NOW_PLAYING_UPDATE, block)
 
+    @Test fun metadataIsNotAnInitialPlaybackSelectionAndAnExplicitPausedBaselineIsRetained() {
+        val status = CarPlayPlaybackStatus()
+        status.acceptUpdate(update { group(0) { string(1, "Old title") } })
+        assertEquals(false, status.playbackKnown)
+        status.acceptUpdate(update { group(1) { u8(0, 2) } })
+        assertEquals(true, status.playbackKnown)
+        assertEquals(false, status.playing)
+        status.clearAll(); assertEquals(false, status.playbackKnown)
+        status.acceptUpdate(update { group(1) { u8(0, 2) } })
+        status.clearAll(); assertEquals(false, status.playbackKnown)
+    }
+
     @Test
     fun reportsOnlyChangesOfThePlaybackStatus() {
         val status = CarPlayPlaybackStatus()

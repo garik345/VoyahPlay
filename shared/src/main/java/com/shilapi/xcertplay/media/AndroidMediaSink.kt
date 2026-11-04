@@ -271,19 +271,24 @@ class AndroidMediaSink(
     private val appContext = context?.applicationContext
     private val ambientSinkToken = AmbientMusicController.openSink(appContext)
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
+    private val assistantFocus = VoyahAssistantFocus(voyahAudioRouting, onAudioFocusStreamChanged)
     private val audioFocusCoordinator = AudioFocusCoordinator(
         appContext,
         audioFocusEnabled,
         audioFocusAutoYield,
         onAudioDiagnostic,
         navigationFocusEnabled = voyahAudioRouting,
-        onFocusStreamChanged = onAudioFocusStreamChanged,
+        onFocusStreamChanged = assistantFocus::base,
     )
 
     /** The media-key session may own Android's current focus request for this same sink. */
     fun onMediaAudioFocusChanged(change: Int) {
         audioFocusCoordinator.onExternalFocusChange(change)
     }
+
+    override fun onModesChanged(params: Map<String, Any?>) = assistantFocus.modes(params)
+    override fun onNativeRadioSelected(selected: Boolean) = assistantFocus.radio(selected)
+    override fun onModesReset() = assistantFocus.reset()
 
     private val screenStateLock = Any()
     private val activeScreenTypes = mutableSetOf<Int>()
@@ -463,7 +468,18 @@ class AndroidMediaSink(
     fun liveVideoCounters(): LiveVideoCounters? = videoDecoders[MAIN_SCREEN_TYPE]?.liveCounters()
 
     fun refreshPicture(type: Int) {
-        videoDecoders[type]?.refreshPicture()
+        val targets = synchronized(videoOwnershipLock) {
+            if (videoClosed) return
+            buildList {
+                videoDecoders[type]?.let(::add)
+                synchronized(mirrorLock) {
+                    mirrorDecoders.filterKeys { it.first == type }.values.forEach(::add)
+                }
+            }
+        }
+        // A retained cluster mirror can be the only configured decoder after the host hides.
+        // Refresh existing outputs; never create a decoder or touch another stream here.
+        targets.forEach { it.refreshPicture() }
     }
 
     /**
@@ -700,6 +716,7 @@ class AndroidMediaSink(
         recoveryExecutor.shutdownNow()
         // Audio workers close asynchronously; none may reacquire focus after their sink closes.
         audioFocusCoordinator.close()
+        assistantFocus.close()
         runCatching { onAudioFocusClosed() }
         audioRenderers.values.forEach(AudioRenderer::close)
         audioRenderers.clear()

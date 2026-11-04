@@ -13,7 +13,7 @@ class VoyahHvacSchemaTest {
         assertEquals(VoyahHvacSchema.Field(3, 4, "airRightTemperature"), VoyahHvacSchema.field(C.PASSENGER_TARGET))
     }
     @Test fun buttonCommandsUseOnePulseForEitherDesiredState() {
-        for (c in listOf(C.POWER, C.AC, C.AUTO, C.RECIRCULATION)) {
+        for (c in listOf(C.POWER, C.AC, C.AUTO, C.RECIRCULATION, C.ZONES_SYNCED)) {
             assertEquals(1, VoyahHvacSchema.wireValue(c, false)); assertEquals(1, VoyahHvacSchema.wireValue(c, true))
         }
         assertEquals(1, VoyahHvacSchema.wireValue(C.FRONT_DEFROST, 1))
@@ -39,8 +39,28 @@ class VoyahHvacSchemaTest {
         assertNull(VoyahHvacSchema.decode(mapOf("airCirculationMode" to -1))[C.RECIRCULATION])
     }
     @Test fun allReviewedAirEnumOrdinalsMatchSdkAndCanApk() {
-        assertEquals(listOf(2,3,7,4,0,6,10,8,9), C.entries.map { VoyahHvacSchema.field(it).ordinal })
-        assertEquals(listOf(3,4,8,5,1,7,11,9,10), C.entries.map { VoyahHvacSchema.field(it).id })
+        assertEquals(listOf(2,3,7,4,0,6,10,8,9,11), C.entries.map { VoyahHvacSchema.field(it).ordinal })
+        assertEquals(listOf(3,4,8,5,1,7,11,9,10,12), C.entries.map { VoyahHvacSchema.field(it).id })
+    }
+    @Test fun syncUsesTheOemFrontDualCommandAndItsOwnReadback() {
+        assertEquals(VoyahHvacSchema.Field(11, 12, "airDUALStatus"), VoyahHvacSchema.field(C.ZONES_SYNCED))
+        for (dual in 0..1) {
+            // Even a contradictory, valid airSyncStatus cannot override the front-zone cache.
+            val raw = mapOf("airDUALStatus" to dual, "airSyncStatus" to dual)
+            assertEquals(dual == 0, VoyahHvacSchema.decode(raw)[C.ZONES_SYNCED])
+        }
+        // Equal temperatures do not prove that the car enabled synchronization.
+        assertEquals(false, VoyahHvacSchema.decode(mapOf("airDUALStatus" to 1,
+            "airLeftTemperature" to 22.5, "airRightTemperature" to 22.5))[C.ZONES_SYNCED])
+    }
+    @Test fun syncRejectsUnknownAndFractionalOemStatesWithoutInventingAnOffState() {
+        for (bad in listOf(-1, 2, 0.5, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertNull(VoyahHvacSchema.decode(mapOf("airDUALStatus" to bad, "airSyncStatus" to 1))[C.ZONES_SYNCED])
+        }
+        assertNull(VoyahHvacSchema.decode(mapOf("airSyncStatus" to 1))[C.ZONES_SYNCED])
+        for (bad in listOf(0, 1, "true")) {
+            try { VoyahHvacSchema.wireValue(C.ZONES_SYNCED, bad); fail() } catch (_: IllegalArgumentException) { }
+        }
     }
     @Test fun realH97cCacheFlagsAreNotSeatSwitchOneTwoFlags() {
         val values = VoyahHvacSchema.decode(mapOf("airSWStatus" to 1,"airACStatus" to 0,"airMode" to 1,

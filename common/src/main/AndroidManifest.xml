@@ -28,6 +28,7 @@
         <package android:name="com.qinggan.carsignal.service" />
         <package android:name="com.qinggan.cluster" />
         <package android:name="com.qinggan.QGBus" />
+        <package android:name="com.qinggan.keymanager.service" />
         <package android:name="com.byd.carsettings" />
         <intent>
             <action android:name="android.intent.action.VIEW" />

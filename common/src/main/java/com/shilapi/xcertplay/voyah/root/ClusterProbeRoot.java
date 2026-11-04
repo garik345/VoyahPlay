@@ -16,12 +16,15 @@ import java.util.concurrent.*;
 final class ClusterProbeRoot {
     static final String CAPABILITY = "VOYAH_CLUSTER_PROBE_1";
     static final String AUTO_CAPABILITY = "VOYAH_CLUSTER_AUTO_1";
+    static final String NAVI_CAPABILITY = "VOYAH_CLUSTER_NAVI_TEST_1";
     private static final File FILE = new File(RootHelperProtocol.DIRECTORY, "cluster-probe.json");
     private static final ScheduledExecutorService TIMER = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "VoyahClusterProbeExpiry"); t.setDaemon(true); return t;
     });
     private static JSONObject lease;
     private static String last = "idle";
+    private static boolean lastNaviRestored;
+    private static boolean rollbackPending;
     private ClusterProbeRoot() {}
 
     static synchronized void initialize() {
@@ -37,14 +40,19 @@ final class ClusterProbeRoot {
         try { publishAutoBounds(false); } catch (Exception error) { last = "auto bounds recovery: " + error; }
         TIMER.scheduleWithFixedDelay(() -> {
             synchronized (ClusterProbeRoot.class) {
-                if (lease != null && SystemClock.elapsedRealtime() >= lease.optLong("deadline")) {
+                if (cleanupDue(lease, rollbackPending, SystemClock.elapsedRealtime())) {
                     try { stop(); } catch (Exception error) { last = "expiry: " + error; }
                 }
             }
         }, 1, 1, TimeUnit.SECONDS);
     }
+    static boolean cleanupDue(JSONObject active, boolean pending, long now) {
+        // A previous boot's elapsedRealtime deadline may be days ahead of this boot's clock.
+        // Once rollback was requested, service startup failures must not postpone its retry.
+        return active != null && (pending || now >= active.optLong("deadline"));
+    }
 
-    static String brief() { return "CLUSTER_PROBE_CAPABILITY=" + CAPABILITY + "\nCLUSTER_AUTO_CAPABILITY=" + AUTO_CAPABILITY + "\n"; }
+    static String brief() { return "CLUSTER_PROBE_CAPABILITY=" + CAPABILITY + "\nCLUSTER_AUTO_CAPABILITY=" + AUTO_CAPABILITY + "\nCLUSTER_NAVI_CAPABILITY=" + NAVI_CAPABILITY + "\n"; }
 
     private static void publishAutoBounds(boolean active) throws Exception {
         String value = active ? "1|" + lease.getString("token") + "|" + lease.getInt("display") + "|" + lease.getLong("deadline") : "0";
@@ -129,21 +137,31 @@ final class ClusterProbeRoot {
         RootHelperOperations.verifyHome();
         String dump = displays();
         Integer target = VoyahClusterProbeSpec.targetDisplay(dump);
-        return new RootProcess.Result(0, false, summary(target) + dump);
+        return new RootProcess.Result(0, false, summary(target) + "CLUSTER_NAVI_TARGET=" + VoyahClusterProbeSpec.targetDisplay(dump, "navi-grid") + "\n" + dump);
     }
     private static String summary(Integer target) throws Exception {
         return brief() + "CLUSTER_PROBE_TARGET=" + (target == null ? "none" : target)
+            + "\nCLUSTER_NAVI_LAST_RESTORED=" + lastNaviRestored
+            + "\nCLUSTER_PROBE_ROLLBACK_PENDING=" + rollbackPending
             + "\nCLUSTER_PROBE_ACTIVE=" + (lease == null ? 0 : 1) + "\nCLUSTER_PROBE_NOTE=" + last + "\n"
             + (lease == null ? "" : "CLUSTER_PROBE_TOKEN=" + lease.getString("token") + "\nCLUSTER_PROBE_MODE=" + lease.getString("mode")
-                + "\nCLUSTER_PROBE_DISPLAY=" + lease.getInt("display") + "\nCLUSTER_PROBE_DEADLINE=" + lease.getLong("deadline") + "\n")
+                + "\nCLUSTER_PROBE_DISPLAY=" + lease.getInt("display") + "\nCLUSTER_PROBE_DEADLINE=" + lease.getLong("deadline")
+                + "\nCLUSTER_PROBE_DISPLAY_NAME=" + VoyahClusterProbeSpec.displayName(lease.getString("mode"))
+                + "\nCLUSTER_NAVI_PREVIOUS_MODE=" + lease.optInt("naviPreviousMode", -1)
+                + "\nCLUSTER_NAVI_PREVIOUS_READY=" + lease.optBoolean("naviPreviousReady") + "\n")
+            + (lease == null || !VoyahClusterProbeSpec.navi(lease.optString("mode")) ? "" :
+                "CLUSTER_NAVI_AREA_GRANTED=" + (lease.optBoolean("naviAreaGranted") ? 1 : 0) +
+                "\nCLUSTER_NAVI_FRAME_CONFIRMED=" + (lease.optBoolean("naviFrameConfirmed") ? 1 : 0) +
+                "\nCLUSTER_NAVI_REQUESTED_MODE=" + lease.optInt("naviRequestedMode", -1) +
+                "\nCLUSTER_NAVI_REQUESTED_CATEGORY=" + lease.optString("naviRequestedCategory") + "\n")
             ;
     }
 
     static synchronized RootProcess.Result start(String mode) throws Exception {
         RootHelperOperations.verifyHome();
         String dump = displays();
-        Integer target = VoyahClusterProbeSpec.targetDisplay(dump);
-        if (target == null) throw new IOException("No unique reviewed Cluster-Media-Display; probe not launched");
+        Integer target = VoyahClusterProbeSpec.targetDisplay(dump, mode);
+        if (target == null) throw new IOException("No unique reviewed " + VoyahClusterProbeSpec.displayName(mode) + "; probe not launched");
         if (lease != null) stop();
         // Prove that our exact task can be retired before creating a new diagnostic window.
         removeOurTasks(target);
@@ -151,9 +169,20 @@ final class ClusterProbeRoot {
         long deadline = SystemClock.elapsedRealtime() + ("auto".equals(mode) ? VoyahClusterProbeSpec.AUTO_LEASE_MS : VoyahClusterProbeSpec.DURATION_MS);
         if (!VoyahClusterProbeSpec.validLease(token, mode, target, deadline, SystemClock.elapsedRealtime()))
             throw new IOException("Invalid probe lease");
+        String returnCategory = null;
+        if (VoyahClusterProbeSpec.navi(mode)) {
+            TweaksBoundsRoot.snapshot(); // Same reviewed firmware/bridge gate as the existing output.
+            returnCategory = currentCategory();
+            lastNaviRestored = false;
+        }
         lease = new JSONObject().put("token", token).put("mode", mode).put("display", target).put("deadline", deadline);
+        if (returnCategory != null) lease.put("naviReturnCategory", returnCategory);
         RootHelperBoot.writePrivate(FILE.getName(), lease.toString().getBytes(StandardCharsets.UTF_8));
         if ("auto".equals(mode)) publishAutoBounds(true);
+        if (VoyahClusterProbeSpec.navi(mode)) {
+            try { nativeNavi("prepare"); }
+            catch (Exception error) { throw rollbackAfterNaviFailure(error); }
+        }
         RootProcess.Result launched = RootProcess.run(5, "/system/bin/am", "start-activity", "--user", "0", "--display", target.toString(),
             "-f", "0x18000000", "-n", RootHelperProtocol.PACKAGE + "/" + VoyahClusterProbeSpec.ACTIVITY,
             "--es", VoyahClusterProbeSpec.TOKEN, token, "--es", VoyahClusterProbeSpec.MODE, mode,
@@ -162,7 +191,7 @@ final class ClusterProbeRoot {
         if (!launched.successful() || launched.output.matches("(?si).*\\b(error|exception|denied)\\b.*")) {
             stop(); return new RootProcess.Result(1, launched.timedOut, launched.output);
         }
-        if ("auto".equals(mode)) {
+        if ("auto".equals(mode) || VoyahClusterProbeSpec.navi(mode)) {
             try {
                 lease.put("taskId", uniqueOwnTaskId(tasks(service()), target));
                 RootHelperBoot.writePrivate(FILE.getName(), lease.toString().getBytes(StandardCharsets.UTF_8));
@@ -205,16 +234,66 @@ final class ClusterProbeRoot {
         return new RootProcess.Result(0, false, "CLUSTER_AUTO_STOPPED=1\n");
     }
 
+    static synchronized RootProcess.Result naviReady() throws Exception {
+        RootHelperOperations.verifyHome();
+        if (lease == null || !VoyahClusterProbeSpec.navi(lease.optString("mode")) || lease.optLong("deadline") <= SystemClock.elapsedRealtime())
+            throw new IOException("NAVI test no longer active");
+        int target = lease.getInt("display");
+        int ownId = uniqueOwnTaskId(tasks(service()), target);
+        if (!readyLease(lease, SystemClock.elapsedRealtime(), ownId)) throw new IOException("NAVI task changed or retired");
+        try { nativeNavi("ready"); }
+        catch (Exception error) { throw rollbackAfterNaviFailure(error); }
+        return new RootProcess.Result(0, false, "CLUSTER_NAVI_READY=1\nCLUSTER_NAVI_FRAME_CONFIRMED=1\n");
+    }
+    private static IOException rollbackAfterNaviFailure(Exception error) {
+        String cleanup;
+        try { cleanup = stop().output; }
+        catch (Exception failed) { error.addSuppressed(failed); cleanup = "CLUSTER_PROBE_ROLLBACK_PENDING=true\n" + failed; }
+        return new IOException(error.getMessage() + "\n" + cleanup, error);
+    }
+    static boolean readyLease(JSONObject active, long now, int taskId) {
+        return active != null && VoyahClusterProbeSpec.navi(active.optString("mode")) && active.optLong("deadline") > now &&
+                active.has("naviPreviousMode") && !active.optBoolean("naviRestored") && taskId >= 0 && active.optInt("taskId", -1) == taskId;
+    }
+
     static synchronized RootProcess.Result stop() throws Exception {
+        rollbackPending = lease != null;
         RootHelperOperations.verifyHome();
         publishAutoBounds(false);
         if (lease != null) {
             int target = lease.optInt("display", -1);
             if (target <= 0) throw new IOException("Invalid stored probe target");
             removeOurTasks(target);
+            if (VoyahClusterProbeSpec.navi(lease.optString("mode")) && FILE.exists()) {
+                nativeNavi("restore");
+                lastNaviRestored = lease.optBoolean("naviRestored");
+            }
         }
         if (FILE.exists()) { RootHelperOperations.privatePath(FILE, false); if (!FILE.delete()) throw new IOException("Probe lease cleanup failed"); }
-        lease = null; last = "stopped";
-        return new RootProcess.Result(0, false, "CLUSTER_PROBE_ACTIVE=0\nCLUSTER_PROBE_STOPPED=1\n");
+        lease = null; rollbackPending = false; last = "stopped";
+        return new RootProcess.Result(0, false, "CLUSTER_PROBE_ACTIVE=0\nCLUSTER_PROBE_STOPPED=1\nCLUSTER_NAVI_LAST_RESTORED=" + lastNaviRestored + "\n");
+    }
+
+    private static String currentCategory() throws Exception {
+        RootProcess.Result result = RootProcess.run(3, "/system/bin/dumpsys", "activity", "service",
+                "com.qinggan.cluster/.service.InstrumentClusterService");
+        java.util.regex.Matcher found = java.util.regex.Pattern.compile("(?m)^\\s*current item: ([12])\\s*$").matcher(result.output);
+        if (!result.successful() || !found.find()) throw new IOException("Open the media or navigation card first; original cluster card unavailable");
+        int page = Integer.parseInt(found.group(1));
+        if (found.find()) throw new IOException("Ambiguous original cluster card");
+        return page == 1 ? "qg.car.cluster.MEDIA_SMALL" : "qg.car.cluster.NAVI";
+    }
+
+    private static void nativeNavi(String action) throws Exception {
+        RootProcess.Result result = RootProcess.run(9, "/system/bin/env", "CLASSPATH=" + RootHelperProtocol.APK,
+                "/system/bin/app_process", "/system/bin", ClusterNaviNative.class.getName(), action);
+        // The child persists its snapshot before mutation, including when it fails midway.
+        if (FILE.exists()) {
+            RootHelperOperations.privatePath(FILE, false);
+            if (FILE.length() > 4096) throw new IOException("Invalid NAVI snapshot");
+            lease = new JSONObject(new String(java.nio.file.Files.readAllBytes(FILE.toPath()), StandardCharsets.UTF_8));
+        }
+        if (!result.successful()) throw new IOException("NAVI " + action + " failed: " + result.output);
+        last = "NAVI " + action + ": " + result.output.trim();
     }
 }

@@ -10,6 +10,22 @@ import org.junit.Test
 
 class AirPlayInfoPlistTest {
     @Test
+    fun deferredClusterKeepsItsDesiredUrlButDoesNotCreateThePhoneSceneFromInfo() {
+        val cluster = AirPlayDisplayConfig(760, 616, initialUrl = CarPlayClusterDisplay.MAP_URL)
+        fun info(display: AirPlayDisplayConfig) = AirPlayInfoPlist.build(AirPlayConfig(
+            "test", "test", "", "1", AirPlayDisplayConfig(1920, 720), cluster = display))
+        val normal = info(cluster)
+        val deferred = info(cluster.copy(deferInitialUi = true))
+        val normalAlt = (normal["displays"] as List<*>)[1] as Map<*, *>
+        val deferredAlt = (deferred["displays"] as List<*>)[1] as Map<*, *>
+        assertEquals(CarPlayClusterDisplay.MAP_URL, normalAlt["initialURL"])
+        assertFalse(deferredAlt.containsKey("initialURL"))
+        assertEquals(normalAlt - "initialURL", deferredAlt)
+        org.junit.Assert.assertArrayEquals(BplistCodec.encode(normal - "displays"), BplistCodec.encode(deferred - "displays"))
+        assertEquals(CarPlayClusterDisplay.MAP_URL, cluster.initialUrl)
+    }
+
+    @Test
     fun bothDisplaysDeclareAutomaticAppearanceAtConnection() {
         val config = AirPlayConfig(
             deviceName = "test", deviceId = "02:00:00:00:00:02", btMac = "02:00:00:00:00:02",

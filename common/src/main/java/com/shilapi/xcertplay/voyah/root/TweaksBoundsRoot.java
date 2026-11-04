@@ -69,9 +69,17 @@ final class TweaksBoundsRoot {
     static RootProcess.Result status() throws Exception {
         TweaksBoundsSnapshot data = snapshot();
         boolean leased = leaseActive();
+        String top = setting(TopBoundsRoot.PROBE), status = setting(TopBoundsRoot.STATUS_PROBE), dock = setting("voyahplay_dock_probe");
+        boolean ready = FullscreenReadiness.ready(top, status, dock, SystemClock.elapsedRealtime(), data.pid,
+                pid("com.qinggan.systemui"), pid("com.qinggan.app.launcher"));
         return new RootProcess.Result(0, false, "TWEAKS_BOUNDS_READY=1\nBRIDGE_VERSION=1.1\n" +
                 "FIRMWARE_PROFILE=" + verifiedProfile + "\nTWEAKS_LEASE=" + (leased ? 1 : 0) + "\nPROBE=" + data.raw +
-                "\nDOCK_GUARD_PROBE=" + setting("voyahplay_dock_probe") + "\n");
+                "\nFULLSCREEN_PREREQUISITES_READY=" + (ready ? 1 : 0) + "\nTOP_BOUNDS_PROBE=" + top +
+                "\nSTATUS_BAR_PROBE=" + status + "\nDOCK_GUARD_PROBE=" + dock + "\n");
+    }
+    private static int pid(String name) throws Exception {
+        RootProcess.Result result = RootProcess.run(2, "/system/bin/pidof", name);
+        return result.successful() && result.output.trim().matches("[1-9][0-9]{0,8}") ? Integer.parseInt(result.output.trim()) : -1;
     }
     static RootProcess.Result policy(boolean active, boolean hidden) throws Exception {
         if (!active || !hidden) {

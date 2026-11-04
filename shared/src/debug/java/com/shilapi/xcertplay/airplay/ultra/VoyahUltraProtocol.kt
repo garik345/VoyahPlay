@@ -9,12 +9,13 @@ import com.shilapi.xcertplay.airplay.rcs.uisync.*
 import com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackageCodec as AP
 import java.io.Closeable
 import java.net.InetAddress
-import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.LinkedBlockingDeque
 
 interface UltraClimateSource : Closeable {
     val supportedControls: Set<UltraClimateControl> get() = emptySet()
@@ -29,9 +30,13 @@ interface UltraClimateSource : Closeable {
     /** Sets a level in [volumeRange] and/or mute; confirmed only by a matching read-back. */
     fun writeVolume(level: Int?, mute: Boolean?): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
     val audioChannelRanges: Map<UltraAudioChannel, IntRange> get() = emptyMap()
+    val audioChannelSample: UltraAudioChannelSample? get() = null
     fun writeAudioChannel(channel: UltraAudioChannel, value: Int): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
     val supportsRadio: Boolean get() = false
+    val preferredMediaSource: UltraMediaSource get() = UltraMediaSource.RADIO
+    fun rememberMediaSource(value: UltraMediaSource) {}
     fun writeRadio(request: UltraRadioRequest): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
+    fun setRadioSpeechDucked(ducked: Boolean) {}
     val supportedVehicleControls: Set<UltraVehicleControl> get() = emptySet()
     fun writeVehicleControl(control: UltraVehicleControl, value: Int): UltraClimateWriteResult = UltraClimateWriteResult(false, "Unavailable")
 }
@@ -61,12 +66,17 @@ class VoyahUltraProtocol(
     @Volatile private var probeFeatures: Set<String> = emptySet()
     @Volatile private var airPlaySession: AirPlaySession? = null
     private val radioAudio = VoyahRadioAudioSync(
-        { airPlaySession?.takeAudioForRadio() == true }, { airPlaySession?.releaseRadioAudio() }, ::log)
+        { airPlaySession?.takeAudioForRadio() == true }, { airPlaySession?.releaseRadioAudio() }, ::log,
+        preferred = { source.preferredMediaSource }, remember = { source.rememberMediaSource(it) },
+        pauseRadio = { source.writeRadio(UltraRadioRequest(VoyahRadioOem.Command.PAUSE)).confirmed },
+        selectionChanged = ::radioSelectionChanged,
+        speechDuckChanged = { source.setRadioSpeechDucked(it) })
     private val dumpedBytes = AtomicLong()
     private val infoCaptured = AtomicBoolean(false)
     private val firstSample = java.util.concurrent.CountDownLatch(1)
     private val closed = AtomicBoolean(false)
     private val sourceStarted = AtomicBoolean(false)
+    private val vehicleCommands = UltraCommandGate()
     private val channels = ConcurrentHashMap<Long, Link>()
     // Keep closed extension stream identities: TEARDOWN may arrive after EOF, including UI Sync.
     private val extensionConnections = ConcurrentHashMap.newKeySet<String>()
@@ -251,8 +261,24 @@ class VoyahUltraProtocol(
     }
 
     override fun onSetupResponseSent(session: AirPlaySession) {
-        if (!closed.get()) { airPlaySession = session; radioAudio.attach() }
+        if (!closed.get()) {
+            airPlaySession = session
+            if (source.supportsRadio) radioAudio.attach() else session.nativeRadioSelected(false)
+        }
         attachPending()
+    }
+
+    private fun radioSelectionChanged() {
+        if (closed.get()) return
+        airPlaySession?.nativeRadioSelected(source.supportsRadio && sample?.radio?.connected == true && radioAudio.radioSelected())
+        channels.values.forEach { (it as? Channel)?.publish() }
+    }
+    override fun onIphoneMediaPlayback(session: AirPlaySession, playing: Boolean, initial: Boolean) {
+        if (!closed.get() && airPlaySession === session && source.supportsRadio) radioAudio.iphonePlayback(playing, initial)
+    }
+
+    override fun onModesChanged(session: AirPlaySession, params: Map<String, Any?>) {
+        if (!closed.get() && airPlaySession === session && source.supportsRadio) radioAudio.modes(params)
     }
 
     internal fun attachPending() {
@@ -278,6 +304,8 @@ class VoyahUltraProtocol(
     }
 
     override fun onTeardown(session: AirPlaySession, body: Map<String, Any?>?) {
+        val types = teardownStreamTypes(body)
+        if (airPlaySession === session && (types == null || 110 in types)) radioAudio.resetModes()
         teardownChannels(body)
     }
 
@@ -309,6 +337,7 @@ class VoyahUltraProtocol(
         radioAudio.close()
         airPlaySession = null
         closeChannels()
+        vehicleCommands.close()
         if (sourceStarted.get()) source.close()
         extensionConnections.clear()
         log("SESSION CLOSED")
@@ -330,6 +359,8 @@ class VoyahUltraProtocol(
                 sample?.radio != value?.radio || sample?.vehicleControlValues != value?.vehicleControlValues
             sample = value
             radioAudio.observe(value?.radio)
+            radioAudio.driverDoor(value?.driverDoorOpen, value?.driverDoorSampledAtMillis ?: 0, clock())
+            airPlaySession?.nativeRadioSelected(source.supportsRadio && value?.radio?.connected == true && radioAudio.radioSelected())
             // A radio-only callback must not end /info's initial wait for actual vehicle readings.
             if (hasVehicleReading(value)) firstSample.countDown()
             if (changed) log("VEHICLE driverTargetC=${value?.driverTargetCelsius ?: "unavailable"} hvac=${value?.hvacValues} readings=${value?.readings} comfort=${value?.comfortLevels} vehicle=${value?.vehicle} controls=${value?.vehicleControlValues}")
@@ -340,31 +371,34 @@ class VoyahUltraProtocol(
     /** What the phone wrote for route sharing in this session, seen by both data streams. */
     private val phoneValues = UltraPhoneValues()
 
-    private fun newAccessory() = VoyahClimateAccessory({ sample }, clock, source.supportedControls,
+    private fun newAccessory(runCommand: (() -> UltraClimateWriteResult) -> UltraClimateWriteResult = { it() }) = VoyahClimateAccessory({ sample }, clock, source.supportedControls,
         { control, level ->
             if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
                 log("OEM WRITE request comfort=$control value=$level")
-                source.write(control, level).also { log("OEM WRITE result confirmed=${it.confirmed} ${it.message}") }
+                runCommand { source.write(control, level) }.also { log("OEM WRITE result confirmed=${it.confirmed} ${it.message}") }
             }
         }, source.supportedHvac, { control, value ->
             if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
                 log("OEM WRITE request hvac=$control value=$value")
-                source.writeHvac(control, value).also { log("OEM WRITE result confirmed=${it.confirmed} ${it.message}") }
+                runCommand { source.writeHvac(control, value) }.also { log("OEM WRITE result confirmed=${it.confirmed} ${it.message}") }
             }
         }, volumeWriter = if (!source.supportsVolume) null else { level: Int?, mute: Boolean? ->
             if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
                 log("VOLUME WRITE request level=$level mute=$mute")
-                source.writeVolume(level, mute).also { log("VOLUME WRITE result confirmed=${it.confirmed} ${it.message}") }
+                runCommand { source.writeVolume(level, mute) }.also { log("VOLUME WRITE result confirmed=${it.confirmed} ${it.message}") }
             }
         }, audioRanges = source.audioChannelRanges, ringtoneLabel = ringtoneLabel,
+        audioChannelSample = { source.audioChannelSample },
+        radioSelected = radioAudio::radioSelected,
         audioWriter = { channel, value ->
             if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
                 log("AUDIO_CHANNEL WRITE channel=$channel value=$value")
-                source.writeAudioChannel(channel, value).also { log("AUDIO_CHANNEL result confirmed=${it.confirmed} ${it.message}") }
+                runCommand { source.writeAudioChannel(channel, value) }.also { log("AUDIO_CHANNEL result confirmed=${it.confirmed} ${it.message}") }
             }
         }, volumeRange = source.volumeRange, phoneValues = phoneValues, radioSupported = source.supportsRadio,
         radioWriter = if (!source.supportsRadio) null else { request ->
-            radioAudio.control(request.command != VoyahRadioOem.Command.PAUSE) {
+            runCommand { radioAudio.control(request.command != VoyahRadioOem.Command.PAUSE,
+                confirmed = { result: UltraClimateWriteResult -> result.confirmed }) {
                 if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
                     log("RADIO CONTROL request=$request")
                     val needsAudio = request.command != VoyahRadioOem.Command.PAUSE
@@ -378,12 +412,13 @@ class VoyahUltraProtocol(
                         log("RADIO CONTROL result confirmed=${it.confirmed} ${it.message}")
                     }
                 }
-            }
+            } }
         }, vehicleDataText = vehicleDataText, supportedVehicleControls = source.supportedVehicleControls,
         vehicleControlWriter = { control, value ->
             if (closed.get() || !negotiated) UltraClimateWriteResult(false, "Session closed") else {
                 log("VEHICLE CONTROL request=$control value=$value")
-                source.writeVehicleControl(control, value).also {
+                (if (control.isAppAction) source.writeVehicleControl(control, value)
+                    else runCommand { source.writeVehicleControl(control, value) }).also {
                     log("VEHICLE CONTROL result confirmed=${it.confirmed} ${it.message}")
                 }
             }
@@ -474,10 +509,18 @@ class VoyahUltraProtocol(
 
     private inner class Channel(data: RcsDataStream, connectionId: String?) : Link(data, connectionId) {
         private val stopped = AtomicBoolean(false)
-        private val accessory = newAccessory()
+        private var commandDeadline = 0L
+        private val accessory = newAccessory { vehicleCommands.run(commandDeadline, it) }
+        private val pendingWrites = AtomicInteger()
+        private val appActionGeneration = AtomicLong()
+        private val publishPending = AtomicBoolean(false)
+        private val refreshRequested = ConcurrentHashMap.newKeySet<Long>()
+        private val appActionIds = source.supportedVehicleControls.filter { it.isAppAction }.map { it.valueIid }.toSet()
         private var encoding = CafBodyEncoding.OPACK
-        private val worker = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(64),
+        private val queue = LinkedBlockingDeque<Runnable>(64)
+        private val worker = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, queue,
             { runnable -> Thread(runnable, "voyah-ultra-caf").apply { isDaemon = true } })
+            .apply { prestartCoreThread() }
 
         override fun onStreamOpened(stream: RcsDataStream) {
             log("RCS CONNECTED client=${stream.clientType.name}")
@@ -490,41 +533,78 @@ class VoyahUltraProtocol(
             val transport = com.shilapi.xcertplay.airplay.rcs.transport.ApTransportPackageCodec
             if (message.kind == transport.KIND_RPLY) { log("CAF transport reply token=${message.token}"); return }
             if (message.kind == transport.KIND_SYNC) data.send(message.reply())
-            enqueue {
-                val startedAt = System.nanoTime()
+            val decoded = runCatching {
                 if (message.messageType != transport.MESSAGE_TYPE_COMM && message.messageType != transport.MESSAGE_TYPE_CMND)
                     throw CafProtocolException("Expected CAF comm/cmnd package")
-                encoding = CafRcsCodec.encoding(message.body)
-                val request = CarAccessoryMessages.reader(message.body)
-                log("CAF transport kind=${message.kind} token=${message.token} encoding=$encoding")
-                log("CAF RX plugin=${request.pluginId} command=${request.command.wireName} values=${ProtocolTraceFormatter.pretty(request.values())}")
-                val decodedAt = System.nanoTime()
-                val response = accessory.handle(request)
-                val handledAt = System.nanoTime()
-                if (request.command == CafCommand.CONFIG_REQUEST) {
-                    val tree = (response?.envelope?.message?.values as? Map<*, *>)?.get("accessories") as? List<*>
-                    log("CAF CONFIG WIRE_REV=$WIRE_REV accessories=${tree?.size ?: 0} RADIO_CAF=${source.supportsRadio} hvac=${source.supportedHvac} comfort=${source.supportedControls} driver=${sample?.driverTargetCelsius}")
-                }
-                response?.let(::send)
-                // Echo on this subscribed channel now, before a later request can block its worker.
-                // Other channels own their subscription state and publish on their own workers.
-                if (request.command == CafCommand.WRITE_REQUEST || request.command == CafCommand.CONTROL_REQUEST) {
-                    accessory.changed()?.let(::send)
-                    channels.values.forEach { if (it !== this) (it as? Channel)?.publish() }
-                }
-                val finishedAt = System.nanoTime()
-                log("CAF TIMING command=${request.command.wireName} transaction=${request.transactionId} " +
-                    "queueMs=${elapsedMs(receivedAt, startedAt)} decodeMs=${elapsedMs(startedAt, decodedAt)} " +
-                    "handleMs=${elapsedMs(decodedAt, handledAt)} responseMs=${elapsedMs(handledAt, finishedAt)} " +
-                    "totalMs=${elapsedMs(receivedAt, finishedAt)}")
+                CafRcsCodec.encoding(message.body) to CarAccessoryMessages.reader(message.body)
+            }.getOrElse { log("CAF decode error: ${it.message}"); close(); return }
+            val (carrier, request) = decoded
+            val decodedAt = System.nanoTime()
+            val priority = request.pluginId == VoyahClimateAccessory.PLUGIN_ID && request.command == CafCommand.WRITE_REQUEST &&
+                runCatching { request.valuesMap().keys.any { it in appActionIds } }.getOrDefault(false)
+            val counted = request.command == CafCommand.WRITE_REQUEST && !priority
+            val actionGeneration = if (priority) appActionGeneration.incrementAndGet() else 0L
+            fun reject() {
+                val transaction = request.transactionId ?: return
+                val response = if (request.command == CafCommand.WRITE_REQUEST)
+                    CarAccessoryMessages.writeResponse(request.pluginId, transaction, request.valuesMap().keys.associateWith { -6727L })
+                else CarAccessoryMessages.generalError(request.pluginId, -6727L, transaction)
+                runCatching { send(response, carrier) }.onSuccess {
+                    if (request.command == CafCommand.WRITE_REQUEST) {
+                        refreshRequested.addAll(request.valuesMap().keys); publish()
+                    }
+                }.onFailure { close() }
             }
+            if (counted && pendingWrites.incrementAndGet() > 2) {
+                pendingWrites.decrementAndGet(); log("CAF write busy; request rejected without closing channel"); reject(); return
+            }
+            val accepted = enqueue(priority) {
+                try {
+                    if (priority && actionGeneration != appActionGeneration.get()) { reject(); return@enqueue }
+                    val startedAt = System.nanoTime()
+                    encoding = carrier
+                    log("CAF transport kind=${message.kind} token=${message.token} encoding=$encoding")
+                    log("CAF RX plugin=${request.pluginId} command=${request.command.wireName} values=${ProtocolTraceFormatter.pretty(request.values())}")
+                    commandDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(300)
+                    val response = accessory.handle(request)
+                    val handledAt = System.nanoTime()
+                    if (request.command == CafCommand.CONFIG_REQUEST) {
+                        val tree = (response?.envelope?.message?.values as? Map<*, *>)?.get("accessories") as? List<*>
+                        log("CAF CONFIG WIRE_REV=$WIRE_REV accessories=${tree?.size ?: 0} RADIO_CAF=${source.supportsRadio} hvac=${source.supportedHvac} comfort=${source.supportedControls} driver=${sample?.driverTargetCelsius}")
+                    }
+                    response?.let(::send)
+                    // Echo on this subscribed channel now, before a later request can block its worker.
+                    // Other channels own their subscription state and publish on their own workers.
+                    if (request.command == CafCommand.WRITE_REQUEST || request.command == CafCommand.CONTROL_REQUEST) {
+                        accessory.changed()?.let(::send)
+                        response?.envelope?.message?.errors?.filterValues { it == -6727L }?.keys
+                            ?.let { accessory.refresh(it)?.let(::send) }
+                        channels.values.forEach { if (it !== this) (it as? Channel)?.publish() }
+                    }
+                    val finishedAt = System.nanoTime()
+                    log("CAF TIMING command=${request.command.wireName} transaction=${request.transactionId} " +
+                        "queueMs=${elapsedMs(decodedAt, startedAt)} decodeMs=${elapsedMs(receivedAt, decodedAt)} " +
+                        "handleMs=${elapsedMs(startedAt, handledAt)} responseMs=${elapsedMs(handledAt, finishedAt)} " +
+                        "totalMs=${elapsedMs(receivedAt, finishedAt)}")
+                } finally { if (counted) pendingWrites.decrementAndGet() }
+            }
+            if (!accepted) { if (counted) pendingWrites.decrementAndGet(); reject() }
         }
 
-        fun publish() = enqueue { accessory.changed()?.let(::send) }
-        private fun send(frame: CafRcsFrame) {
+        fun publish() {
+            if (!publishPending.compareAndSet(false, true)) return
+            if (!enqueue {
+                publishPending.set(false)
+                accessory.changed()?.let(::send)
+                val ids = mutableListOf<Long>()
+                refreshRequested.forEach { if (refreshRequested.remove(it)) ids += it }
+                accessory.refresh(ids)?.let(::send)
+            }) publishPending.set(false)
+        }
+        private fun send(frame: CafRcsFrame, carrier: CafBodyEncoding = encoding) {
             val startedAt = System.nanoTime()
             // Factories already encode OPACK. Only the legacy plist carrier needs conversion.
-            val wire = if (encoding == CafBodyEncoding.OPACK) frame else CafRcsCodec.encode(frame.envelope, encoding)
+            val wire = if (carrier == CafBodyEncoding.OPACK) frame else CafRcsCodec.encode(frame.envelope, carrier)
             val encodedAt = System.nanoTime()
             data.send(wire.asRcsMessage())
             val sentAt = System.nanoTime()
@@ -537,10 +617,14 @@ class VoyahUltraProtocol(
                 "bytes=${wire.rcsBody.size} encodeMs=${elapsedMs(startedAt, encodedAt)} transportMs=${elapsedMs(encodedAt, sentAt)}")
         }
         private fun elapsedMs(start: Long, end: Long) = (end - start) / 1_000_000
-        private fun enqueue(action: () -> Unit) {
-            if (stopped.get()) return
-            try { worker.execute { runCatching(action).onFailure { log("CAF ERROR ${it.javaClass.simpleName}: ${it.message}"); close() } } }
-            catch (_: java.util.concurrent.RejectedExecutionException) { if (!stopped.get()) { log("CAF queue full"); close() } }
+        private fun enqueue(priority: Boolean = false, action: () -> Unit): Boolean {
+            if (stopped.get()) return false
+            val work = Runnable { if (!stopped.get()) runCatching(action).onFailure {
+                log("CAF ERROR ${it.javaClass.simpleName}: ${it.message}"); close()
+            } }
+            val accepted = if (priority) queue.offerFirst(work) else queue.offerLast(work)
+            if (!accepted) log("CAF queue full; work rejected without closing channel")
+            return accepted
         }
         override fun onStreamClosed(stream: RcsDataStream, cause: Throwable?) {
             log("RCS CLOSED client=${stream.clientType.name} reason=${cause?.message ?: "EOF"}")
@@ -555,7 +639,7 @@ class VoyahUltraProtocol(
     }
 
     companion object {
-        const val FEATURE = "vehicleStateProtocol"; const val WIRE_REV = "opack-75-pi-ota72"
+        const val FEATURE = "vehicleStateProtocol"; const val WIRE_REV = "opack-108-radio-duck"
         const val UI_SYNC_FEATURE = "uiSync"
         val PROBE_FEATURES = listOf("fileTransfer")
         val PROBE_CLIENTS = setOf(RcsClientTypes.CAR_PLAY_UPDATE_DATA)

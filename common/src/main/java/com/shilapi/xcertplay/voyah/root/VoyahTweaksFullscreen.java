@@ -45,7 +45,9 @@ public final class VoyahTweaksFullscreen {
             if (app == null) return;
             Activity current = host.get();
             if (current == null || current.isFinishing() || current.isDestroyed()) return;
-            boolean full = enabled(app) && hidden && !current.isInMultiWindowMode();
+            VoyahFeatureAccess.refresh(null);
+            boolean full = enabled(app) && hidden && !current.isInMultiWindowMode()
+                    && VoyahFeatureAccess.allows(VoyahFeatureAccess.Feature.FULLSCREEN);
             if (enabled(app) || preferences(app).getBoolean("restore_pending", false)) publish(full);
             if (full) MAIN.postDelayed(this, 3000);
         }

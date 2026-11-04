@@ -58,6 +58,9 @@ public final class VoyahDockVisibility {
         return activity.getWindowManager().getDefaultDisplay().getDisplayId() == 0;
     }
     private boolean shouldHide() {
+        com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.refresh(null);
+        if (!com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(
+                com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)) return false;
         return active && (hidden || statusHidden) && isMainDisplay() && !activity.isFinishing()
                 && !activity.isDestroyed() && !activity.isInMultiWindowMode()
                 && (!paused || windowVisible());

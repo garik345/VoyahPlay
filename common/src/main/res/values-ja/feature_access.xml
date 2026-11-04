@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_helper_required">インストールパッケージから VoyahPlay の root ヘルパーをインストールし、設定を開き直してください。</string>
+    <string name="settings_fullscreen_required">全画面表示を利用できません。対応する root ヘルパーと Tweaks ブリッジをインストールし、車載機を再起動して設定を開き直してください。</string>
+    <string name="settings_map_required">メーターの地図を利用できません。対応する root ヘルパーと Tweaks ブリッジをインストールし、車載機を再起動してメディアカードを開いてください。</string>
+    <string name="settings_features_subtitle">車両で使う CarPlay の機能</string>
+    <string name="settings_ultra_features_hint">空調と車両の操作。CarPlay の再接続後に適用されます。</string>
+    <string name="settings_radio_feature_hint">CarPlay で純正ラジオを使用。再接続後に適用されます。</string>
+    <string name="settings_radio_labels_feature_hint">純正ラジオに放送局名を表示。すぐに適用されます。</string>
+    <string name="settings_map_feature_hint">ナビゲーション中に地図を表示。CarPlay の再接続後に適用されます。</string>
+    <string name="settings_split_feature_hint">分割ウィンドウに CarPlay を合わせる。再接続後に適用されます。</string>
+</resources>

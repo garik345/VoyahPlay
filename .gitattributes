@@ -1,0 +1,3 @@
+# Android shell payloads must retain Unix line endings on Windows checkouts.
+common/src/main/assets/voyah-helper/*.sh text eol=lf
+scripts/root-module/*.sh text eol=lf

@@ -23,7 +23,7 @@ internal object VoyahClusterMapLayout {
         scalePercent = (10000.0 / elementSize(value)).roundToInt(),
         content = CarPlayClusterDisplay.Content.MAP,
         baseSafeArea = CarPlayClusterDisplay.VIRTUAL_SAFE_AREA_PERCENT,
-    )
+    ).copy(deferInitialUi = true)
 
     fun cover(width: Int, height: Int, aspect: Double): Matrix {
         val matrix = Matrix()
@@ -35,7 +35,7 @@ internal object VoyahClusterMapLayout {
 }
 
 /** One clipped card: texture and waiting label always occupy its complete measured height. */
-internal class VoyahClusterMapView(context: Context) : FrameLayout(context) {
+internal class VoyahClusterMapView(context: Context, private val fit: Boolean = false) : FrameLayout(context) {
     val texture = TextureView(context)
     val waiting = TextView(context).apply {
         text = context.getString(R.string.settings_cluster_probe_waiting)
@@ -52,7 +52,15 @@ internal class VoyahClusterMapView(context: Context) : FrameLayout(context) {
         addView(waiting, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
-    fun updateTransform() = texture.setTransform(VoyahClusterMapLayout.cover(width, height, MapMirrors.STREAM_ASPECT))
+    fun updateTransform() {
+        if (!fit || width <= 0 || height <= 0) texture.setTransform(VoyahClusterMapLayout.cover(width, height, MapMirrors.STREAM_ASPECT))
+        else {
+            val ratio = MapMirrors.STREAM_ASPECT / (width.toDouble() / height)
+            texture.setTransform(Matrix().apply {
+                setScale(minOf(1.0, ratio).toFloat(), minOf(1.0, 1.0 / ratio).toFloat(), width / 2f, height / 2f)
+            })
+        }
+    }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         updateTransform()

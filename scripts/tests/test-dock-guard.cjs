@@ -12,9 +12,10 @@ function fixture(setup={}) {
  if(setup.localHook) method.implementation=setup.localHook;
  const previous=method.implementation;
  let top='com.shilapi.xcertplay/com.shilapi.xcertplay.CarPlayHostActivity',topError=false;
+ const bar={show:{overload:()=>method},class:{getDeclaredMethods:()=>setup.missingMethod?[]:[{
+   getName:()=> 'show',getParameterTypes:()=>[],getModifiers:()=>setup.nativeHook?257:1}]}};
  const types={
-  'com.qinggan.mainlauncher.navigation.NavigationBar':{show:{overload:()=>method},class:{getDeclaredMethods:()=>setup.missingMethod?[]:[{
-   getName:()=> 'show',getParameterTypes:()=>[],getModifiers:()=>setup.nativeHook?257:1}]}},
+  [setup.ru?'com.qinggan.launcher.navigation.NavigationBarController':'com.qinggan.mainlauncher.navigation.NavigationBar']:bar,
   'com.qinggan.launcher.base.utils.AppUtils':{getTopAppInfo(context,display,kind) {assert.equal(display,0);assert.equal(kind,4);if(topError) throw Error('QG service unavailable');return top;}},
   'android.os.SystemClock':{elapsedRealtime:()=>now},
   'android.provider.Settings$Global':{getString:(_,key)=>values.get(key)??null,putString:(_,key,value)=>values.set(key,value)},
@@ -25,7 +26,7 @@ function fixture(setup={}) {
   top:s=>{top=s;},topError:()=>{topError=true;},baseChange:c=>values.set('voyahplay_tweaks_bounds_probe',JSON.stringify({...base,...c})),
   replacement:()=>method.implementation,previous,
   invoke(options={}) {
-   const bar={mScreenId:{value:options.screen??0},mBarName:{value:options.name??'MainScreenNavigationBar'},
+   const bar={mScreenId:{value:options.screen??0},[setup.ru?'mTag':'mBarName']:{value:options.name??(setup.ru?'MainNavigationBarController':'MainScreenNavigationBar')},
     mContext:{value:options.noContext?null:{getPackageName:()=>options.package??'com.qinggan.app.launcher'}}};
    return method.implementation.call(bar);
   },probe:()=>JSON.parse(values.get('voyahplay_dock_probe'))};
@@ -90,4 +91,24 @@ test('existing local or native replacements are not overwritten; conflicts stay 
 test('an uninspectable method is left untouched',()=>{
  const f=fixture({missingMethod:true});assert.equal(f.replacement(),undefined);
  assert.equal(f.probe().installed,false);assert(f.probe().error.includes('DOCK_GUARD_METHOD'));
+});
+
+test('RU controller suppresses only its main bar and exact live VoyahPlay activity',()=>{
+ const f=fixture({ru:true});
+ assert.equal(f.probe().profile,'RU');assert.equal(f.probe().installed,true);
+ assert.equal(f.invoke(),undefined);assert.equal(f.original(),0);
+ for(const options of [{screen:1},{name:'SecondNavigationBarController'},{name:'MainScreenNavigationBar'},{package:'other'}]) {
+  assert.equal(f.invoke(options),'OEM-return');
+ }
+ f.top('com.qinggan.app.launcher/com.qinggan.app.launcher.activity.MainActivity');
+ assert.equal(f.invoke(),'OEM-return');assert.equal(f.original(),5);
+});
+
+test('RU controller retains lease expiry, foreground errors and replacement-conflict protections',()=>{
+ const expired=fixture({ru:true});expired.clock(25000);assert.equal(expired.invoke(),'OEM-return');
+ const error=fixture({ru:true});error.topError();assert.equal(error.invoke(),'OEM-return');
+ for(const setup of [{nativeHook:true},{localHook:()=>{}}]) {
+  const f=fixture({ru:true,...setup});assert.equal(f.probe().installed,false);
+  assert.equal(f.replacement(),f.previous);assert(f.probe().error.includes('DOCK_GUARD_CONFLICT'));
+ }
 });

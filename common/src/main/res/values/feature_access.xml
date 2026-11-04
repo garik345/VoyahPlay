@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_helper_required">Install the VoyahPlay root helper from the installation bundle, then reopen Settings.</string>
+    <string name="settings_fullscreen_required">Full screen is unavailable. Install the compatible root helper and Tweaks bridge, restart the head unit, then reopen Settings.</string>
+    <string name="settings_map_required">Cluster map is unavailable. Install the compatible root helper and Tweaks bridge, restart the head unit and open its media card.</string>
+    <string name="settings_features_subtitle">CarPlay features for your vehicle</string>
+    <string name="settings_ultra_features_hint">Climate and vehicle controls. Applies after reconnecting CarPlay.</string>
+    <string name="settings_radio_feature_hint">Use the built-in radio in CarPlay. Applies after reconnecting.</string>
+    <string name="settings_radio_labels_feature_hint">Show station names in the built-in radio. Applies immediately.</string>
+    <string name="settings_map_feature_hint">Show the map during navigation. Applies after reconnecting CarPlay.</string>
+    <string name="settings_split_feature_hint">Fit CarPlay to a split window. Applies after reconnecting.</string>
+</resources>

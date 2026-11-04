@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.os.IBinder
 import android.os.SystemClock
 import com.shilapi.xcertplay.airplay.ultra.UltraAudioChannel
+import com.shilapi.xcertplay.airplay.ultra.UltraAudioChannelSample
 import com.shilapi.xcertplay.airplay.ultra.UltraClimateWriteResult
 
 /** Vendor volume groups. Reading/setting a volume never requests focus or touches mute. */
@@ -28,8 +29,8 @@ internal class VoyahOemAudioChannels(
     private var service: Service? = null
     private var retryAt = 0L
     private var advertised: Map<UltraAudioChannel, IntRange>? = null
-    @Volatile var values: Map<UltraAudioChannel, Int> = emptyMap(); private set
-    @Volatile var sampledAt = 0L; private set
+    @Volatile var snapshot = UltraAudioChannelSample(emptyMap(), 0); private set
+    val values get() = snapshot.values
     private fun api(): Service? {
         service?.takeIf { it.alive() }?.let { return it }
         service = null
@@ -61,8 +62,7 @@ internal class VoyahOemAudioChannels(
                 if (advertised == null && ranges.isNotEmpty()) advertised = ranges.toMap()
             }
         } catch (error: Exception) { failed(error); result.clear() }
-        values = result.toMap(); sampledAt = clock()
-        return values
+        return result.toMap().also { snapshot = UltraAudioChannelSample(it, clock()) }
     }
     /** Frozen for the session; a missing service yields no extra controls. */
     @Synchronized fun ranges(): Map<UltraAudioChannel, IntRange> {
@@ -93,7 +93,7 @@ internal class VoyahOemAudioChannels(
             Thread.currentThread().interrupt()
             UltraClimateWriteResult(false, "OEM audio confirmation interrupted")
         } catch (error: Exception) {
-            failed(error); values = emptyMap(); sampledAt = clock()
+            failed(error); snapshot = UltraAudioChannelSample(emptyMap(), clock())
             UltraClimateWriteResult(false, "OEM audio write unavailable")
         }
     }

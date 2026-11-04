@@ -1,0 +1,11 @@
+<resources>
+    <string name="settings_helper_required">請從安裝套件安裝 VoyahPlay root 助手，然後重新開啟設定。</string>
+    <string name="settings_fullscreen_required">全螢幕無法使用。請安裝相容的 root 助手與 Tweaks 橋接模組，重新啟動車機後再開啟設定。</string>
+    <string name="settings_map_required">儀表地圖無法使用。請安裝相容的 root 助手與 Tweaks 橋接模組，重新啟動車機並開啟媒體卡片。</string>
+    <string name="settings_features_subtitle">適用於您車輛的 CarPlay 功能</string>
+    <string name="settings_ultra_features_hint">空調及車輛控制。重新連接 CarPlay 後生效。</string>
+    <string name="settings_radio_feature_hint">在 CarPlay 中使用原車收音機。重新連接後生效。</string>
+    <string name="settings_radio_labels_feature_hint">在原車收音機中顯示電台名稱。立即生效。</string>
+    <string name="settings_map_feature_hint">導航時顯示地圖。重新連接 CarPlay 後生效。</string>
+    <string name="settings_split_feature_hint">讓 CarPlay 適應分割視窗。重新連接後生效。</string>
+</resources>

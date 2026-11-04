@@ -57,7 +57,7 @@ class VoyahUltraPanelsTest {
         for (hid in value["hidDevices"] as List<*>) assertEquals("Center_Display", (hid as Map<*, *>)["displayUUID"])
         val panels = (value["displayPanels"] as List<*>).map { it as Map<*, *> }
         assertEquals(listOf("Center_Display", mapUuid, "${VoyahUltraDisplayPanels.CLUSTER_UID}-panel"), panels.map { it["uid"] })
-        assertEquals(emptyList<String>(), panels[1]["properties"])
+        assertEquals(listOf("showsInstruments"), panels[1]["properties"])
         assertFalse(panels[1].containsKey("displayPlugins"))
         assertEquals(mapUuid, ((panels[1]["initialVideoStreams"] as List<*>).single() as Map<*, *>)["uuid"])
         val plugin = (panels[2]["displayPlugins"] as List<*>).single() as Map<*, *>

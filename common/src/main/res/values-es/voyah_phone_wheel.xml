@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_voyah_phone_wheel">Botón de teléfono en CarPlay (experimental)</string>
+    <string name="settings_voyah_phone_wheel_description">Una pulsación breve abre Recientes de CarPlay mientras está conectado. Durante una llamada o sin conexión a CarPlay, el botón funciona como siempre.</string>
+    <string name="settings_voyah_phone_wheel_permission">Permitir</string>
+    <string name="settings_voyah_phone_wheel_permission_description">Para volver desde el menú del coche, permite que VoyahPlay se muestre sobre otras aplicaciones. Hasta entonces, el botón del teléfono funciona como siempre cuando VoyahPlay está en segundo plano.</string>
+</resources>

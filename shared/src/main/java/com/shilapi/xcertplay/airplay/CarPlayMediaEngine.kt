@@ -19,6 +19,9 @@ data class AudioStreamId(val type: Int, val audioType: String)
 
 /** Rendering seam for the decrypted CarPlay media streams. */
 interface MediaSink {
+    fun onModesChanged(params: Map<String, Any?>) {}
+    fun onNativeRadioSelected(selected: Boolean) {}
+    fun onModesReset() {}
     fun onVideoCodec(type: Int, codec: VideoCodec) {}
     fun onVideoConfig(type: Int, codecData: ByteArray) {}
     fun onVideoFrame(type: Int, naluBytes: ByteArray) {}
@@ -86,6 +89,9 @@ class CarPlayMediaEngine(
     private val streams = ConcurrentHashMap<StreamKey, Closeable>()
     private val audioMeta = ConcurrentHashMap<StreamKey, AudioMeta>()
     private val pendingMicrophone = ConcurrentHashMap<StreamKey, MicrophoneConfig>()
+    private val modesLock = Any()
+    private val modesTokens = WeakHashMap<AirPlaySession, Any>()
+    private var modesOwner: AirPlaySession? = null
     private val audioCaptures = ConcurrentHashMap<StreamKey, AudioPacketCapture>()
     private val pendingIapTunnels = ConcurrentHashMap<AirPlaySession, PendingIapTunnel>()
     private val videoSettingsChannels = ConcurrentHashMap<AirPlaySession, VideoSettingsChannel>()
@@ -464,6 +470,14 @@ class CarPlayMediaEngine(
     }
 
     override fun onSetupResponseSent(session: AirPlaySession) {
+        session.mainScreenSessionToken()?.let { token -> synchronized(modesLock) {
+            if (modesTokens[session] !== token) {
+                modesTokens[session] = token
+                modesOwner = session
+                sink.onModesReset()
+                sink.onNativeRadioSelected(session.nativeRadioSelected)
+            }
+        } }
         val pending = pendingIapTunnels.remove(session) ?: return
         val attached = try {
             pending.handler(pending.bridge)
@@ -515,6 +529,7 @@ class CarPlayMediaEngine(
     }
 
     override fun onTeardown(session: AirPlaySession, type: Int) {
+        if (type == 110) resetModes(session)
         if (type == STREAM_TYPE_DATA) clearPendingIapTunnel(session)
         if (type == BufferedAudioStream.STREAM_TYPE) {
             retireBuffered(session)
@@ -536,6 +551,7 @@ class CarPlayMediaEngine(
     }
 
     override fun onSessionClosed(session: AirPlaySession) {
+        resetModes(session)
         clearPendingIapTunnel(session)
         retireBuffered(session)
         videoSettingsChannels.remove(session)?.close()
@@ -550,6 +566,17 @@ class CarPlayMediaEngine(
         pendingMicrophone.clear()
         audioCaptures.values.forEach(AudioPacketCapture::close)
         audioCaptures.clear()
+    }
+
+    override fun onModesChanged(session: AirPlaySession, params: Map<String, Any?>) = synchronized(modesLock) {
+        if (modesOwner === session) sink.onModesChanged(params)
+    }
+    override fun onNativeRadioSelected(session: AirPlaySession, selected: Boolean) = synchronized(modesLock) {
+        if (modesOwner === session) sink.onNativeRadioSelected(selected)
+    }
+    private fun resetModes(session: AirPlaySession) = synchronized(modesLock) {
+        modesTokens.remove(session)
+        if (modesOwner === session) { modesOwner = null; sink.onModesReset() }
     }
 
     /** Removes ownership before a close that may block on delivery or invoke the sink. */

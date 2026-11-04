@@ -227,7 +227,7 @@ object AirPlayInfoPlist {
         entry["initialViewArea"] = if (areas == null) 0 else display.initialViewArea.coerceIn(0, areas.lastIndex)
         if (type == STREAM_TYPE_MAIN_SCREEN && display.mainDisplayCornerMasks != null) entry["cornerMasks"] = display.mainDisplayCornerMasks
         if (areas != null && areas.size > 1) entry["viewAreaTransitionControl"] = true
-        if (display.initialUrl != null) entry["initialURL"] = display.initialUrl
+        if (display.initialUrl != null && !display.deferInitialUi) entry["initialURL"] = display.initialUrl
         return entry
     }
 

@@ -1,7 +1,14 @@
 'use strict';
-// The reviewed PI Launcher: suppress a driver-dock show before its window is drawn.
+// Reviewed RU/PI Launchers: suppress a driver-dock show before its window is drawn.
 Java.perform(function () {
-    const Bar = Java.use('com.qinggan.mainlauncher.navigation.NavigationBar');
+    let Bar, profile, nameField, mainBar;
+    try {
+        Bar = Java.use('com.qinggan.mainlauncher.navigation.NavigationBar');
+        profile = 'PI'; nameField = 'mBarName'; mainBar = 'MainScreenNavigationBar';
+    } catch (_) {
+        Bar = Java.use('com.qinggan.launcher.navigation.NavigationBarController');
+        profile = 'RU'; nameField = 'mTag'; mainBar = 'MainNavigationBarController';
+    }
     const AppUtils = Java.use('com.qinggan.launcher.base.utils.AppUtils');
     const Clock = Java.use('android.os.SystemClock');
     const Settings = Java.use('android.provider.Settings$Global');
@@ -30,7 +37,7 @@ Java.perform(function () {
                 Math.min(end, base.lease_until_ms, base.now_ms + 5000) : 0;
             error = '';
         } catch (e) { allowedUntil = 0; error = String(e).slice(0,160); }
-        Settings.putString(resolver, 'voyahplay_dock_probe', JSON.stringify({version:'1.0', pid:Process.id,
+        Settings.putString(resolver, 'voyahplay_dock_probe', JSON.stringify({version:'1.1', profile:profile, pid:Process.id,
             now_ms:now, installed:installed, active:installed && allowedUntil > now,
             calls:calls, blocked:blocked, foreground:foreground,
             error:setupError || error, last_show_error:lastShowError}));
@@ -41,8 +48,8 @@ Java.perform(function () {
         try {
             lastShowError = '';
             const now = Number(Clock.elapsedRealtime());
-            if (this.mScreenId.value === 0 && this.mBarName.value !== null &&
-                this.mBarName.value.toString() === 'MainScreenNavigationBar' && allowedUntil > now && lease(now) > now) {
+            if (this.mScreenId.value === 0 && this[nameField].value !== null &&
+                this[nameField].value.toString() === mainBar && allowedUntil > now && lease(now) > now) {
                 const context = this.mContext.value;
                 if (context !== null && context.getPackageName().toString() === 'com.qinggan.app.launcher') {
                     const top = AppUtils.getTopAppInfo(context, 0, 4);
@@ -79,5 +86,5 @@ Java.perform(function () {
     } catch (e) { setupError = String(e).slice(0,160); }
     poll();
     setInterval(function () { Java.perform(poll); }, 500);
-    console.log('VOYAH_DOCK_GUARD_READY version=1.0 installed=' + installed);
+    console.log('VOYAH_DOCK_GUARD_READY version=1.1 profile=' + profile + ' installed=' + installed);
 });

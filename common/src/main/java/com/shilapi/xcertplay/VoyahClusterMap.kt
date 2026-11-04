@@ -16,10 +16,9 @@ internal object VoyahClusterMap {
     private var session: CarPlayBackgroundSession.Snapshot? = null
     private var owner: Any? = null
     private var suppressed: Any? = null
-    private var surface: Surface? = null
-    private var surfaceToken: String? = null
-    private var boundSink: AndroidMediaSink? = null
-    private var boundKey: String? = null
+    private val binding = VoyahClusterSurfaceBinding<AndroidMediaSink, Surface> { sink, key, output ->
+        sink.setMirrorSurface(111, key, output)
+    }
     private val loop = VoyahClusterMapLoop(SystemClock::elapsedRealtime, { keepAlive, complete ->
         VoyahRootModule.clusterAuto(requireNotNull(app), keepAlive) { ok, text ->
             complete(ok, text)
@@ -49,8 +48,11 @@ internal object VoyahClusterMap {
         val glance = CarPlayGlance.snapshot()
         if (!glance.connected || !glance.navigationActive || token !== owner) suppressed = null
         owner = token
+        if (token != null && glance.connected && !glance.navigationActive && AirPlayPersistence.loadClusterMapEnabled(context)) {
+            current.controller.prepareIdleDashboardMap(token)
+        }
         val wanted = token != null && token !== suppressed && glance.connected && glance.navigationActive &&
-            AirPlayPersistence.loadClusterMapEnabled(context) && current?.sink?.isScreenStreamActive(111) == true
+            AirPlayPersistence.loadClusterMapEnabled(context) && current?.controller?.hasPreparedDashboardScreenForSession(token) == true
         session = if (wanted) current else null
         loop.update(if (wanted) token else null)
         bind()
@@ -74,41 +76,39 @@ internal object VoyahClusterMap {
         "\nAUTO_ROUTE_SUPPRESSED=${owner != null && owner === suppressed}" +
         "\nAUTO_LEASE_REMAINING_MS=${loop.lease?.let { (it.deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0) } ?: 0}\n"
 
-    fun setSurface(token: String, next: Surface?): Boolean {
+    fun setSurface(token: String, window: Any, next: Surface?): Boolean {
         if (next != null && (loop.lease?.token != token || !ownsLiveSession())) return false
-        if (next == null && surfaceToken != token) return true
-        surfaceToken = if (next == null) null else token
-        surface = next
+        binding.set(token, window, next)
         bind()
         return true
     }
 
     private fun ownsLiveSession(): Boolean {
+        com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.refresh(null)
         val expected = session ?: return false
         val current = CarPlayBackgroundSession.snapshot() ?: return false
         val glance = CarPlayGlance.snapshot()
         return current.controller === expected.controller && current.sink === expected.sink &&
             current.controller.activeAirPlaySessionToken() === owner && owner != null &&
-            glance.connected && glance.navigationActive && current.sink.isScreenStreamActive(111) &&
+            glance.connected && glance.navigationActive && current.controller.hasPreparedDashboardScreenForSession(owner) &&
             app?.let(AirPlayPersistence::loadClusterMapEnabled) == true
     }
 
-    fun requestMap(token: String, complete: (Boolean) -> Unit) {
+    fun requestMap(token: String, reopen: Boolean = false, complete: (Boolean) -> Unit,
+        refreshViewArea: Boolean = false) {
         if (loop.lease?.token != token || !ownsLiveSession()) { complete(false); return }
-        session!!.controller.showDashboardContentForSession(
+        if (refreshViewArea) session!!.controller.refreshDashboardMapViewAreaForSession(owner, complete)
+        else if (reopen) session!!.controller.recoverDashboardMapForSession(owner, complete)
+        else session!!.controller.showDashboardContentForSession(
             com.shilapi.xcertplay.airplay.CarPlayClusterDisplay.MAP_URL, owner, complete)
     }
 
-    fun showsMap(): Boolean = boundKey != null && boundSink != null && surface?.isValid == true &&
+    fun showsMap(): Boolean = binding.active && binding.output?.isValid == true &&
         loop.lease?.deadline?.let { it > SystemClock.elapsedRealtime() } == true && ownsLiveSession()
 
     private fun bind() {
-        val valid = loop.lease?.takeIf { it.token == surfaceToken && it.deadline > SystemClock.elapsedRealtime() }
-        val sink = if (valid != null && surface?.isValid == true && ownsLiveSession()) session?.sink else null
-        val key = if (sink == null) null else "voyah-cluster-auto:${valid!!.token}"
-        if (boundSink === sink && boundKey == key) return
-        boundKey?.let { boundSink?.setMirrorSurface(111, it, null) }
-        boundSink = sink; boundKey = key
-        if (key != null) sink?.setMirrorSurface(111, key, surface)
+        val valid = loop.lease?.takeIf { it.token == binding.token && it.deadline > SystemClock.elapsedRealtime() }
+        val sink = if (valid != null && binding.output?.isValid == true && ownsLiveSession()) session?.sink else null
+        binding.bind(valid?.token, sink)
     }
 }

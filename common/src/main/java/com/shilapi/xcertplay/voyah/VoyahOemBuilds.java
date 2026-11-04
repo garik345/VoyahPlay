@@ -22,6 +22,8 @@ public final class VoyahOemBuilds {
     public static boolean hasHeatedWheel(String canSha256) {
         return CAN_RU.equals(canSha256);
     }
+    /** Reviewed PI configurations have no radio receiver, including OEM APK stubs. */
+    public static boolean hasRadio(String canSha256) { return CAN_RU.equals(canSha256); }
 
     public static boolean supportsApk(String packageName, String sha256) {
         if ("com.qinggan.canbus.service".equals(packageName)) return supportsCanApk(sha256);

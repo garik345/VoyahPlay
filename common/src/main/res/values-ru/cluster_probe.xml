@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_cluster_probe_title">Карта на приборке (экспериментально)</string>
-    <string name="settings_cluster_probe_description">Карта появляется автоматически при активном маршруте. Нужен root-помощник 1.2.7. Кнопки ручной проверки ниже запускают тест на 60 секунд. Ручной тест приостанавливает автопоказ до завершения маршрута.</string>
+    <string name="settings_cluster_probe_description">Карта появляется автоматически при активном маршруте. Нужен root-помощник 1.2.15. Кнопки ручной проверки ниже запускают тест на 60 секунд. Ручной тест приостанавливает автопоказ до завершения маршрута.</string>
     <string name="settings_cluster_probe_status">Проверить экран приборки</string>
     <string name="settings_cluster_probe_grid">Показать тестовую сетку</string>
     <string name="settings_cluster_probe_map">Показать карту CarPlay</string>

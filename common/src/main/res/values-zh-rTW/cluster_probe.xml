@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_cluster_probe_title">儀表地圖（實驗性）</string>
-    <string name="settings_cluster_probe_description">路線導航時自動顯示地圖。需要 root 助手 1.2.7。下方手動測試按鈕執行60秒。 手動測試會暫停自動顯示，直到路線結束。</string>
+    <string name="settings_cluster_probe_description">路線導航時自動顯示地圖。需要 root 助手 1.2.15。下方手動測試按鈕執行60秒。 手動測試會暫停自動顯示，直到路線結束。</string>
     <string name="settings_cluster_probe_status">檢查儀表螢幕</string>
     <string name="settings_cluster_probe_grid">顯示測試網格</string>
     <string name="settings_cluster_probe_map">顯示 CarPlay 地圖</string>

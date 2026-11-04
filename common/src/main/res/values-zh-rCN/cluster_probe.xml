@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_cluster_probe_title">仪表地图（实验性）</string>
-    <string name="settings_cluster_probe_description">路线导航时自动显示地图。需要 root 助手 1.2.7。下方手动测试按钮运行60秒。 手动测试会暂停自动显示，直到路线结束。</string>
+    <string name="settings_cluster_probe_description">路线导航时自动显示地图。需要 root 助手 1.2.15。下方手动测试按钮运行60秒。 手动测试会暂停自动显示，直到路线结束。</string>
     <string name="settings_cluster_probe_status">检查仪表屏幕</string>
     <string name="settings_cluster_probe_grid">显示测试网格</string>
     <string name="settings_cluster_probe_map">显示 CarPlay 地图</string>

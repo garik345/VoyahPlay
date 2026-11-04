@@ -43,7 +43,7 @@ function Invoke-Installer([string]$Operation) {
 
 try {
     if ($PreparePiFullscreen -and $RestorePiFullscreen) { throw 'Choose either PI installation or restoration.' }
-    Write-Host 'VoyahPlay — root helper 1.2.10' -ForegroundColor Cyan
+    Write-Host 'VoyahPlay — root helper 1.2.16' -ForegroundColor Cyan
     Write-Host $(if ($Mode -eq 'Install') { 'Установка и проверка помощника' } else { 'Проверка установленного помощника' })
     Write-Host ''
     $logs = Join-Path $PSScriptRoot 'logs'
@@ -132,7 +132,7 @@ try {
     if ($script:rebootRequired -or $script:mountReadOnly -eq $false) {
         Write-Host 'Помощник установлен и отвечает. Перезагрузите мультимедиа обычным способом, затем запустите STATUS.cmd.' -ForegroundColor Yellow
     } else {
-        Write-Host $(if ($Mode -eq 'Install') { 'Готово. Root helper 1.2.10 установлен, состояние проверено.' } else { 'Проверка пройдена. Root helper 1.2.10 отвечает.' }) -ForegroundColor Green
+        Write-Host $(if ($Mode -eq 'Install') { 'Готово. Root helper 1.2.16 установлен, состояние проверено.' } else { 'Проверка пройдена. Root helper 1.2.16 отвечает.' }) -ForegroundColor Green
     }
     $exitCode = 0
 } catch [OperationCanceledException] {

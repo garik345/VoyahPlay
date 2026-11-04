@@ -101,4 +101,20 @@ class VoyahClusterMapLoopTest {
         f.complete(false, "helper unavailable")
         assertNull(f.loop.lease)
     }
+
+    @Test fun repeatedBusyRepliesCannotBackOffPastTheLastValidRenewalChance() {
+        val f = Fixture(); val phone = Any()
+        f.loop.update(phone); f.complete()
+        val original = f.loop.lease
+        for (at in listOf(16000L, 18000L, 23000L, 38000L)) {
+            f.now = at; f.loop.update(phone); assertNotNull(f.reply)
+            f.complete(false, "HELPER_BUSY")
+            assertEquals(original, f.loop.lease)
+        }
+        // Lease expires at 46000; a normal 15 s backoff would skip it entirely.
+        f.now = 44999; f.loop.update(phone); assertNull(f.reply)
+        f.now = 45000; f.loop.update(phone); assertNotNull(f.reply)
+        f.complete()
+        assertEquals(f.now + 45000, f.loop.lease!!.deadline)
+    }
 }

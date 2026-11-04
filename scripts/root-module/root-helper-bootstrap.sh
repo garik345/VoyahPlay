@@ -6,6 +6,9 @@ ROOT=/data/local/voyahplay-root-helper
 OWNER=voyahplay-root-helper-v1
 CLASS=com.shilapi.xcertplay.voyah.root.VoyahRootHelper
 MODE=${1:-status}
+QUIESCE_UPLOAD=${2:-}
+QUIESCE_SHA=${3:-}
+QUIESCE_STAGED=
 locked=0
 fail() { echo "ERROR $*"; exit 1; }
 number() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
@@ -33,6 +36,64 @@ verify_helper_target() {
     [ "$helper_uid" = '0 0 0 0' ] && [ "$helper_name" = voyahplay-root-helper ] || fail 'old PID does not identify the owned root helper; no signal sent'
     helper_live
 }
+radio_lock_diagnostics() {
+    # Evidence only. Do not delete an incomplete lock or signal its owner.
+    radio_lock=$ROOT/radio-runtime.lock
+    echo 'RADIO_LOCK_DIAGNOSTICS=1'
+    echo "RADIO_LOCK_BOOT=$boot_id"
+    if [ ! -e "$radio_lock" ] && [ ! -L "$radio_lock" ]; then echo RADIO_LOCK_MISSING=1; return; fi
+    if [ -L "$radio_lock" ]; then echo RADIO_LOCK_SYMLINK=1; return; fi
+    [ -d "$radio_lock" ] || { echo RADIO_LOCK_NOT_DIRECTORY=1; return; }
+    printf 'RADIO_LOCK_METADATA='; stat -c '%u:%a' "$radio_lock" 2>/dev/null || true
+    set -- "$radio_lock"/owner-*
+    if [ "$#" = 1 ] && [ ! -e "$1" ] && [ ! -L "$1" ]; then echo RADIO_LOCK_OWNER_COUNT=0; return; fi
+    echo "RADIO_LOCK_OWNER_COUNT=$#"
+    diagnostic_count=0
+    for radio_owner in "$@"; do
+        [ -e "$radio_owner" ] || continue
+        diagnostic_count=$((diagnostic_count + 1)); [ "$diagnostic_count" -le 4 ] || break
+        [ -f "$radio_owner" ] && [ ! -L "$radio_owner" ] &&
+            [ "$(stat -c '%u:%a' "$radio_owner" 2>/dev/null)" = '0:600' ] || continue
+        radio_owner_size=$(stat -c '%s' "$radio_owner" 2>/dev/null)
+        number "$radio_owner_size" && [ "$radio_owner_size" -le 512 ] || continue
+        printf 'RADIO_LOCK_OWNER='; head -c 512 "$radio_owner"; echo
+        read radio_boot radio_pid radio_start < "$radio_owner" || continue
+        number "$radio_pid" && number "$radio_start" || continue
+        radio_actual=$(identity "$radio_pid" || true)
+        echo "RADIO_LOCK_ACTUAL_START=$radio_actual"
+        if [ "$radio_boot" = "$boot_id" ] && [ "$radio_actual" = "$radio_start" ]; then
+            echo RADIO_LOCK_OWNER_ALIVE=1
+            printf 'RADIO_LOCK_OWNER_UID='; awk '/^Uid:/ { print $2 " " $3 " " $4 " " $5 }' "/proc/$radio_pid/status" 2>/dev/null || true
+            echo 'RADIO_LOCK_OWNER_ARGS_BEGIN'
+            process_args "$radio_pid" | head -n 8
+            echo 'RADIO_LOCK_OWNER_ARGS_END'
+        else echo RADIO_LOCK_OWNER_ALIVE=0; fi
+    done
+}
+quiesce_owned_runtime() {
+    quiesce_attempt=0
+    while :; do
+        quiesce_attempt=$((quiesce_attempt + 1))
+        quiesce_code=0
+        quiesce_output=$(sh "${QUIESCE_STAGED:-$ROOT/runtime.sh}" quiesce 2>&1) || quiesce_code=$?
+        printf '%s\n' "$quiesce_output"
+        [ "$quiesce_code" = 0 ] && return 0
+        # stop_watch may leave its already-running radio child finishing a bounded operation.
+        # Retry only this explicit transient result; all permission/restore/identity errors stop.
+        if [ "$quiesce_code" = 1 ] &&
+                printf '%s\n' "$quiesce_output" | grep -Fxq RADIO_LABELS_BUSY=1 &&
+                printf '%s\n' "$quiesce_output" | grep -Fxq 'ERROR radio-agent-stop'; then
+            if [ "$quiesce_attempt" -lt 8 ]; then
+                echo "HELPER_QUIESCE_WAIT=radio-busy ATTEMPT=$quiesce_attempt"
+                sleep 1
+                continue
+            fi
+            radio_lock_diagnostics
+            echo 'HELPER_QUIESCE_REPAIR=Reboot multimedia normally, then retry INSTALL.cmd; if repeated, send this report.'
+        fi
+        return "$quiesce_code"
+    done
+}
 [ "$(id -u)" = 0 ] || fail 'launch with adb shell su 0 sh'
 [ "$(getprop ro.build.version.sdk)" = 30 ] || fail 'Android 11 required'
 case "$MODE" in install|start|status|stop|enableautostart|disableautostart|removeautostart) ;; *) fail 'unknown bootstrap mode';; esac
@@ -55,7 +116,7 @@ if ! number "$uid" || [ "$uid" -lt 10000 ] || [ "$uid" -ge 20000 ]; then
 fi
 echo "APP_UID=$uid"
 echo "HELPER_SNAPSHOT_UID=${old_uid:-none}"
-echo EXPECTED_HELPER_VERSION=1.2.10
+echo EXPECTED_HELPER_VERSION=1.2.16
 if [ "$MODE" = status ]; then
     [ -f "$ROOT/app.apk" ] && number "$old_uid" || { echo HELPER_NOT_INSTALLED; exit 2; }
     if [ "$uid" != "$old_uid" ]; then
@@ -68,7 +129,7 @@ if [ "$MODE" = status ]; then
     exit $?
 fi
 if [ "$MODE" = start ]; then
-    [ -f "$ROOT/runtime.sh" ] || fail 'install helper 1.2.10 first'
+    [ -f "$ROOT/runtime.sh" ] || fail 'install helper 1.2.16 first'
     sh "$ROOT/runtime.sh" start
     exit $?
 fi
@@ -88,9 +149,23 @@ locked=1
 printf '%s %s %s\n' "$boot_id" "$$" "$(identity $$)" > "$ROOT/setup.lock/identity"
 cleanup() {
     rm -f "$ROOT/app.apk.new"
+    [ -z "$QUIESCE_STAGED" ] || rm -f "$QUIESCE_STAGED"
     if [ "$locked" = 1 ]; then rm -f "$ROOT/setup.lock/identity"; rmdir "$ROOT/setup.lock"; fi
 }
 trap cleanup EXIT
+if [ -n "$QUIESCE_UPLOAD" ]; then
+    case "$MODE" in install|stop) ;; *) fail 'shutdown payload is only accepted for install/stop';; esac
+    case "$QUIESCE_UPLOAD" in /data/local/tmp/voyahplay-helper-*-quiesce.sh) ;; *) fail 'invalid shutdown upload path';; esac
+    case "$QUIESCE_SHA" in ''|*[!a-f0-9]*) fail 'invalid shutdown checksum';; esac
+    [ "${#QUIESCE_SHA}" = 64 ] && [ -f "$QUIESCE_UPLOAD" ] && [ ! -L "$QUIESCE_UPLOAD" ] || fail 'invalid shutdown upload'
+    shutdown_target=$ROOT/quiesce-runtime.install-$$.sh
+    [ ! -e "$shutdown_target" ] && [ ! -L "$shutdown_target" ] || fail 'shutdown staging already exists'
+    (set -C; cat "$QUIESCE_UPLOAD" > "$shutdown_target") || fail 'cannot stage shutdown payload'
+    QUIESCE_STAGED=$shutdown_target
+    chmod 600 "$QUIESCE_STAGED"
+    [ "$(sha256sum "$QUIESCE_STAGED" | awk '{print $1}')" = "$QUIESCE_SHA" ] || fail 'shutdown checksum mismatch'
+    echo HELPER_QUIESCE_SOURCE=installer
+fi
 if [ "$MODE" = install ]; then
     paths=$(pm path --user 0 com.shilapi.xcertplay)
     apk=$(printf '%s\n' "$paths" | sed -n 's/^package://p' | grep '/base.apk$' | head -n 1)
@@ -98,15 +173,15 @@ if [ "$MODE" = install ]; then
     case "$apk" in /data/app/*.apk|/system/app/*.apk|/system/priv-app/*.apk) ;; *) fail 'unexpected installed APK path';; esac
     [ -f "$apk" ] && [ ! -L "$ROOT/app.apk.new" ] || fail 'invalid installed/staging APK path'
     cp "$apk" "$ROOT/app.apk.new"; chmod 600 "$ROOT/app.apk.new"
-    candidate=$(run_apk "$ROOT/app.apk.new" --check "$uid") || fail 'rebuild and install automotive 1.2.10 first'
+    candidate=$(run_apk "$ROOT/app.apk.new" --check "$uid") || fail 'rebuild and install automotive 1.2.16 first'
     printf '%s\n' "$candidate"
-    printf '%s\n' "$candidate" | grep -Fxq 'HELPER_VERSION=1.2.10' || fail 'APK helper version differs; rebuild and install automotive 1.2.10 before updating the helper'
+    printf '%s\n' "$candidate" | grep -Fxq 'HELPER_VERSION=1.2.16' || fail 'APK helper version differs; rebuild and install automotive 1.2.16 before updating the helper'
     run_apk "$ROOT/app.apk.new" --retire-legacy "$uid" || fail 'old payload retirement incomplete; read the reason above'
 fi
 if [ "$MODE" = install ] || [ "$MODE" = stop ]; then
     if [ -f "$ROOT/runtime.sh" ] && grep -q '^VERSION=1\.2\.' "$ROOT/runtime.sh"; then
         [ ! -L "$ROOT/runtime.sh" ] && [ "$(stat -c '%u:%a' "$ROOT/runtime.sh")" = '0:600' ] || fail 'untrusted runtime'
-        sh "$ROOT/runtime.sh" quiesce || fail 'supervisor/top-edge agent did not pause'
+        quiesce_owned_runtime || fail 'supervisor/top-edge agent did not pause; snapshot and UID were not replaced'
     fi
     helper_record_loaded=0
     helper_owned_seen=0

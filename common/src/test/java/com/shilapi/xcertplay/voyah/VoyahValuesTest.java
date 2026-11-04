@@ -4,6 +4,17 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class VoyahValuesTest {
+    @Test public void driverDoorUsesFrontLeftOnlyAndKeepsUnknownStates() {
+        assertNull(new VoyahValues(50, 28, 23, 23, 3, 1000).driverDoorOpen());
+        for (int[] doors : new int[][] { {}, {-1}, {2}, {255} })
+            assertNull(new VoyahValues(50, 28, 23, 23, 3, 1000, doors, null).driverDoorOpen());
+        int[] doors = {0, 1, 1, 1};
+        VoyahValues closed = new VoyahValues(50, 28, 23, 23, 3, 1000, doors, null);
+        doors[0] = 1;
+        assertEquals(Boolean.FALSE, closed.driverDoorOpen());
+        assertEquals(Boolean.TRUE, new VoyahValues(50, 28, 23, 23, 3, 1001, doors, null).driverDoorOpen());
+    }
+
     @Test public void unknownValuesAreNotDisplayedAsMeasurements() {
         VoyahValues values = new VoyahValues(-1, Float.NaN, -9999, Float.POSITIVE_INFINITY, -1, 1000);
         assertNull(values.battery); assertNull(values.fuel);

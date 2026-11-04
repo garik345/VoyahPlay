@@ -2,6 +2,8 @@
 // UI copy and visual language adapted from DiAuto. See docs/THIRD_PARTY_NOTICES.md.
 package com.shilapi.xcertplay
 
+import com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess
+import com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature
 import android.Manifest
 import android.app.AlertDialog
 import android.app.Dialog
@@ -156,11 +158,10 @@ internal object SettingsInformationArchitecture {
             SettingsSection.VOYAH_SIGNS,
             SettingsSection.CAR_BUTTON,
         ),
-        SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS),
+        SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS, SettingsSection.VOYAH_HELPER),
         SettingsCategory.ADVANCED to setOf(
             SettingsSection.CLUSTER_MAP,
             SettingsSection.EXPERIMENTAL_DISPLAY,
-            SettingsSection.VOYAH_HELPER,
             SettingsSection.VOYAH_CLUSTER_PROBE,
             SettingsSection.ULTRA_CLIMATE,
             SettingsSection.AMBIENT_LIGHTING,
@@ -375,7 +376,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.attach(this)
         com.shilapi.xcertplay.voyah.VoyahSettingsProfile.apply(this)
+        VoyahPhoneWheel.attach(applicationContext)
         // Back on the home page finishes this activity while the session runs on, so the icon lands here.
         if (savedInstanceState == null && isLauncherIntent(intent) && CarPlayBackgroundSession.hasSession()) {
             if (CarPlayBackgroundSession.projectionVisible) {
@@ -415,6 +418,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         page = savedInstanceState?.getString("page") ?: intent.getStringExtra("page")
             ?: "home"
         render()
+        val wheelSupported = VoyahPhoneWheel.supported()
+        VoyahPhoneWheel.refresh {
+            if (!isFinishing && !isDestroyed && wheelSupported != VoyahPhoneWheel.supported()) render()
+        }
         scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
         if (consumeBluetoothAutoConnectIntent(intent)) {
@@ -523,6 +530,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     override fun onResume() {
         super.onResume()
+        VoyahPhoneWheel.refreshEnabled()
         WheelKeyService.restoreIfNeeded(this)
         applyFullscreenMode()
         voyahDock.resume()
@@ -1205,7 +1213,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             SettingsCategory.LANGUAGE to R.string.settings_language_summary,
             SettingsCategory.ABOUT to R.string.about_diplay,
             SettingsCategory.DIAGNOSTICS to R.string.settings_diagnostics_summary,
-            SettingsCategory.ADVANCED to R.string.settings_advanced_subtitle,
+            SettingsCategory.ADVANCED to R.string.settings_features_subtitle,
         )
         val categoryGap = dp(SETTINGS_BLOCK_GAP_DP)
         val twoColumns = isExpandedSettingsLayout && resources.configuration.let {
@@ -1676,14 +1684,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun advancedSettings(content: LinearLayout) {
-        settingsPageTitle(content, getString(R.string.settings_advanced), getString(R.string.settings_advanced_subtitle))
-        val caution = card().apply {
-            addView(label(getString(R.string.settings_advanced_caution_title), 18, WARNING, true))
-            addView(label(getString(R.string.settings_advanced_caution_description), 14, MUTED).apply {
-                setPadding(0, dp(6), 0, 0)
-            })
-        }
-        content.addView(caution, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
+        settingsPageTitle(content, getString(R.string.settings_advanced), getString(R.string.settings_features_subtitle))
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.ADVANCED))
     }
 
@@ -1719,17 +1720,20 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             filteredSection(content, SettingsSection.ULTRA_CLIMATE,
                 getString(R.string.voyah_ultra_title), R.drawable.ic_dp_advanced) { card ->
                 toggle(card, getString(R.string.voyah_ultra_toggle),
-                    getString(R.string.voyah_ultra_description),
-                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isEnabled(this)) { enabled ->
+                    getString(if (VoyahFeatureAccess.allows(Feature.ULTRA)) R.string.settings_ultra_features_hint else R.string.settings_helper_required),
+                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isEnabled(this),
+                    enabled = VoyahFeatureAccess.allows(Feature.ULTRA)) { enabled ->
                     com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveEnabled(this, enabled)
                     markReconnectNeeded()
                 }
-                card.addView(label(getString(R.string.voyah_ultra_readonly), 14, MUTED))
-                toggle(card, getString(R.string.settings_ultra_radio),
-                    getString(R.string.settings_ultra_radio_description),
-                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isRadioEnabled(this)) { enabled ->
-                    com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveRadioEnabled(this, enabled)
-                    markReconnectNeeded()
+                if (com.shilapi.xcertplay.voyah.VoyahEquipment.hasRadio(this)) {
+                    com.shilapi.xcertplay.voyah.root.RadioLabelsSettings.add(this, card, SettingsTheme.card(palette))
+                    toggle(card, getString(R.string.settings_ultra_radio),
+                        getString(R.string.settings_radio_feature_hint),
+                        com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.isRadioEnabled(this)) { enabled ->
+                        com.shilapi.xcertplay.voyah.ultra.VoyahUltraSettings.saveRadioEnabled(this, enabled)
+                        markReconnectNeeded()
+                    }
                 }
             }
         }
@@ -1756,20 +1760,19 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         filteredSection(content, SettingsSection.VOYAH_CLUSTER_PROBE,
             getString(R.string.settings_cluster_probe_title), R.drawable.ic_dp_dashboard) { card ->
-            card.addView(label(getString(R.string.settings_cluster_probe_description), 14, MUTED))
             // Voyah hides the upstream BYD cluster card, but the probe needs the same iPhone stream.
-            reconnectingToggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
-                getString(R.string.settings_cluster_probe_stream_description),
-                AirPlayPersistence.loadClusterMapEnabled(this)) {
+            toggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
+                getString(if (VoyahFeatureAccess.allows(Feature.MAP)) R.string.settings_map_feature_hint else R.string.settings_map_required),
+                AirPlayPersistence.loadClusterMapEnabled(this), enabled = VoyahFeatureAccess.allows(Feature.MAP)) {
                 AirPlayPersistence.saveClusterMapEnabled(this, it)
                 markReconnectNeeded()
             }
-            card.addView(label(getString(R.string.settings_cluster_map_element_size_description), 14, MUTED))
             val elementSizes = VoyahClusterMapLayout.elementSizes
             val sizeValues = elementSizes.map { getString(R.string.settings_cluster_map_size_value, it) }
             val sizeTitle = getString(R.string.settings_cluster_map_element_size)
             var selectedSize = elementSizes.indexOf(AirPlayPersistence.loadVoyahClusterElementSize(this))
             val sizeButton = button("$sizeTitle · ${sizeValues[selectedSize]}", false) {}.apply { minHeight = dp(CONTROL_HEIGHT_DP) }
+            sizeButton.isEnabled = VoyahFeatureAccess.allows(Feature.MAP)
             sizeButton.setOnClickListener {
                 var pending = selectedSize
                 appDialogBuilder().setTitle(sizeTitle).setSingleChoiceItems(sizeValues.toTypedArray(), selectedSize) { _, index -> pending = index }
@@ -1783,30 +1786,22 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     }.setNegativeButton(R.string.cancel, null).show()
             }
             card.addView(sizeButton, matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
-            card.addView(label(getString(R.string.settings_cluster_map_zoom_description), 14, MUTED))
-            for ((title, zoomIn) in listOf(R.string.settings_cluster_map_zoom_in to true, R.string.settings_cluster_map_zoom_out to false)) {
-                card.addView(button(getString(title), false) { VoyahClusterProbeSettings.zoom(this, zoomIn) }
-                    .apply { minHeight = dp(CONTROL_HEIGHT_DP) },
-                    matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
-            }
-            val actions = listOf(
-                R.string.settings_cluster_probe_status to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.STATUS,
-                R.string.settings_cluster_probe_grid to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.GRID,
-                R.string.settings_cluster_probe_map to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.MAP,
-                R.string.settings_cluster_probe_stop to com.shilapi.xcertplay.voyah.root.VoyahRootModule.ClusterProbeAction.STOP,
-            )
-            for ((text, action) in actions) card.addView(button(getString(text), false) {
-                VoyahClusterProbeSettings.run(this, action)
-            }.apply { minHeight = dp(CONTROL_HEIGHT_DP) },
-                matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
-            card.addView(button(getString(R.string.settings_cluster_probe_copy), false) {
-                VoyahClusterProbeSettings.copyReport(this)
-            }.apply { minHeight = dp(CONTROL_HEIGHT_DP) },
-                matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP).apply { height = ViewGroup.LayoutParams.WRAP_CONTENT })
         }
         filteredSection(content, SettingsSection.CARPLAY_CONTROLS,
             getString(R.string.carplay_controls), R.drawable.ic_dp_controls) { card ->
             toggle(card, getString(R.string.right_hand_drive), getString(R.string.place_carplay_s_controls_closer_to_the_driver), AirPlayPersistence.loadRightHandDrive(this)) { AirPlayPersistence.saveRightHandDrive(this, it); markReconnectNeeded() }
+            if (VoyahPhoneWheel.supported()) {
+                toggle(card, getString(R.string.settings_voyah_phone_wheel),
+                    getString(R.string.settings_voyah_phone_wheel_description), VoyahPhoneWheelSettings.enabled(this)) {
+                    VoyahPhoneWheelSettings.setEnabled(this, it)
+                    render()
+                }
+                if (VoyahPhoneWheelSettings.enabled(this) && Build.VERSION.SDK_INT >= 29 && !Settings.canDrawOverlays(this)) {
+                    card.addView(label(getString(R.string.settings_voyah_phone_wheel_permission_description), 14, MUTED))
+                    card.addView(button(getString(R.string.settings_voyah_phone_wheel_permission), false,
+                        ::openOverlayPermission), matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP))
+                }
+            }
         }
         filteredSection(content, SettingsSection.CONNECTION_SETUP,
             getString(R.string.connection_setup), R.drawable.ic_dp_connection) { card ->
@@ -1978,7 +1973,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 onHideTopBarChanged = { AirPlayPersistence.saveHideTopBar(this, it); applyFullscreenMode() },
                 onHideBottomBarChanged = { AirPlayPersistence.saveHideBottomBar(this, it); applyFullscreenMode() },
             ) { label, checked, onChanged ->
-                toggle(card, getString(label), getString(R.string.hide_the_car_s_system_bars_while_carplay_is_open), checked, save = onChanged)
+                toggle(card, getString(label),
+                    getString(if (VoyahFeatureAccess.allows(Feature.FULLSCREEN)) R.string.hide_the_car_s_system_bars_while_carplay_is_open else R.string.settings_fullscreen_required),
+                    checked, enabled = VoyahFeatureAccess.allows(Feature.FULLSCREEN), save = onChanged)
             }
             toggle(card, getString(R.string.adapt_pip_resolution), getString(R.string.adapt_pip_resolution_description), AirPlayPersistence.loadAdaptPipResolution(this)) {
                 AirPlayPersistence.saveAdaptPipResolution(this, it)
@@ -1995,7 +1992,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         filteredSection(content, SettingsSection.EXPERIMENTAL_DISPLAY,
             getString(R.string.settings_experimental_display), R.drawable.ic_dp_display) { card ->
-            toggle(card, getString(R.string.split_screen_areas), getString(R.string.split_screen_areas_description),
+            toggle(card, getString(R.string.split_screen_areas), getString(R.string.settings_split_feature_hint),
                 SplitScreenSettings.enabled(this)) {
                 SplitScreenSettings.setEnabled(this, it)
                 markReconnectNeeded()
@@ -5544,7 +5541,22 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
 
+    private var featureReadiness = -1
+    private fun refreshFeatureAccess() {
+        VoyahFeatureAccess.refresh {
+            if (isFinishing || isDestroyed) return@refresh
+            val current = (if (VoyahFeatureAccess.allows(Feature.ULTRA)) 1 else 0) or
+                (if (VoyahFeatureAccess.allows(Feature.FULLSCREEN)) 2 else 0) or
+                (if (VoyahFeatureAccess.allows(Feature.MAP)) 4 else 0)
+            if (current != featureReadiness) {
+                featureReadiness = current
+                applyFullscreenMode()
+                if (page == "settings") render()
+            }
+        }
+    }
     private fun refreshStatus() {
+        refreshFeatureAccess()
         val running = CarPlayBackgroundSession.hasSession()
         // A USB session shares this card's status and Disconnect, but not its wireless title or Wi-Fi hint (#742).
         val wired = HomeCardTransport.wired(running, AirPlayPersistence.loadWirelessEnabled(this))

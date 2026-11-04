@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Switch
+import android.widget.TextView
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.voyah.VoyahClusterProbeSpec
 import com.shilapi.xcertplay.voyah.root.VoyahRootModule
@@ -33,14 +34,17 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [30], manifest = Config.NONE)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class VoyahClusterProbeUiTest {
+    @org.junit.Before fun readyFeatures() = com.shilapi.xcertplay.voyah.root.VoyahFeatureAccessTest.allowAll()
     @Test fun oldVideoFramesAreNotPresentedAsFramesFromANewOrClosedProbe() {
         val host = Robolectric.buildActivity(DiPlayActivity::class.java).get()
         host.getSharedPreferences(VoyahClusterProbeActivity.PREFS, 0).edit()
-            .putString("token", "old").putLong("frames", 75).commit()
+            .putString("token", "old").putLong("frames", 75).putBoolean("mapHasPicture", true).commit()
         val report = VoyahClusterProbeSettings.localReport(host, "CLUSTER_PROBE_TOKEN=new\n")
         assertTrue(report.contains("PROBE_ACTIVITY_MATCHES_LEASE=false\nPROBE_MAP_FRAMES=0\n"))
         assertTrue(report.contains("PROBE_LAST_FRAMES=75"))
+        assertTrue(report.contains("PROBE_MAP_HAS_PICTURE=false"))
         assertTrue(VoyahClusterProbeSettings.localReport(host, "CLUSTER_PROBE_TOKEN=old\n").contains("PROBE_MAP_FRAMES=75"))
+        assertTrue(VoyahClusterProbeSettings.localReport(host, "CLUSTER_PROBE_TOKEN=old\n").contains("PROBE_MAP_HAS_PICTURE=true"))
         assertTrue(VoyahClusterProbeSettings.localReport(host).contains("PROBE_MAP_FRAMES=0"))
         host.finish()
     }
@@ -48,11 +52,14 @@ class VoyahClusterProbeUiTest {
         val host = Robolectric.buildActivity(DiPlayActivity::class.java).get()
         host.setTheme(R.style.Theme_Xcertplay)
         AirPlayPersistence.saveClusterMapEnabled(host, false)
-        VoyahClusterProbeSettings.run(host, VoyahRootModule.ClusterProbeAction.MAP)
-        assertFalse(AirPlayPersistence.loadClusterMapEnabled(host))
-        val dialog = ShadowAlertDialog.getLatestAlertDialog()
-        assertNotNull(dialog)
-        dialog.dismiss(); host.finish()
+        for (action in listOf(VoyahRootModule.ClusterProbeAction.MAP, VoyahRootModule.ClusterProbeAction.NAVI_MAP,
+                VoyahRootModule.ClusterProbeAction.AR_MAP)) {
+            VoyahClusterProbeSettings.run(host, action)
+            assertFalse(AirPlayPersistence.loadClusterMapEnabled(host))
+            val dialog = ShadowAlertDialog.getLatestAlertDialog()
+            assertNotNull(dialog); dialog.dismiss()
+        }
+        host.finish()
     }
 
     @Test fun voyahProbeOffersTheStreamSettingEvenThoughTheBydCardIsHidden() {
@@ -147,11 +154,20 @@ class VoyahClusterProbeUiTest {
                 ReflectionHelpers.ClassParameter.from(LinearLayout::class.java, content),
                 ReflectionHelpers.ClassParameter.from(Set::class.java, setOf(SettingsSection.VOYAH_CLUSTER_PROBE)))
             val buttons = descendants(content).filterIsInstance<Button>().filterNot { it is Switch }
-            assertEquals(8, buttons.size)
+            assertEquals(1, buttons.size)
+            assertFalse(buttons.any { it.text == host.getString(R.string.settings_cluster_probe_grid) ||
+                it.text == host.getString(R.string.settings_cluster_probe_map) ||
+                it.text == host.getString(R.string.settings_cluster_probe_navi_grid) ||
+                it.text == host.getString(R.string.settings_cluster_probe_ar_grid) })
             assertEquals(1, descendants(content).filterIsInstance<Switch>().size)
             assertTrue(buttons.all { it.isEnabled })
             val width = (widthDp.toInt() * host.resources.displayMetrics.density).toInt()
             screenshot(content, width, "settings-$name")
+            val advanced = LinearLayout(host).apply { orientation = LinearLayout.VERTICAL; layoutDirection = config.layoutDirection }
+            ReflectionHelpers.callInstanceMethod<Unit>(host, "advancedSettings",
+                ReflectionHelpers.ClassParameter.from(LinearLayout::class.java, advanced))
+            assertFalse(descendants(advanced).filterIsInstance<TextView>().any { it.text == host.getString(R.string.voyah_helper_title) })
+            screenshot(advanced, width, "advanced-$name")
             for (button in buttons) {
                 assertTrue(button.height >= button.minHeight)
                 val text = button.layout
@@ -174,6 +190,37 @@ class VoyahClusterProbeUiTest {
             assertEquals(Color.RED, bitmap.getPixel(50, 50)); assertEquals(Color.GREEN, bitmap.getPixel(500, 50))
             assertEquals(Color.BLUE, bitmap.getPixel(50, 400)); assertEquals(Color.YELLOW, bitmap.getPixel(500, 400))
             save(bitmap, "grid")
+        } finally { bitmap.recycle(); host.finish() }
+    }
+
+    @Test fun naviGridUsesTheWholeNavigationCanvasAndFitsTheExistingMapWithoutCropping() {
+        val host = Robolectric.buildActivity(DiPlayActivity::class.java).get()
+        val grid = VoyahClusterProbeGrid(host, SystemClock.elapsedRealtime() + 60000, true)
+        grid.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+        grid.layout(0, 0, 1920, 720)
+        val bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888)
+        try { grid.draw(Canvas(bitmap)); save(bitmap, "navi-grid") } finally { bitmap.recycle() }
+        val map = VoyahClusterMapView(host, true)
+        val oldAspect = MapMirrors.streamAspect
+        MapMirrors.streamAspect = 574.0 / 464.0
+        map.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+        map.layout(0, 0, 1920, 720); map.updateTransform()
+        val values = FloatArray(9); map.texture.getTransform(android.graphics.Matrix()).getValues(values)
+        assertTrue(values[0] <= 1f); assertTrue(values[4] <= 1f)
+        assertEquals("map fitting must keep an entire dimension visible", 1f, maxOf(values[0], values[4]), 0.001f)
+        assertTrue("a narrow existing map must be letterboxed, not cropped", values[0] < 1f)
+        MapMirrors.streamAspect = oldAspect
+        host.finish()
+    }
+    @Test fun arGridUsesTheSameCanvasWithItsOwnModeLabel() {
+        val host = Robolectric.buildActivity(DiPlayActivity::class.java).get()
+        val grid = VoyahClusterProbeGrid(host, SystemClock.elapsedRealtime() + 60000, true, 3)
+        grid.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+        grid.layout(0, 0, 1920, 720)
+        val bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888)
+        try {
+            grid.draw(Canvas(bitmap)); save(bitmap, "ar-grid")
+            assertEquals(Color.RED, bitmap.getPixel(50, 50)); assertEquals(Color.YELLOW, bitmap.getPixel(1850, 650))
         } finally { bitmap.recycle(); host.finish() }
     }
 

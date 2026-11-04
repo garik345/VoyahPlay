@@ -33,6 +33,7 @@ foreach ($name in @('start-root-helper.ps1','root-helper.ps1','root-helper-boots
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-root-helper.cmd') -Destination (Join-Path $bundle 'INSTALL.cmd')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'status-root-helper.cmd') -Destination (Join-Path $bundle 'STATUS.cmd')
+[IO.File]::WriteAllText((Join-Path $bundle 'helper-quiesce.sh'),$runtime.Replace("`r`n","`n"),[Text.UTF8Encoding]::new($false))
 $readme = @"
 VOYAHPLAY — ROOT HELPER $version
 

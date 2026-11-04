@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_voyah_phone_wheel">CarPlayの通話ボタン（実験的機能）</string>
+    <string name="settings_voyah_phone_wheel_description">接続中に短く押すとCarPlayの「履歴」が開きます。通話中やCarPlay未接続時は、通常どおり動作します。</string>
+    <string name="settings_voyah_phone_wheel_permission">許可する</string>
+    <string name="settings_voyah_phone_wheel_permission_description">車両メニューから戻るには、VoyahPlayに他のアプリの上への表示を許可してください。許可するまでは、VoyahPlayがバックグラウンドにあるとき通話ボタンは通常どおり動作します。</string>
+</resources>

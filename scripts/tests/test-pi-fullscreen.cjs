@@ -55,8 +55,9 @@ sha256sum() {
     // Keep /proc read-only and isolate every writable absolute path in the production script.
     let script = prefix + source.replaceAll('/data/local', shellDir+'/data/local').replaceAll('/proc/sys/kernel/random/boot_id',shellDir+'/boot-id');
     if (oldHashAlias) script = script.replaceAll('voyah_file_sha256','hash');
-    function run(mode, changes={}) {
-        const result = executeShell(['-s','--',mode,shellPath(tmp)+'/voyah-bounds-test.bin'],
+    function run(mode, changes={}, profile=null) {
+        const args=['-s','--',mode,shellPath(tmp)+'/voyah-bounds-test.bin'];if(profile!==null)args.push(profile);
+        const result = executeShell(args,
             {input:script, encoding:'utf8', env:{...env,...changes}, timeout:10000});
         assert(!result.error, result.error?.message);
         return result;
@@ -67,6 +68,31 @@ test('PI check validates original bridge without changing it or creating a backu
     const f=fixture(), r=f.run('check'); assert.equal(r.status,0,r.stdout+r.stderr);
     assert(r.stdout.includes('INJECTOR_ACTUAL_SHA256=0d99be0e44d4ca3449056fa0a0b868fca1cf66c8ad704508949945afc07706aa'));
     assert.deepEqual(f.current(), original); assert(!fs.existsSync(f.home));
+});
+
+test('RU requires an explicit RU profile; old PI calls still reject RU before any backup',()=>{
+    const ru={SERVICES:'0faed7ebf1094c62a4f92b4bc533bbb3c08480a2cd847567cb1cff91b2d1d045',UI:'28f5d93eaec22b755b339193a733bd0d4160c496cf301bcd2fcfb88c36ade162'};
+    const old=fixture(), refused=old.run('install',ru);
+    assert.notEqual(refused.status,0);assert.deepEqual(old.current(),original);assert(!fs.existsSync(old.home));
+    const fresh=fixture(), checked=fresh.run('check',ru,'RU');
+    assert.equal(checked.status,0,checked.stdout+checked.stderr);assert(checked.stdout.includes('RU_FIRMWARE_VERIFIED=1'));
+    assert(!fs.existsSync(fresh.home));
+    const installed=fresh.run('install',ru,'RU');assert.equal(installed.status,0,installed.stdout+installed.stderr);
+    assert(installed.stdout.includes('RU_BRIDGE_INSTALLED=1'));assert.deepEqual(fresh.current(),patch);assert.deepEqual(fresh.backup(),original);
+    const again=fresh.run('install',ru,'RU');assert.equal(again.status,0);assert(again.stdout.includes('ALREADY_INSTALLED=1'));
+    const restored=fresh.run('restore',ru,'RU');assert.equal(restored.status,0,restored.stdout+restored.stderr);
+    assert.deepEqual(fresh.current(),original);
+});
+
+test('RU launcher cannot install PI, mixed firmware or unknown profiles',()=>{
+    const ruServices='0faed7ebf1094c62a4f92b4bc533bbb3c08480a2cd847567cb1cff91b2d1d045';
+    const ruUi='28f5d93eaec22b755b339193a733bd0d4160c496cf301bcd2fcfb88c36ade162';
+    for(const changes of [{},{SERVICES:ruServices},{UI:ruUi},{SERVICES:'unknown',UI:ruUi},{SERVICES:ruServices,UI:ruUi,INJECTOR:'other'}]) {
+        const f=fixture(), r=f.run('install',changes,'RU');assert.notEqual(r.status,0);
+        assert.deepEqual(f.current(),original);assert(!fs.existsSync(f.home));
+    }
+    const f=fixture();assert.notEqual(f.run('install',{SERVICES:ruServices,UI:ruUi},'unknown').status,0);
+    assert.deepEqual(f.current(),original);assert(!fs.existsSync(f.home));
 });
 test('OTA7.2 pair installs the same reviewed extension and mixed PI pairs are rejected', () => {
     const services='262bfd515f5c181a556477cadbdee1e574ead0ef1acff158dc3fa25bd8b84c38';

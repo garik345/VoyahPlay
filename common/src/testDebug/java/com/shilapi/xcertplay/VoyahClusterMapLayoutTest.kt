@@ -34,11 +34,14 @@ class VoyahClusterMapLayoutTest {
     @Test fun advertisedNavigationAreaUsesTheWholeFrameAndSymmetricMarginsAtEveryScale() {
         for (size in VoyahClusterMapLayout.elementSizes) {
             val stream = VoyahClusterMapLayout.stream(size)
+            assertTrue(stream.deferInitialUi)
             val info = AirPlayInfoPlist.build(AirPlayConfig("test", "test", "", "1",
                 AirPlayDisplayConfig(1920, 720), cluster = stream))
             val display = (info["displays"] as List<*>).filterIsInstance<Map<*, *>>()
                 .single { (it["type"] as Number).toInt() == 111 }
             val area = (display["viewAreas"] as List<*>).single() as Map<*, *>
+            assertFalse(display.containsKey("initialURL"))
+            assertEquals(CarPlayClusterDisplay.MAP_URL, stream.initialUrl)
             assertEquals(stream.widthPixels, area["widthPixels"])
             assertEquals(stream.heightPixels, area["heightPixels"])
             assertEquals(0, area["originXPixels"])

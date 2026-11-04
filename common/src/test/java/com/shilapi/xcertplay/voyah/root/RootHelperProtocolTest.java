@@ -60,7 +60,10 @@ public class RootHelperProtocolTest {
                     || action == RootHelperProtocol.Action.RADIO_POLICY || action == RootHelperProtocol.Action.CLUSTER_STATUS
                     || action == RootHelperProtocol.Action.CLUSTER_GRID || action == RootHelperProtocol.Action.CLUSTER_MAP
                     || action == RootHelperProtocol.Action.CLUSTER_STOP || action == RootHelperProtocol.Action.CLUSTER_AUTO_TICK
-                    || action == RootHelperProtocol.Action.CLUSTER_AUTO_STOP;
+                    || action == RootHelperProtocol.Action.CLUSTER_AUTO_STOP
+                    || action == RootHelperProtocol.Action.CLUSTER_NAVI_GRID || action == RootHelperProtocol.Action.CLUSTER_NAVI_MAP
+                    || action == RootHelperProtocol.Action.CLUSTER_NAVI_READY
+                    || action == RootHelperProtocol.Action.CLUSTER_AR_GRID || action == RootHelperProtocol.Action.CLUSTER_AR_MAP;
             assertEquals(allowed, RootHelperProtocol.authorized(10042,10042,10042,action));
             assertFalse(RootHelperProtocol.authorized(10043,10042,10042,action));
             assertFalse(RootHelperProtocol.authorized(10042,10042,10043,action));

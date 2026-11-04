@@ -87,15 +87,15 @@ class VoyahUltraHvacTest {
     }
     @Test fun readingsAreRealCacheValuesSharedByBothZonesAndNeverWritten() {
         sample = sample!!.copy(readings = mapOf(UltraClimateReading.CABIN_TEMPERATURE to 19.4,
-            UltraClimateReading.ZONES_SYNCED to false, UltraClimateReading.MAX_AC to null))
+            UltraClimateReading.MAX_AC to null))
         val a = accessory()
         val read = reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 3, listOf(16, 26, 96, 43, 44))))!!).valuesMap()
         // The sensor value is only aligned to the advertised 0.5 °C step.
-        assertEquals(19.5, read[16]); assertEquals(19.5, read[26]); assertEquals(false, read[96])
+        assertEquals(19.5, read[16]); assertEquals(19.5, read[26]); assertNull(read[96])
         assertNull(read[43]); assertNull(read[44])
         assertEquals(19.5, UltraClimateReading.CABIN_TEMPERATURE.normalize(19.6))
-        assertNull(UltraClimateReading.CABIN_TEMPERATURE.normalize(-100)); assertNull(UltraClimateReading.ZONES_SYNCED.normalize(2))
-        val response = write(a, mapOf(16L to 20.0, 26L to 20.0, 96L to true, 43L to true, 44L to true, 15L to false, 52L to false, 53L to true))
+        assertNull(UltraClimateReading.CABIN_TEMPERATURE.normalize(-100))
+        val response = write(a, mapOf(16L to 20.0, 26L to 20.0, 43L to true, 44L to true, 15L to false, 52L to false, 53L to true))
         assertTrue(response.errors().values.all { it == -50L }); assertTrue(writes.isEmpty())
         sample = sample!!.copy(hvacSampledAtMillis = -6000)
         assertNull(reader(a.handle(reader(CarAccessoryMessages.readRequest(0, 4, listOf(16))))!!).valuesMap()[16])

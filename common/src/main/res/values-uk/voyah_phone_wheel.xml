@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_voyah_phone_wheel">Кнопка слухавки в CarPlay (експериментально)</string>
+    <string name="settings_voyah_phone_wheel_description">Коротке натискання відкриває «Недавні» CarPlay, коли iPhone підключено. Під час дзвінка та без підключення CarPlay кнопка працює як зазвичай.</string>
+    <string name="settings_voyah_phone_wheel_permission">Дозволити</string>
+    <string name="settings_voyah_phone_wheel_permission_description">Для повернення з меню автомобіля дозвольте VoyahPlay відображатися поверх інших програм. До цього кнопка слухавки у фоні працює як зазвичай.</string>
+</resources>

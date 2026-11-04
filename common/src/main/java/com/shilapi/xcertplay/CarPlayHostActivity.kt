@@ -602,11 +602,13 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.attach(this)
         com.shilapi.xcertplay.voyah.VoyahSettingsProfile.apply(this)
         com.shilapi.xcertplay.telecom.PhoneAudioRoute.attach(applicationContext)
         NavigationWidgetUpdater.attach(applicationContext)
         VoyahClusterMap.attach(applicationContext)
         CarPlayCallKeys.install(applicationContext)
+        VoyahPhoneWheel.attach(applicationContext)
         CenterMapOverlay.requestShow = ::showCenterMap
         MapMirrors.sink = mirrorSink
         MapMirrors.onChanged = mirrorsChanged
@@ -890,6 +892,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        VoyahPhoneWheel.refreshEnabled()
         CarPlayBackgroundSession.projectionVisible = true
         comfortHostActive = true
         updateComfortBar()
@@ -2252,7 +2255,15 @@ class CarPlayHostActivity : ComponentActivity() {
             },
         ) { label, checked, onChanged ->
             section.addView(
-                settingsSwitchRow(getString(label), checked, getString(label), onChanged),
+                settingsSwitchRow(getString(label), checked,
+                    getString(if (com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)) label else R.string.settings_fullscreen_required),
+                    onChanged).apply {
+                    fun disable(view: View) {
+                        view.isEnabled = com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)
+                        if (view is ViewGroup) for (i in 0 until view.childCount) disable(view.getChildAt(i))
+                    }
+                    disable(this)
+                },
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -3519,6 +3530,22 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun startCarPlay(size: DisplaySize) {
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
+        if (!com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled &&
+            !com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.fresh()) {
+            if (featureCheckPending) return
+            featureCheckPending = true
+            val expectedGeneration = restartGeneration
+            com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.refresh {
+                featureCheckPending = false
+                if (!isFinishing && !isDestroyed && restartGeneration == expectedGeneration) {
+                    hideTopBar = AirPlayPersistence.loadHideTopBar(this)
+                    hideBottomBar = AirPlayPersistence.loadHideBottomBar(this)
+                    applyFullscreenMode()
+                    startCarPlay(size)
+                }
+            }
+            return
+        }
         val controllerGeneration = restartGeneration
         // Settings → Connection can change the target while this screen stays open (#696).
         mfiTarget = AirPlayPersistence.loadMfiTarget(this)
@@ -4398,10 +4425,13 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     }
 
+    private var featureCheckPending = false
     private fun applyFullscreenMode() {
         val multiWindow = isMultiWindowActive()
-        val hideTop = hideTopBar && !multiWindow
-        val hideBottom = hideBottomBar && !multiWindow
+        val barsReady = com.shilapi.xcertplay.VoyahPlatformPolicy.bydIntegrationEnabled ||
+            com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.allows(com.shilapi.xcertplay.voyah.root.VoyahFeatureAccess.Feature.FULLSCREEN)
+        val hideTop = hideTopBar && !multiWindow && barsReady
+        val hideBottom = hideBottomBar && !multiWindow && barsReady
         voyahDock.setStatusBarHidden(hideTop)
         voyahDock.setHidden(hideBottom)
         WindowCompat.setDecorFitsSystemWindows(window, !(hideTop && hideBottom))
@@ -4525,6 +4555,17 @@ internal object CarPlayBackgroundSession {
     @Volatile var active = false
     // Android pauses the host before delivering a launcher intent. Clear only when covered.
     @Volatile var projectionVisible = false
+        set(value) {
+            synchronized(this) {
+                if (field != value) {
+                    field = value
+                    projectionVisibilityVersion++
+                }
+            }
+        }
+    /** Monotonic even when the host hides and returns between two cluster polls. */
+    @Volatile var projectionVisibilityVersion = 0L
+        private set
     private var stopAction: (((() -> Unit)) -> Unit)? = null
     private var stopping = false
     private var owner: Any? = null
@@ -4584,11 +4625,13 @@ internal object CarPlayBackgroundSession {
         this.height = height
         this.display = display
         this.mediaSettingsKey = mediaSettingsKey
+        VoyahPhoneWheel.setController(controller)
     }
 
     @Synchronized
     fun clear(expected: CarPlayController? = null, keepOwner: Boolean = false) {
         if (expected != null && controller !== expected) return
+        VoyahPhoneWheel.setController(null)
         controller = null
         sink = null
         if (!keepOwner) { stopAction = null; owner = null }

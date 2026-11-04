@@ -912,4 +912,9 @@
     <string name="carplay_voyahplay_settings">إعدادات VoyahPlay</string>
     <string name="voyah_waiting_for_car_hotspot">بانتظار نقطة اتصال السيارة. سيُستأنف الاتصال تلقائيًا.</string>
     <string name="voyah_wireless_retry_later">سيعيد VoyahPlay المحاولة تلقائيًا بعد فترة انتظار.</string>
+    <string name="settings_cluster_probe_navi_grid">NAVI: شبكة اختبار لمدة 60 ثانية</string>
+    <string name="settings_cluster_probe_navi_map">NAVI: خريطة CarPlay لمدة 60 ثانية</string>
+    <string name="settings_cluster_probe_navi_description">تختبر أزرار منفصلة NAVI_FULL (الوضع 2) وAR (الوضع 3). يلزم مساعد root بالإصدار 1.2.15. يبدأ الاختبار فوراً ويستعيد وضع لوحة العدادات الأصلي بعد دقيقة أو عند الإيقاف. للخريطة، فعّل بث خريطة CarPlay وأعد توصيل iPhone.</string>
+    <string name="settings_cluster_probe_ar_grid">AR: شبكة اختبار لمدة 60 ثانية</string>
+    <string name="settings_cluster_probe_ar_map">AR: خريطة CarPlay لمدة 60 ثانية</string>
 </resources>

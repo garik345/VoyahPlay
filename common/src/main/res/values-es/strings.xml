@@ -863,4 +863,9 @@
     <string name="carplay_voyahplay_settings">Ajustes de VoyahPlay</string>
     <string name="voyah_waiting_for_car_hotspot">Esperando el punto de acceso del vehículo. La conexión se reanudará automáticamente.</string>
     <string name="voyah_wireless_retry_later">VoyahPlay volverá a intentarlo automáticamente después de una pausa.</string>
+    <string name="settings_cluster_probe_navi_grid">NAVI: cuadrícula de prueba durante 60 segundos</string>
+    <string name="settings_cluster_probe_navi_map">NAVI: mapa CarPlay durante 60 segundos</string>
+    <string name="settings_cluster_probe_navi_description">Los botones separados prueban NAVI_FULL (modo 2) y AR (modo 3). Requiere root helper 1.2.15. La prueba comienza al pulsar y restaura el modo original del cuadro tras un minuto o al detenerla. Para el mapa, activa su flujo CarPlay y vuelve a conectar el iPhone.</string>
+    <string name="settings_cluster_probe_ar_grid">AR: cuadrícula de prueba durante 60 segundos</string>
+    <string name="settings_cluster_probe_ar_map">AR: mapa CarPlay durante 60 segundos</string>
 </resources>
